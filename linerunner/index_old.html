@@ -240,24 +240,6 @@
   .scene-actions button.del{border-color:var(--danger);color:var(--danger);}
   .scene-actions button.del:hover{background:rgba(255,95,109,0.1);}
   .storage-warning{color:var(--danger);font-size:0.72rem;margin-bottom:10px;line-height:1.4;}
-  .screenplay-group{margin-bottom:16px;}
-  .screenplay-header{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:8px;
-    margin-bottom:8px;
-  }
-  .screenplay-header .title{
-    color:var(--neon);
-    font-size:0.85rem;
-    letter-spacing:1px;
-    text-transform:uppercase;
-    overflow:hidden;
-    text-overflow:ellipsis;
-    white-space:nowrap;
-  }
-  .screenplay-header button{padding:4px 8px;font-size:0.75rem;flex-shrink:0;}
   footer{color:var(--muted);font-size:0.7rem;margin-top:30px;text-align:center;}
 </style>
 </head>
@@ -297,16 +279,11 @@
   </select>
   <div class="hint" id="voiceHint">Checking available voices…</div>
 
-  <label>Screenplay</label>
-  <input type="text" id="screenplayName" list="screenplayOptions" placeholder="e.g. Romeo and Juliet">
-  <datalist id="screenplayOptions"></datalist>
-
   <label>Save this scene as</label>
   <div style="display:flex;gap:8px;">
     <input type="text" id="sceneName" placeholder="e.g. Act 2 Scene 1 — Balcony">
     <button onclick="saveScene()" style="white-space:nowrap;">Save</button>
   </div>
-  <div class="hint">Group scenes under a screenplay so you can keep separate roles — e.g. two characters from the same play — organized and easy to tell apart.</div>
 
   <button class="primary" onclick="startPractice()">START PRACTICE</button>
 </div>
@@ -395,11 +372,9 @@ let voices = [];
 let ttsLang = "ro-RO";
 
 // ---- Scene storage (localStorage with in-memory fallback) ----
-// Structure: { [screenplayName]: { [sceneName]: {script, myChar, shuffle, speak, hint, ttsLang} } }
-const STORAGE_KEY = "lineRunnerScreenplays";
-const OLD_STORAGE_KEY = "lineRunnerScenes"; // pre-screenplay-grouping format
+const STORAGE_KEY = "lineRunnerScenes";
 let storageWorks = true;
-let memoryScreenplays = {};
+let memoryScenes = {};
 
 function testStorage(){
   try{
@@ -412,39 +387,7 @@ function testStorage(){
 }
 storageWorks = testStorage();
 
-function looksLikeSceneObject(v){
-  return v && typeof v === "object" && typeof v.script === "string";
-}
-
-// True if every top-level value in obj is itself a scene (old flat format),
-// rather than a screenplay containing scenes (new nested format).
-function isFlatSceneFormat(obj){
-  const vals = Object.values(obj);
-  if(vals.length===0) return false;
-  return vals.every(looksLikeSceneObject);
-}
-
-function migrateOldScenesIfNeeded(){
-  if(!storageWorks) return;
-  try{
-    const hasNew = localStorage.getItem(STORAGE_KEY);
-    const oldRaw = localStorage.getItem(OLD_STORAGE_KEY);
-    if(!oldRaw) return;
-    const oldScenes = JSON.parse(oldRaw);
-    if(Object.keys(oldScenes).length===0){
-      localStorage.removeItem(OLD_STORAGE_KEY);
-      return;
-    }
-    const current = hasNew ? JSON.parse(hasNew) : {};
-    if(!current["My Scenes"]) current["My Scenes"] = {};
-    Object.assign(current["My Scenes"], oldScenes);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
-    localStorage.removeItem(OLD_STORAGE_KEY);
-  }catch(e){ /* leave old data untouched if anything goes wrong */ }
-}
-migrateOldScenesIfNeeded();
-
-function loadScreenplays(){
+function loadScenes(){
   if(storageWorks){
     try{
       return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
@@ -452,17 +395,17 @@ function loadScreenplays(){
       return {};
     }
   }
-  return memoryScreenplays;
+  return memoryScenes;
 }
 
-function saveScreenplays(data){
+function saveScenes(scenes){
   if(storageWorks){
     try{
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(scenes));
       return;
     }catch(e){ /* fall through to memory */ }
   }
-  memoryScreenplays = data;
+  memoryScenes = scenes;
 }
 
 function saveScene(){
@@ -471,19 +414,13 @@ function saveScene(){
     alert("Paste in a script before saving.");
     return;
   }
-  const play = document.getElementById("screenplayName").value.trim();
-  if(!play){
-    alert("Give this screenplay a name first (so scenes can be grouped under it).");
-    return;
-  }
   const name = document.getElementById("sceneName").value.trim();
   if(!name){
     alert("Give this scene a name first.");
     return;
   }
-  const data = loadScreenplays();
-  if(!data[play]) data[play] = {};
-  data[play][name] = {
+  const scenes = loadScenes();
+  scenes[name] = {
     script: raw,
     myChar: document.getElementById("myChar").value.trim(),
     shuffle: document.getElementById("shuffleMode").checked,
@@ -491,14 +428,14 @@ function saveScene(){
     hint: document.getElementById("hintMode").checked,
     ttsLang: document.getElementById("ttsLang").value
   };
-  saveScreenplays(data);
+  saveScenes(scenes);
   document.getElementById("sceneName").value = "";
   renderSceneList();
 }
 
-function loadScene(play, name){
-  const data = loadScreenplays();
-  const s = data[play] && data[play][name];
+function loadScene(name){
+  const scenes = loadScenes();
+  const s = scenes[name];
   if(!s) return;
   document.getElementById("scriptInput").value = s.script;
   document.getElementById("myChar").value = s.myChar || "";
@@ -506,45 +443,25 @@ function loadScene(play, name){
   document.getElementById("speakOthers").checked = !!s.speak;
   document.getElementById("hintMode").checked = !!s.hint;
   document.getElementById("ttsLang").value = s.ttsLang || "ro-RO";
-  document.getElementById("screenplayName").value = play;
   document.getElementById("sceneName").value = name;
   updateVoiceHint();
   window.scrollTo({top:0, behavior:"smooth"});
 }
 
-function deleteScene(play, name){
-  if(!confirm(`Delete saved scene "${name}" from "${play}"?`)) return;
-  const data = loadScreenplays();
-  if(data[play]){
-    delete data[play][name];
-    if(Object.keys(data[play]).length===0) delete data[play];
-  }
-  saveScreenplays(data);
-  renderSceneList();
-}
-
-function deleteScreenplay(play){
-  const data = loadScreenplays();
-  const count = data[play] ? Object.keys(data[play]).length : 0;
-  if(!confirm(`Delete "${play}" and all ${count} scene(s) under it?`)) return;
-  delete data[play];
-  saveScreenplays(data);
+function deleteScene(name){
+  if(!confirm(`Delete saved scene "${name}"?`)) return;
+  const scenes = loadScenes();
+  delete scenes[name];
+  saveScenes(scenes);
   renderSceneList();
 }
 
 function renderSceneList(){
-  const data = loadScreenplays();
-  const plays = Object.keys(data);
+  const scenes = loadScenes();
+  const names = Object.keys(scenes);
   const list = document.getElementById("sceneList");
   const empty = document.getElementById("noScenes");
-
-  // keep the "save as" screenplay datalist up to date
-  const datalist = document.getElementById("screenplayOptions");
-  if(datalist){
-    datalist.innerHTML = plays.sort().map(p=>`<option value="${escapeAttr(p)}">`).join("");
-  }
-
-  if(plays.length===0){
+  if(names.length===0){
     list.innerHTML = "";
     empty.style.display = "block";
     return;
@@ -552,42 +469,32 @@ function renderSceneList(){
   empty.style.display = "none";
   let html = "";
   if(!storageWorks){
-    html += `<div class="storage-warning">This browser tab can't persist storage (private/incognito mode, or restricted preview). Scenes will only stay saved until you close this tab — export them to keep a copy. For lasting saves, open this file directly in a normal browser tab.</div>`;
+    html += `<div class="storage-warning">⚠ This browser tab can't persist storage (private/incognito mode, or restricted preview). Scenes will only stay saved until you close this tab — export them to keep a copy. For lasting saves, open this file directly in a normal browser tab.</div>`;
   }
-  plays.sort().forEach(play=>{
-    const scenes = data[play];
-    const names = Object.keys(scenes).sort();
-    html += `<div class="screenplay-group">
-      <div class="screenplay-header">
-        <span class="title">${escapeHtml(play)}</span>
-        <button class="del" onclick="deleteScreenplay('${escapeAttr(play)}')">&times;</button>
-      </div>`;
-    names.forEach(name=>{
-      const lineCount = scenes[name].script.split("\n").map(r=>r.trim()).filter(r=>r).length;
-      const charLabel = scenes[name].myChar ? ` · as ${scenes[name].myChar}` : "";
-      html += `<div class="scene-row">
-        <div class="scene-info">
-          <div class="name">${escapeHtml(name)}</div>
-          <div class="meta">${lineCount} lines${charLabel}</div>
-        </div>
-        <div class="scene-actions">
-          <button onclick="loadScene('${escapeAttr(play)}','${escapeAttr(name)}')">Load</button>
-          <button class="del" onclick="deleteScene('${escapeAttr(play)}','${escapeAttr(name)}')">&times;</button>
-        </div>
-      </div>`;
-    });
-    html += `</div>`;
+  names.sort().forEach(name=>{
+    const lineCount = scenes[name].script.split("\n").map(r=>r.trim()).filter(r=>r).length;
+    const charLabel = scenes[name].myChar ? ` · as ${scenes[name].myChar}` : "";
+    html += `<div class="scene-row">
+      <div class="scene-info">
+        <div class="name">${escapeHtml(name)}</div>
+        <div class="meta">${lineCount} lines${charLabel}</div>
+      </div>
+      <div class="scene-actions">
+        <button onclick="loadScene('${escapeAttr(name)}')">Load</button>
+        <button class="del" onclick="deleteScene('${escapeAttr(name)}')">&times;</button>
+      </div>
+    </div>`;
   });
   list.innerHTML = html;
 }
 
 function exportScenes(){
-  const data = loadScreenplays();
-  if(Object.keys(data).length===0){
+  const scenes = loadScenes();
+  if(Object.keys(scenes).length===0){
     alert("No saved scenes to export yet.");
     return;
   }
-  const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
+  const blob = new Blob([JSON.stringify(scenes, null, 2)], {type:"application/json"});
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   const stamp = new Date().toISOString().slice(0,10);
@@ -612,45 +519,22 @@ function importScenesFile(event){
       event.target.value = "";
       return;
     }
-    if(typeof imported !== "object" || imported===null || Object.keys(imported).length===0){
+    const existing = loadScenes();
+    const incomingNames = Object.keys(imported);
+    if(incomingNames.length===0){
       alert("No scenes found in that file.");
       event.target.value = "";
       return;
     }
-
-    // Support both old flat exports ({sceneName: {...}}) and the current
-    // grouped format ({screenplayName: {sceneName: {...}}}).
-    let incoming;
-    if(isFlatSceneFormat(imported)){
-      let playName = prompt("This file has scenes without a screenplay grouping. What screenplay should they be filed under?", "Imported Scenes");
-      if(playName===null){ event.target.value = ""; return; }
-      playName = playName.trim() || "Imported Scenes";
-      incoming = { [playName]: imported };
-    } else {
-      incoming = imported;
-    }
-
-    const existing = loadScreenplays();
-    const collisions = [];
-    Object.keys(incoming).forEach(play=>{
-      Object.keys(incoming[play]).forEach(name=>{
-        if(existing[play] && existing[play][name]) collisions.push(`${play} / ${name}`);
-      });
-    });
-    if(collisions.length>0){
-      const ok = confirm(`${collisions.length} scene(s) share a name with ones you already have and will be overwritten:\n${collisions.slice(0,8).join("\n")}${collisions.length>8 ? "\n…" : ""}\n\nContinue?`);
+    const overwrites = incomingNames.filter(n=>existing[n]);
+    if(overwrites.length>0){
+      const ok = confirm(`${overwrites.length} scene(s) share a name with ones you already have and will be overwritten. Continue?`);
       if(!ok){ event.target.value = ""; return; }
     }
-
-    let sceneCount = 0;
-    Object.keys(incoming).forEach(play=>{
-      if(!existing[play]) existing[play] = {};
-      Object.assign(existing[play], incoming[play]);
-      sceneCount += Object.keys(incoming[play]).length;
-    });
-    saveScreenplays(existing);
+    const merged = {...existing, ...imported};
+    saveScenes(merged);
     renderSceneList();
-    alert(`Imported ${sceneCount} scene(s) across ${Object.keys(incoming).length} screenplay(s).`);
+    alert(`Imported ${incomingNames.length} scene(s).`);
     event.target.value = "";
   };
   reader.readAsText(file);
