@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Line Runner — Learn Your Lines</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0a0e0f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Line Runner">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<style>
+  :root{
+    --bg:#0a0e0f;
+    --panel:#11171a;
+    --border:#1f2b2e;
+    --neon:#39ff9a;
+    --neon-dim:#1f8f5c;
+    --cyan:#3ad6ff;
+    --text:#d7e5e2;
+    --muted:#6b8079;
+    --danger:#ff5f6d;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:radial-gradient(circle at top, #0e1416 0%, #060809 70%);
+    color:var(--text);
+    font-family:'Courier New', ui-monospace, monospace;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:24px 16px 60px;
+  }
+  .layout{
+    display:flex;
+    align-items:flex-start;
+    gap:24px;
+    width:100%;
+    max-width:980px;
+  }
+  .main-col{
+    flex:1;
+    min-width:0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+  }
+  .side-col{
+    width:300px;
+    flex-shrink:0;
+  }
+  .side-col details{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:10px;
+    overflow:hidden;
+  }
+  .side-col summary{
+    cursor:pointer;
+    list-style:none;
+    padding:16px 18px;
+    color:var(--cyan);
+    font-size:0.85rem;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  .side-col summary::-webkit-details-marker{display:none;}
+  .side-col summary::after{content:"▾";transition:transform 0.2s;color:var(--muted);}
+  .side-col details[open] summary::after{transform:rotate(180deg);}
+  .side-col .panel-body{padding:0 18px 18px;}
+  @media (min-width:900px){
+    .side-col summary{pointer-events:none;}
+    .side-col summary::after{display:none;}
+  }
+  @media (max-width:899px){
+    .layout{flex-direction:column;}
+    .side-col{width:100%;}
+  }
+  h1{
+    color:var(--neon);
+    text-shadow:0 0 8px rgba(57,255,154,0.5);
+    letter-spacing:2px;
+    font-size:1.4rem;
+    margin:0 0 4px;
+  }
+  .subtitle{color:var(--muted);font-size:0.85rem;margin-bottom:24px;text-align:center;}
+  .card{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:20px;
+    width:100%;
+    max-width:640px;
+    box-shadow:0 0 24px rgba(57,255,154,0.05);
+  }
+  label{display:block;font-size:0.8rem;color:var(--cyan);margin:14px 0 6px;text-transform:uppercase;letter-spacing:1px;}
+  label:first-of-type{margin-top:0;}
+  textarea{
+    width:100%;
+    min-height:180px;
+    background:#080b0c;
+    border:1px solid var(--border);
+    color:var(--text);
+    border-radius:6px;
+    padding:12px;
+    font-family:inherit;
+    font-size:0.95rem;
+    resize:vertical;
+  }
+  select{
+    width:100%;
+    background:#080b0c;
+    border:1px solid var(--border);
+    color:var(--text);
+    border-radius:6px;
+    padding:10px 12px;
+    font-family:inherit;
+    font-size:0.95rem;
+  }
+  input[type=text]{
+    width:100%;
+    background:#080b0c;
+    border:1px solid var(--border);
+    color:var(--text);
+    border-radius:6px;
+    padding:10px 12px;
+    font-family:inherit;
+    font-size:0.95rem;
+  }
+  .hint{color:var(--muted);font-size:0.75rem;margin-top:6px;line-height:1.4;}
+  .row{display:flex;gap:16px;flex-wrap:wrap;margin-top:14px;}
+  .checkbox-row{display:flex;align-items:center;gap:8px;font-size:0.85rem;color:var(--text);}
+  .checkbox-row input{accent-color:var(--neon);width:16px;height:16px;}
+  button{
+    font-family:inherit;
+    cursor:pointer;
+    border-radius:6px;
+    border:1px solid var(--neon-dim);
+    background:transparent;
+    color:var(--neon);
+    padding:10px 16px;
+    font-size:0.9rem;
+    transition:all 0.15s;
+  }
+  button:hover{background:rgba(57,255,154,0.1);}
+  .primary{
+    width:100%;
+    margin-top:20px;
+    padding:14px;
+    font-size:1.05rem;
+    background:var(--neon);
+    color:#04140c;
+    border:none;
+    font-weight:bold;
+    letter-spacing:1px;
+  }
+  .primary:hover{box-shadow:0 0 16px rgba(57,255,154,0.6);}
+
+  /* Practice view */
+  #practice{display:none;width:100%;max-width:640px;flex-direction:column;align-items:center;}
+  .stage{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:10px;
+    width:100%;
+    padding:22px;
+    text-align:center;
+    min-height:220px;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+  }
+  .progress{color:var(--muted);font-size:0.8rem;margin-bottom:10px;letter-spacing:1px;}
+  .progress-bar{height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:20px;}
+  .progress-fill{height:100%;background:var(--neon);box-shadow:0 0 8px var(--neon);transition:width 0.2s;}
+  .context-line{color:var(--muted);font-size:0.85rem;margin-bottom:14px;min-height:1.2em;}
+  .char-name{color:var(--cyan);font-weight:bold;letter-spacing:1px;font-size:0.85rem;margin-bottom:8px;min-height:1.2em;}
+  .line-text{font-size:1.3rem;line-height:1.5;min-height:2.6em;display:flex;align-items:center;justify-content:center;}
+  .line-hidden{color:var(--muted);letter-spacing:3px;}
+  .big-btn{
+    width:100%;
+    margin-top:22px;
+    padding:22px;
+    font-size:1.2rem;
+    background:var(--neon);
+    color:#04140c;
+    border:none;
+    font-weight:bold;
+    letter-spacing:1px;
+    border-radius:10px;
+  }
+  .big-btn:active{transform:scale(0.98);}
+  .big-btn.cue{background:var(--cyan);}
+  .controls-row{display:flex;gap:10px;width:100%;margin-top:14px;flex-wrap:wrap;justify-content:center;}
+  .controls-row button{flex:1;min-width:100px;}
+  .score-row{display:flex;gap:20px;margin-top:16px;font-size:0.85rem;color:var(--muted);}
+  .score-row span.good{color:var(--neon);}
+  .score-row span.bad{color:var(--danger);}
+  .score-btn.good{border-color:var(--neon-dim);color:var(--neon);}
+  .score-btn.good:hover{background:rgba(57,255,154,0.1);}
+  .score-btn.bad{border-color:var(--danger);color:var(--danger);}
+  .score-btn.bad:hover{background:rgba(255,95,109,0.1);}
+  .font-controls{display:flex;align-items:center;gap:8px;margin-top:14px;}
+  .font-controls button{padding:4px 10px;}
+  #done{display:none;text-align:center;}
+  #done h2{color:var(--neon);}
+  .scene-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    background:#080b0c;
+    border:1px solid var(--border);
+    border-radius:6px;
+    padding:10px 12px;
+    margin-bottom:8px;
+  }
+  .scene-info{overflow:hidden;}
+  .scene-info .name{color:var(--text);font-size:0.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .scene-info .meta{color:var(--muted);font-size:0.7rem;margin-top:2px;}
+  .scene-actions{display:flex;gap:6px;flex-shrink:0;}
+  .scene-actions button{padding:6px 10px;font-size:0.8rem;}
+  .scene-actions button.del{border-color:var(--danger);color:var(--danger);}
+  .scene-actions button.del:hover{background:rgba(255,95,109,0.1);}
+  .storage-warning{color:var(--danger);font-size:0.72rem;margin-bottom:10px;line-height:1.4;}
+  footer{color:var(--muted);font-size:0.7rem;margin-top:30px;text-align:center;}
+</style>
+</head>
+<body>
+
+<div class="layout">
+<div class="main-col">
+
+<h1>LINE RUNNER</h1>
+<div class="subtitle">Paste your script. Reveal one line at a time. Learn faster.</div>
+
+<div class="card" id="setup">
+  <label>Paste your script</label>
+  <textarea id="scriptInput" placeholder="One line per row. For cue practice, use format:&#10;JULIET: O Romeo, Romeo, wherefore art thou Romeo?&#10;ROMEO: Shall I hear more, or shall I speak at this?"></textarea>
+  <div class="hint">Tip: use <b>CHARACTER: dialogue</b> per line to unlock cue mode (see below). Plain lines work fine too for a simple read-through.</div>
+
+  <label>Your character name (optional, enables cue mode)</label>
+  <input type="text" id="myChar" placeholder="e.g. JULIET">
+  <div class="hint">When set, everyone else's lines auto-display as your cue — only <i>your</i> lines stay hidden until you press the button.</div>
+
+  <div class="row">
+    <div class="checkbox-row"><input type="checkbox" id="shuffleMode"> Shuffle (random cue, then your line — requires character name above)</div>
+    <div class="checkbox-row"><input type="checkbox" id="speakOthers"> Read other characters' lines aloud</div>
+    <div class="checkbox-row"><input type="checkbox" id="hintMode"> Show first-letter hints for hidden lines</div>
+  </div>
+
+  <label>Text-to-speech language</label>
+  <select id="ttsLang">
+    <option value="ro-RO">Română (Romanian)</option>
+    <option value="en-US">English (US)</option>
+    <option value="en-GB">English (UK)</option>
+    <option value="fr-FR">Français</option>
+    <option value="es-ES">Español</option>
+    <option value="de-DE">Deutsch</option>
+    <option value="it-IT">Italiano</option>
+  </select>
+  <div class="hint" id="voiceHint">Checking available voices…</div>
+
+  <label>Save this scene as</label>
+  <div style="display:flex;gap:8px;">
+    <input type="text" id="sceneName" placeholder="e.g. Act 2 Scene 1 — Balcony">
+    <button onclick="saveScene()" style="white-space:nowrap;">Save</button>
+  </div>
+
+  <button class="primary" onclick="startPractice()">START PRACTICE</button>
+</div>
+
+<div id="practice">
+  <div class="stage">
+    <div class="progress" id="progressText">LINE 1 / 1</div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+    <div class="context-line" id="contextLine"></div>
+    <div class="char-name" id="charName"></div>
+    <div class="line-text" id="lineText">Press start below</div>
+  </div>
+
+  <button class="big-btn" id="mainBtn" onclick="handlePress()">NEXT LINE</button>
+
+  <div class="controls-row" id="scoreButtons" style="display:none;">
+    <button class="score-btn good" onclick="markScore(true)">Got it</button>
+    <button class="score-btn bad" onclick="markScore(false)">Missed it</button>
+  </div>
+
+  <div class="controls-row">
+    <button id="hideBtn" onclick="hideAgain()">Hide Again</button>
+    <button onclick="restart()">Restart</button>
+    <button onclick="reshuffle()">Reshuffle</button>
+    <button onclick="backToSetup()">Edit Script</button>
+  </div>
+
+  <div class="score-row" id="scoreRow" style="display:none;">
+    <span>Got it: <span class="good" id="gotItCount">0</span></span>
+    <span>Missed: <span class="bad" id="missedCount">0</span></span>
+  </div>
+
+  <div class="font-controls">
+    <span style="color:var(--muted);font-size:0.75rem;">TEXT SIZE</span>
+    <button onclick="changeFont(-1)">A-</button>
+    <button onclick="changeFont(1)">A+</button>
+  </div>
+
+  <div class="hint" style="margin-top:14px;text-align:center;">Space / Enter = reveal or next &nbsp;•&nbsp; G = got it &nbsp;•&nbsp; M = missed it</div>
+</div>
+
+<div id="done">
+  <h2>Run complete</h2>
+  <div id="doneStats"></div>
+  <button class="primary" onclick="restart()">Run it again</button>
+  <button id="redoMissedBtn" style="display:none;margin-top:10px;width:100%;" onclick="redoMissed()">Redo missed lines only</button>
+  <button style="margin-top:10px;width:100%;" onclick="backToSetup()">Finish</button>
+</div>
+
+<footer>Everything stays in this browser tab — nothing is saved or uploaded, except scenes you choose to export.</footer>
+
+</div><!-- /main-col -->
+
+<aside class="side-col">
+  <details id="scenesDetails">
+    <summary>Saved Scenes</summary>
+    <div class="panel-body">
+      <div class="row" style="margin-top:0;">
+        <button onclick="exportScenes()" style="flex:1;">Export</button>
+        <button onclick="document.getElementById('importFile').click()" style="flex:1;">Import</button>
+      </div>
+      <input type="file" id="importFile" accept="application/json,.json" style="display:none;" onchange="importScenesFile(event)">
+      <div id="sceneList" style="margin-top:14px;"></div>
+      <div id="noScenes" class="hint">No saved scenes yet. Save one from the editor, or import a file.</div>
+    </div>
+  </details>
+</aside>
+
+</div><!-- /layout -->
+
+
+<script>
+let allLines = [];      // {character, text}
+let order = [];         // indices into allLines
+let pos = 0;            // position in order
+let revealed = false;   // is current line currently shown
+let myChar = "";
+let cueMode = false;
+let shuffleOn = false;
+let speakOn = false;
+let hintOn = false;
+let gotIt = 0, missed = 0;
+let missedSet = new Set(); // original allLines indices of "my" lines marked as missed
+let fontSize = 1.3;
+let voices = [];
+let ttsLang = "ro-RO";
+
+// ---- Scene storage (localStorage with in-memory fallback) ----
+const STORAGE_KEY = "lineRunnerScenes";
+let storageWorks = true;
+let memoryScenes = {};
+
+function testStorage(){
+  try{
+    localStorage.setItem("__lr_test__","1");
+    localStorage.removeItem("__lr_test__");
+    return true;
+  }catch(e){
+    return false;
+  }
+}
+storageWorks = testStorage();
+
+function loadScenes(){
+  if(storageWorks){
+    try{
+      return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+    }catch(e){
+      return {};
+    }
+  }
+  return memoryScenes;
+}
+
+function saveScenes(scenes){
+  if(storageWorks){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(scenes));
+      return;
+    }catch(e){ /* fall through to memory */ }
+  }
+  memoryScenes = scenes;
+}
+
+function saveScene(){
+  const raw = document.getElementById("scriptInput").value;
+  if(raw.trim().length===0){
+    alert("Paste in a script before saving.");
+    return;
+  }
+  const name = document.getElementById("sceneName").value.trim();
+  if(!name){
+    alert("Give this scene a name first.");
+    return;
+  }
+  const scenes = loadScenes();
+  scenes[name] = {
+    script: raw,
+    myChar: document.getElementById("myChar").value.trim(),
+    shuffle: document.getElementById("shuffleMode").checked,
+    speak: document.getElementById("speakOthers").checked,
+    hint: document.getElementById("hintMode").checked,
+    ttsLang: document.getElementById("ttsLang").value
+  };
+  saveScenes(scenes);
+  document.getElementById("sceneName").value = "";
+  renderSceneList();
+}
+
+function loadScene(name){
+  const scenes = loadScenes();
+  const s = scenes[name];
+  if(!s) return;
+  document.getElementById("scriptInput").value = s.script;
+  document.getElementById("myChar").value = s.myChar || "";
+  document.getElementById("shuffleMode").checked = !!s.shuffle;
+  document.getElementById("speakOthers").checked = !!s.speak;
+  document.getElementById("hintMode").checked = !!s.hint;
+  document.getElementById("ttsLang").value = s.ttsLang || "ro-RO";
+  document.getElementById("sceneName").value = name;
+  updateVoiceHint();
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+
+function deleteScene(name){
+  if(!confirm(`Delete saved scene "${name}"?`)) return;
+  const scenes = loadScenes();
+  delete scenes[name];
+  saveScenes(scenes);
+  renderSceneList();
+}
+
+function renderSceneList(){
+  const scenes = loadScenes();
+  const names = Object.keys(scenes);
+  const list = document.getElementById("sceneList");
+  const empty = document.getElementById("noScenes");
+  if(names.length===0){
+    list.innerHTML = "";
+    empty.style.display = "block";
+    return;
+  }
+  empty.style.display = "none";
+  let html = "";
+  if(!storageWorks){
+    html += `<div class="storage-warning">⚠ This browser tab can't persist storage (private/incognito mode, or restricted preview). Scenes will only stay saved until you close this tab — export them to keep a copy. For lasting saves, open this file directly in a normal browser tab.</div>`;
+  }
+  names.sort().forEach(name=>{
+    const lineCount = scenes[name].script.split("\n").map(r=>r.trim()).filter(r=>r).length;
+    const charLabel = scenes[name].myChar ? ` · as ${scenes[name].myChar}` : "";
+    html += `<div class="scene-row">
+      <div class="scene-info">
+        <div class="name">${escapeHtml(name)}</div>
+        <div class="meta">${lineCount} lines${charLabel}</div>
+      </div>
+      <div class="scene-actions">
+        <button onclick="loadScene('${escapeAttr(name)}')">Load</button>
+        <button class="del" onclick="deleteScene('${escapeAttr(name)}')">&times;</button>
+      </div>
+    </div>`;
+  });
+  list.innerHTML = html;
+}
+
+function exportScenes(){
+  const scenes = loadScenes();
+  if(Object.keys(scenes).length===0){
+    alert("No saved scenes to export yet.");
+    return;
+  }
+  const blob = new Blob([JSON.stringify(scenes, null, 2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const stamp = new Date().toISOString().slice(0,10);
+  a.href = url;
+  a.download = `line-runner-scenes-${stamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function importScenesFile(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (e)=>{
+    let imported;
+    try{
+      imported = JSON.parse(e.target.result);
+    }catch(err){
+      alert("That file isn't valid scene JSON.");
+      event.target.value = "";
+      return;
+    }
+    const existing = loadScenes();
+    const incomingNames = Object.keys(imported);
+    if(incomingNames.length===0){
+      alert("No scenes found in that file.");
+      event.target.value = "";
+      return;
+    }
+    const overwrites = incomingNames.filter(n=>existing[n]);
+    if(overwrites.length>0){
+      const ok = confirm(`${overwrites.length} scene(s) share a name with ones you already have and will be overwritten. Continue?`);
+      if(!ok){ event.target.value = ""; return; }
+    }
+    const merged = {...existing, ...imported};
+    saveScenes(merged);
+    renderSceneList();
+    alert(`Imported ${incomingNames.length} scene(s).`);
+    event.target.value = "";
+  };
+  reader.readAsText(file);
+}
+
+function escapeHtml(s){
+  return s.replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function escapeAttr(s){
+  return s.replace(/'/g,"\\'");
+}
+
+function loadVoices(){
+  voices = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
+  updateVoiceHint();
+}
+if(window.speechSynthesis){
+  loadVoices();
+  window.speechSynthesis.onvoiceschanged = loadVoices;
+}
+
+function updateVoiceHint(){
+  const sel = document.getElementById("ttsLang");
+  if(!sel) return;
+  const lang = sel.value;
+  const match = pickVoice(lang);
+  const hintEl = document.getElementById("voiceHint");
+  if(!hintEl) return;
+  if(match){
+    hintEl.textContent = `Voice found: ${match.name} (${match.lang})`;
+  } else {
+    hintEl.textContent = `No ${lang} voice installed on this device — speech may fall back to a default voice or stay silent. (On Android/Chrome: Settings → Languages → Text-to-speech, add the language.)`;
+  }
+}
+
+function pickVoice(lang){
+  if(!voices.length) return null;
+  const base = lang.split("-")[0];
+  return voices.find(v=>v.lang===lang)
+      || voices.find(v=>v.lang && v.lang.toLowerCase().startsWith(base))
+      || null;
+}
+
+function parseScript(raw){
+  const rows = raw.split("\n").map(r=>r.trim()).filter(r=>r.length>0);
+  const result = [];
+  rows.forEach(row=>{
+    const m = row.match(/^([A-Za-z][A-Za-z0-9 '.\-]{0,30}):\s*(.+)$/);
+    if(m){
+      result.push({character: m[1].trim(), text: m[2].trim()});
+    } else if(result.length>0 && result[result.length-1].character){
+      // continuation of the previous character's line (wrapped in the original text)
+      result[result.length-1].text += " " + row;
+    } else {
+      result.push({character: null, text: row});
+    }
+  });
+  return result;
+}
+
+function shuffleArray(arr){
+  const a = arr.slice();
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
+
+function buildCuePairs(onlyIndices){
+  // for every line spoken by "my" character, pair it with the line right before it (the cue).
+  const pairs = [];
+  for(let i=0;i<allLines.length;i++){
+    const line = allLines[i];
+    if(line.character && line.character.toUpperCase()===myChar){
+      if(onlyIndices && !onlyIndices.has(i)) continue;
+      if(i>0) pairs.push([i-1, i]);
+      else pairs.push([i]);
+    }
+  }
+  return pairs;
+}
+
+function buildOrder(){
+  if(shuffleOn){
+    if(cueMode){
+      const pairs = shuffleArray(buildCuePairs());
+      const flat = pairs.flat();
+      return flat.length>0 ? flat : allLines.map((_,i)=>i);
+    }
+    return shuffleArray(allLines.map((_,i)=>i));
+  }
+  return allLines.map((_,i)=>i);
+}
+
+function firstLetterHint(text){
+  return text.split(" ").map(w=>{
+    const clean = w.replace(/[^A-Za-z']/g,"");
+    if(clean.length===0) return w;
+    return w[0] + "_".repeat(Math.max(clean.length-1,0));
+  }).join(" ");
+}
+
+function startPractice(){
+  const raw = document.getElementById("scriptInput").value;
+  if(raw.trim().length===0){
+    alert("Paste in your script first.");
+    return;
+  }
+  allLines = parseScript(raw);
+  myChar = document.getElementById("myChar").value.trim().toUpperCase();
+  cueMode = myChar.length>0;
+  shuffleOn = document.getElementById("shuffleMode").checked;
+  if(shuffleOn && !cueMode){
+    alert("Shuffle mode needs your character name (above) so it knows which lines are yours.");
+    return;
+  }
+  speakOn = document.getElementById("speakOthers").checked;
+  hintOn = document.getElementById("hintMode").checked;
+  ttsLang = document.getElementById("ttsLang").value;
+  gotIt = 0; missed = 0;
+  missedSet = new Set();
+  order = buildOrder();
+  pos = 0;
+  revealed = false;
+
+  document.getElementById("setup").style.display = "none";
+  document.getElementById("done").style.display = "none";
+  document.getElementById("practice").style.display = "flex";
+  document.getElementById("scoreRow").style.display = cueMode ? "flex" : "none";
+  document.querySelector(".side-col").style.display = "none";
+  updateScore();
+  renderCurrent();
+}
+
+function isMyLine(line){
+  return cueMode && line.character && line.character.toUpperCase()===myChar;
+}
+
+function speak(text){
+  if(!speakOn) return;
+  try{
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 0.95;
+    u.lang = ttsLang;
+    const v = pickVoice(ttsLang);
+    if(v) u.voice = v;
+    window.speechSynthesis.speak(u);
+  }catch(e){}
+}
+
+function renderCurrent(){
+  if(pos >= order.length){
+    showDone();
+    return;
+  }
+  const line = allLines[order[pos]];
+  const total = order.length;
+  document.getElementById("progressText").textContent = `LINE ${pos+1} / ${total}`;
+  document.getElementById("progressFill").style.width = `${(pos/total)*100}%`;
+  document.getElementById("charName").textContent = line.character ? line.character : "";
+  document.getElementById("lineText").style.fontSize = fontSize+"rem";
+
+  // context: previous line, dimmed
+  if(pos>0){
+    const prev = allLines[order[pos-1]];
+    const prevLabel = prev.character ? prev.character+": " : "";
+    document.getElementById("contextLine").textContent = "Previous: " + prevLabel + prev.text;
+  } else {
+    document.getElementById("contextLine").textContent = "";
+  }
+
+  const mine = isMyLine(line);
+  const mainBtn = document.getElementById("mainBtn");
+  const scoreRow = document.getElementById("scoreRow");
+  const scoreButtons = document.getElementById("scoreButtons");
+  const hideBtn = document.getElementById("hideBtn");
+
+  // Hide Again only makes sense for a hideable line: your own line in cue mode,
+  // or any line in plain read-through mode (no cue lines exist there).
+  hideBtn.style.display = (cueMode ? mine : true) ? "inline-block" : "none";
+
+  if(mine && !revealed){
+    // hide it, prompt recall
+    document.getElementById("lineText").className = "line-text line-hidden";
+    document.getElementById("lineText").textContent = hintOn ? firstLetterHint(line.text) : "· · · your line · · ·";
+    mainBtn.textContent = "REVEAL MY LINE";
+    mainBtn.className = "big-btn cue";
+    scoreRow.style.display = "none";
+    scoreButtons.style.display = "none";
+  } else if(mine && revealed){
+    document.getElementById("lineText").className = "line-text";
+    document.getElementById("lineText").textContent = line.text;
+    mainBtn.textContent = "NEXT LINE";
+    mainBtn.className = "big-btn";
+    if(cueMode){
+      scoreRow.style.display = "flex";
+      scoreButtons.style.display = "flex";
+    }
+  } else {
+    // not my line, or no cue mode at all -> show only if revealed, otherwise blank until pressed (plain read-through)
+    if(cueMode){
+      // auto show cue lines
+      document.getElementById("lineText").className = "line-text";
+      document.getElementById("lineText").textContent = line.text;
+      mainBtn.textContent = "NEXT LINE";
+      mainBtn.className = "big-btn";
+      if(!revealed){ speak(line.text); revealed = true; }
+      scoreRow.style.display = "none";
+      scoreButtons.style.display = "none";
+    } else {
+      if(!revealed){
+        document.getElementById("lineText").className = "line-text line-hidden";
+        document.getElementById("lineText").textContent = hintOn ? firstLetterHint(line.text) : "· · · press to reveal · · ·";
+        mainBtn.textContent = "REVEAL";
+        mainBtn.className = "big-btn cue";
+      } else {
+        document.getElementById("lineText").className = "line-text";
+        document.getElementById("lineText").textContent = line.text;
+        mainBtn.textContent = "NEXT LINE";
+        mainBtn.className = "big-btn";
+      }
+    }
+  }
+}
+
+function handlePress(){
+  const line = allLines[order[pos]];
+  const mine = isMyLine(line);
+  if((mine || !cueMode) && !revealed){
+    revealed = true;
+    renderCurrent();
+    return;
+  }
+  // advance
+  pos++;
+  revealed = false;
+  renderCurrent();
+}
+
+function hideAgain(){
+  const line = allLines[order[pos]];
+  const mine = isMyLine(line);
+  if(mine || !cueMode){
+    revealed = false;
+    renderCurrent();
+  }
+}
+
+function markScore(good){
+  const idx = order[pos];
+  if(good){
+    gotIt++;
+    missedSet.delete(idx);
+  } else {
+    missed++;
+    missedSet.add(idx);
+  }
+  updateScore();
+  handlePress();
+}
+
+function updateScore(){
+  document.getElementById("gotItCount").textContent = gotIt;
+  document.getElementById("missedCount").textContent = missed;
+}
+
+function showDone(){
+  document.getElementById("practice").style.display = "none";
+  document.getElementById("done").style.display = "block";
+  let stats = `<p>${order.length} lines run through.</p>`;
+  if(cueMode){
+    stats += `<p style="color:var(--neon)">Got it: ${gotIt} &nbsp;&nbsp; <span style="color:var(--danger)">Missed: ${missed}</span></p>`;
+  }
+  document.getElementById("doneStats").innerHTML = stats;
+  const redoBtn = document.getElementById("redoMissedBtn");
+  if(cueMode && missedSet.size>0){
+    redoBtn.style.display = "block";
+    redoBtn.textContent = `Redo missed lines only (${missedSet.size})`;
+  } else {
+    redoBtn.style.display = "none";
+  }
+}
+
+function redoMissed(){
+  if(missedSet.size===0) return;
+  const pairs = shuffleArray(buildCuePairs(missedSet));
+  order = pairs.flat();
+  pos = 0;
+  revealed = false;
+  gotIt = 0; missed = 0;
+  updateScore();
+  document.getElementById("done").style.display = "none";
+  document.getElementById("practice").style.display = "flex";
+  document.getElementById("scoreRow").style.display = "flex";
+  renderCurrent();
+}
+
+function restart(){
+  pos = 0;
+  revealed = false;
+  gotIt = 0; missed = 0;
+  missedSet = new Set();
+  updateScore();
+  document.getElementById("done").style.display = "none";
+  document.getElementById("practice").style.display = "flex";
+  document.getElementById("scoreRow").style.display = cueMode ? "flex" : "none";
+  renderCurrent();
+}
+
+function reshuffle(){
+  order = buildOrder();
+  pos = 0;
+  revealed = false;
+  document.getElementById("done").style.display = "none";
+  document.getElementById("practice").style.display = "flex";
+  renderCurrent();
+}
+
+function backToSetup(){
+  document.getElementById("practice").style.display = "none";
+  document.getElementById("done").style.display = "none";
+  document.getElementById("setup").style.display = "block";
+  document.querySelector(".side-col").style.display = "block";
+  renderSceneList();
+  syncSidebar();
+}
+
+function changeFont(delta){
+  fontSize = Math.min(2.2, Math.max(0.9, fontSize + delta*0.1));
+  renderCurrent();
+}
+
+document.addEventListener("DOMContentLoaded", ()=>{
+  const sel = document.getElementById("ttsLang");
+  if(sel) sel.addEventListener("change", updateVoiceHint);
+  updateVoiceHint();
+  renderSceneList();
+  syncSidebar();
+});
+window.addEventListener("resize", syncSidebar);
+
+function syncSidebar(){
+  const d = document.getElementById("scenesDetails");
+  if(!d) return;
+  if(window.innerWidth >= 900) d.open = true;
+}
+
+document.addEventListener("keydown", (e)=>{
+  if(document.getElementById("practice").style.display !== "flex") return;
+  if(e.code === "Space" || e.code === "Enter"){
+    e.preventDefault();
+    handlePress();
+  } else if(e.key.toLowerCase()==="g" && cueMode){
+    markScore(true);
+  } else if(e.key.toLowerCase()==="m" && cueMode){
+    markScore(false);
+  } else if(e.key.toLowerCase()==="h"){
+    hideAgain();
+  }
+});
+
+if("serviceWorker" in navigator){
+  window.addEventListener("load", ()=>{
+    navigator.serviceWorker.register("sw.js").catch(()=>{
+      // Registration fails harmlessly if opened as a local file:// page —
+      // service workers require http(s) hosting. The app still works fine without it.
+    });
+  });
+}
+</script>
+</body>
+</html>
