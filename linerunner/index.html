@@ -92,6 +92,15 @@
     margin:0 0 4px;
   }
   .subtitle{color:var(--muted);font-size:0.85rem;margin-bottom:24px;text-align:center;}
+  #installBtn{
+    margin-bottom:20px;
+    padding:10px 20px;
+    background:transparent;
+    border:1px solid var(--cyan);
+    color:var(--cyan);
+    border-radius:6px;
+  }
+  #installBtn:hover{background:rgba(58,214,255,0.1);}
   .card{
     background:var(--panel);
     border:1px solid var(--border);
@@ -241,6 +250,7 @@
 
 <h1>LINE RUNNER</h1>
 <div class="subtitle">Paste your script. Reveal one line at a time. Learn faster.</div>
+<button id="installBtn" style="display:none;">Install App</button>
 
 <div class="card" id="setup">
   <label>Paste your script</label>
@@ -896,6 +906,51 @@ if("serviceWorker" in navigator){
     });
   });
 }
+
+// ---- Install-to-home-screen button ----
+let deferredInstallPrompt = null;
+
+function isRunningStandalone(){
+  return window.matchMedia("(display-mode: standalone)").matches
+      || window.navigator.standalone === true; // iOS Safari
+}
+
+function updateInstallButton(){
+  const btn = document.getElementById("installBtn");
+  if(!btn) return;
+  if(isRunningStandalone()){
+    btn.style.display = "none";
+  } else if(deferredInstallPrompt){
+    btn.style.display = "inline-block";
+  } else {
+    btn.style.display = "none";
+  }
+}
+
+window.addEventListener("beforeinstallprompt", (e)=>{
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  updateInstallButton();
+});
+
+window.addEventListener("appinstalled", ()=>{
+  deferredInstallPrompt = null;
+  updateInstallButton();
+});
+
+document.addEventListener("DOMContentLoaded", ()=>{
+  const btn = document.getElementById("installBtn");
+  if(btn){
+    btn.addEventListener("click", async ()=>{
+      if(!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      await deferredInstallPrompt.userChoice;
+      deferredInstallPrompt = null;
+      updateInstallButton();
+    });
+  }
+  updateInstallButton();
+});
 </script>
 </body>
 </html>
