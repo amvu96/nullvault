@@ -8,6 +8,13 @@
   "background_color": "#0a0e0f",
   "theme_color": "#0a0e0f",
   "orientation": "any",
+  "prefer_related_applications": false,
+  "related_applications": [
+    {
+      "platform": "webapp",
+      "url": "manifest.json"
+    }
+  ],
   "icons": [
     {
       "src": "icons/icon-192.png",
