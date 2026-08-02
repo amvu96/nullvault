@@ -2,7 +2,7 @@
   "name": "Line Runner",
   "short_name": "Line Runner",
   "description": "Learn theatre lines one reveal at a time.",
-  "start_url": "./line-runner.html",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "background_color": "#0a0e0f",

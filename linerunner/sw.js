@@ -1,6 +1,6 @@
 const CACHE_NAME = "line-runner-v1";
 const ASSETS = [
-  "./line-runner.html",
+  "./index.html",
   "./manifest.json",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
