@@ -1,4 +1,4 @@
-const CACHE_NAME = "line-runner-v1";
+const CACHE_NAME = "stage-whisper-v2";
 const ASSETS = [
   "./index.html",
   "./manifest.json",
@@ -45,4 +45,4 @@ self.addEventListener("fetch", (event) => {
       return cached || networkFetch;
     })
   );
-});
+ });
