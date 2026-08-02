@@ -909,18 +909,43 @@ if("serviceWorker" in navigator){
 
 // ---- Install-to-home-screen button ----
 let deferredInstallPrompt = null;
+const INSTALLED_FLAG = "lineRunnerInstalled";
+
+function markInstalled(){
+  try{ localStorage.setItem(INSTALLED_FLAG, "1"); }catch(e){}
+}
+
+function wasMarkedInstalled(){
+  try{ return localStorage.getItem(INSTALLED_FLAG) === "1"; }catch(e){ return false; }
+}
 
 function isRunningStandalone(){
   return window.matchMedia("(display-mode: standalone)").matches
       || window.navigator.standalone === true; // iOS Safari
 }
 
-function updateInstallButton(){
+async function isAlreadyInstalled(){
+  if(isRunningStandalone()) return true;
+  if(wasMarkedInstalled()) return true;
+  if("getInstalledRelatedApps" in navigator){
+    try{
+      const related = await navigator.getInstalledRelatedApps();
+      if(related.length > 0){
+        markInstalled();
+        return true;
+      }
+    }catch(e){ /* unsupported or blocked, fall through */ }
+  }
+  return false;
+}
+
+async function updateInstallButton(){
   const btn = document.getElementById("installBtn");
   if(!btn) return;
-  if(isRunningStandalone()){
+  if(await isAlreadyInstalled()){
     btn.style.display = "none";
   } else if(deferredInstallPrompt){
+    btn.textContent = "Install App";
     btn.style.display = "inline-block";
   } else {
     btn.style.display = "none";
@@ -934,6 +959,7 @@ window.addEventListener("beforeinstallprompt", (e)=>{
 });
 
 window.addEventListener("appinstalled", ()=>{
+  markInstalled();
   deferredInstallPrompt = null;
   updateInstallButton();
 });
@@ -944,9 +970,19 @@ document.addEventListener("DOMContentLoaded", ()=>{
     btn.addEventListener("click", async ()=>{
       if(!deferredInstallPrompt) return;
       deferredInstallPrompt.prompt();
-      await deferredInstallPrompt.userChoice;
+      const choice = await deferredInstallPrompt.userChoice;
+      // The prompt can only be used once, win or lose.
       deferredInstallPrompt = null;
-      updateInstallButton();
+      if(choice.outcome === "accepted"){
+        markInstalled();
+        btn.style.display = "none";
+      } else {
+        // Declined: hide for now, but it's not gone for good — the browser
+        // will offer beforeinstallprompt again on a future visit, and the
+        // button will reappear then.
+        btn.textContent = "Install App";
+        btn.style.display = "none";
+      }
     });
   }
   updateInstallButton();
