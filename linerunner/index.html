@@ -3,13 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Line Runner — Learn Your Lines</title>
+<title>Stage Whisper — Learn Your Lines</title>
+<script>
+  try{
+    var t = localStorage.getItem("stageWhisperTheme");
+    document.documentElement.setAttribute("data-theme", t === "light" ? "light" : "dark");
+  }catch(e){
+    document.documentElement.setAttribute("data-theme", "dark");
+  }
+</script>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0a0e0f">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Line Runner">
+<meta name="apple-mobile-web-app-title" content="Stage Whisper">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <style>
@@ -23,18 +31,35 @@
     --text:#d7e5e2;
     --muted:#6b8079;
     --danger:#ff5f6d;
+    --bg-gradient-1:#0e1416;
+    --bg-gradient-2:#060809;
+    --input-bg:#080b0c;
+  }
+  [data-theme="light"]{
+    --bg:#f2f5f4;
+    --panel:#ffffff;
+    --border:#dbe4e1;
+    --neon:#0e8a4f;
+    --neon-dim:#0a6b3d;
+    --cyan:#0077b6;
+    --text:#182220;
+    --muted:#5c6b66;
+    --danger:#c8283a;
+    --bg-gradient-1:#f7faf9;
+    --bg-gradient-2:#e8eeec;
+    --input-bg:#eef2f1;
   }
   *{box-sizing:border-box;}
   body{
     margin:0;
-    background:radial-gradient(circle at top, #0e1416 0%, #060809 70%);
+    background:radial-gradient(circle at top, var(--bg-gradient-1) 0%, var(--bg-gradient-2) 70%);
     color:var(--text);
     font-family:'Courier New', ui-monospace, monospace;
     min-height:100vh;
     display:flex;
     flex-direction:column;
     align-items:center;
-    padding:24px 16px 60px;
+    padding:24px 16px 76px;
   }
   .layout{
     display:flex;
@@ -101,6 +126,30 @@
     border-radius:6px;
   }
   #installBtn:hover{background:rgba(58,214,255,0.1);}
+  .bottom-bar{
+    position:fixed;
+    bottom:0;
+    left:0;
+    right:0;
+    background:var(--panel);
+    border-top:1px solid var(--border);
+    display:flex;
+    justify-content:flex-end;
+    align-items:center;
+    padding:10px 16px;
+    z-index:100;
+  }
+  .theme-toggle-btn{
+    width:40px;
+    height:40px;
+    padding:0;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:1.1rem;
+    line-height:1;
+  }
   .card{
     background:var(--panel);
     border:1px solid var(--border);
@@ -115,7 +164,7 @@
   textarea{
     width:100%;
     min-height:180px;
-    background:#080b0c;
+    background:var(--input-bg);
     border:1px solid var(--border);
     color:var(--text);
     border-radius:6px;
@@ -126,7 +175,7 @@
   }
   select{
     width:100%;
-    background:#080b0c;
+    background:var(--input-bg);
     border:1px solid var(--border);
     color:var(--text);
     border-radius:6px;
@@ -136,7 +185,7 @@
   }
   input[type=text]{
     width:100%;
-    background:#080b0c;
+    background:var(--input-bg);
     border:1px solid var(--border);
     color:var(--text);
     border-radius:6px;
@@ -226,7 +275,7 @@
     align-items:center;
     justify-content:space-between;
     gap:8px;
-    background:#080b0c;
+    background:var(--input-bg);
     border:1px solid var(--border);
     border-radius:6px;
     padding:10px 12px;
@@ -266,7 +315,7 @@
 <div class="layout">
 <div class="main-col">
 
-<h1>LINE RUNNER</h1>
+<h1>STAGE WHISPER</h1>
 <div class="subtitle">Paste your script. Reveal one line at a time. Learn faster.</div>
 <button id="installBtn" style="display:none;">Install App</button>
 
@@ -592,7 +641,7 @@ function exportScenes(){
   const a = document.createElement("a");
   const stamp = new Date().toISOString().slice(0,10);
   a.href = url;
-  a.download = `line-runner-scenes-${stamp}.json`;
+  a.download = `stage-whisper-scenes-${stamp}.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -985,12 +1034,34 @@ function changeFont(delta){
   renderCurrent();
 }
 
+// ---- Theme toggle (dark / day) ----
+function setTheme(theme){
+  document.documentElement.setAttribute("data-theme", theme);
+  try{ localStorage.setItem("stageWhisperTheme", theme); }catch(e){}
+  const btn = document.getElementById("themeToggleBtn");
+  if(btn){
+    btn.textContent = theme === "dark" ? "☀" : "☾";
+    btn.title = theme === "dark" ? "Switch to day theme" : "Switch to dark theme";
+    btn.setAttribute("aria-label", btn.title);
+  }
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if(meta){
+    meta.setAttribute("content", theme === "dark" ? "#0a0e0f" : "#f2f5f4");
+  }
+}
+
+function toggleTheme(){
+  const current = document.documentElement.getAttribute("data-theme") || "dark";
+  setTheme(current === "dark" ? "light" : "dark");
+}
+
 document.addEventListener("DOMContentLoaded", ()=>{
   const sel = document.getElementById("ttsLang");
   if(sel) sel.addEventListener("change", updateVoiceHint);
   updateVoiceHint();
   renderSceneList();
   syncSidebar();
+  setTheme(document.documentElement.getAttribute("data-theme") || "dark");
 });
 window.addEventListener("resize", syncSidebar);
 
@@ -1104,5 +1175,9 @@ document.addEventListener("DOMContentLoaded", ()=>{
   updateInstallButton();
 });
 </script>
+<div class="bottom-bar">
+  <button id="themeToggleBtn" class="theme-toggle-btn" onclick="toggleTheme()" title="Switch theme" aria-label="Switch theme">☀</button>
+</div>
+
 </body>
 </html>
