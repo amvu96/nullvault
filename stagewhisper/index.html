@@ -162,14 +162,20 @@
   }
   .subtitle{color:var(--muted);font-size:0.85rem;margin-bottom:24px;text-align:center;}
   #installBtn{
-    margin-bottom:20px;
-    padding:10px 20px;
+    width:40px;
+    height:40px;
+    padding:0;
+    border-radius:50%;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    font-size:1.1rem;
+    line-height:1;
     background:transparent;
-    border:1px solid var(--cyan);
-    color:var(--cyan);
-    border-radius:6px;
+    border:1px solid #3ad6ff;
+    color:#3ad6ff;
   }
-  #installBtn:hover{background:rgba(58,214,255,0.1);}
+  #installBtn:hover{background:rgba(58,214,255,0.15);}
   .bottom-bar{
     position:fixed;
     bottom:0;
@@ -372,11 +378,6 @@
 
 <h1>STAGE WHISPER</h1>
 <div class="subtitle">Paste your script. Reveal one line at a time. Learn faster.</div>
-<div id="authArea" style="margin-bottom:16px;text-align:center;">
-  <button id="authBtn" onclick="handleAuthClick()">Sign in with Google</button>
-  <div id="authStatus" class="hint" style="display:none;margin-top:6px;"></div>
-</div>
-<button id="installBtn" style="display:none;">Install App</button>
 
 <div class="card" id="setup">
   <label>Paste your script</label>
@@ -514,6 +515,9 @@ let shuffleOn = false;
 let speakOn = false;
 let hintOn = false;
 let gotIt = 0, missed = 0;
+let currentScreen = "setup"; // "setup" | "practice" | "done" — tracked explicitly since
+                              // inline style checks read "" (not "none") before any JS
+                              // has touched an element, which was causing bugs on first load.
 let missedSet = new Set(); // original allLines indices of "my" lines marked as missed
 let fontSize = 1.3;
 let voices = [];
@@ -1027,6 +1031,7 @@ function startPractice(){
   document.getElementById("practice").style.display = "flex";
   document.getElementById("scoreRow").style.display = cueMode ? "flex" : "none";
   document.querySelector(".side-col").style.display = "none";
+  currentScreen = "practice";
   closeScenesSheet();
   updateBottomBarVisibility();
   updateScore();
@@ -1169,6 +1174,7 @@ function updateScore(){
 function showDone(){
   document.getElementById("practice").style.display = "none";
   document.getElementById("done").style.display = "block";
+  currentScreen = "done";
   let stats = `<p>${order.length} lines run through.</p>`;
   if(cueMode){
     stats += `<p style="color:var(--neon)">Got it: ${gotIt} &nbsp;&nbsp; <span style="color:var(--danger)">Missed: ${missed}</span></p>`;
@@ -1195,6 +1201,8 @@ function redoMissed(){
   document.getElementById("done").style.display = "none";
   document.getElementById("practice").style.display = "flex";
   document.getElementById("scoreRow").style.display = "flex";
+  currentScreen = "practice";
+  updateBottomBarVisibility();
   renderCurrent();
 }
 
@@ -1207,6 +1215,8 @@ function restart(){
   document.getElementById("done").style.display = "none";
   document.getElementById("practice").style.display = "flex";
   document.getElementById("scoreRow").style.display = cueMode ? "flex" : "none";
+  currentScreen = "practice";
+  updateBottomBarVisibility();
   renderCurrent();
 }
 
@@ -1216,6 +1226,8 @@ function reshuffle(){
   revealed = false;
   document.getElementById("done").style.display = "none";
   document.getElementById("practice").style.display = "flex";
+  currentScreen = "practice";
+  updateBottomBarVisibility();
   renderCurrent();
 }
 
@@ -1224,6 +1236,7 @@ function backToSetup(){
   document.getElementById("done").style.display = "none";
   document.getElementById("setup").style.display = "block";
   document.querySelector(".side-col").style.display = "block";
+  currentScreen = "setup";
   closeScenesSheet();
   renderSceneList();
   updateBottomBarVisibility();
@@ -1284,9 +1297,9 @@ function toggleScenesSheet(){
 
 function updateBottomBarVisibility(){
   const isMobile = window.innerWidth < 900;
-  const setupVisible = document.getElementById("setup").style.display !== "none";
-  const practiceVisible = document.getElementById("practice").style.display !== "none";
-  const doneVisible = document.getElementById("done").style.display !== "none";
+  const setupVisible = currentScreen === "setup";
+  const practiceVisible = currentScreen === "practice";
+  const doneVisible = currentScreen === "done";
 
   const scenesBtn = document.getElementById("scenesBarBtn");
   if(scenesBtn) scenesBtn.style.display = (isMobile && setupVisible) ? "inline-block" : "none";
@@ -1357,8 +1370,8 @@ async function updateInstallButton(){
   if(await isAlreadyInstalled()){
     btn.style.display = "none";
   } else if(deferredInstallPrompt){
-    btn.textContent = "Install App";
-    btn.style.display = "inline-block";
+    btn.textContent = "⭳";
+    btn.style.display = "flex";
   } else {
     btn.style.display = "none";
   }
@@ -1392,7 +1405,6 @@ document.addEventListener("DOMContentLoaded", ()=>{
         // Declined: hide for now, but it's not gone for good — the browser
         // will offer beforeinstallprompt again on a future visit, and the
         // button will reappear then.
-        btn.textContent = "Install App";
         btn.style.display = "none";
       }
     });
@@ -1404,6 +1416,7 @@ document.addEventListener("DOMContentLoaded", ()=>{
   <button id="scenesBarBtn" onclick="toggleScenesSheet()">Saved Scenes</button>
   <div class="bar-right">
     <button id="homeBtn" class="theme-toggle-btn" onclick="backToSetup()" title="Home" aria-label="Home" style="display:none;">⌂</button>
+    <button id="installBtn" title="Install App" aria-label="Install App">⭳</button>
     <button id="themeToggleBtn" class="theme-toggle-btn" onclick="toggleTheme()" title="Switch theme" aria-label="Switch theme">☀</button>
   </div>
 </div>
