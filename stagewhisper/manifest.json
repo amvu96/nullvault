@@ -1,6 +1,6 @@
 {
-  "name": "Line Runner",
-  "short_name": "Line Runner",
+  "name": "Stage Whisper",
+  "short_name": "Stage Whisper",
   "description": "Learn theatre lines one reveal at a time.",
   "start_url": "./index.html",
   "scope": "./",
