@@ -85,7 +85,8 @@
     border-radius:10px;
     overflow:hidden;
   }
-  .side-col .panel-header{
+  .side-col .panel-header,
+  .tts-panel-inner .panel-header{
     padding:16px 18px;
     color:var(--cyan);
     font-size:0.85rem;
@@ -95,7 +96,8 @@
     justify-content:space-between;
     align-items:center;
   }
-  .side-col .panel-header .close-sheet{
+  .side-col .panel-header .close-sheet,
+  .tts-panel-inner .panel-header .close-sheet{
     display:none;
     background:none;
     border:none;
@@ -104,7 +106,9 @@
     padding:0 4px;
     cursor:pointer;
   }
-  .side-col .panel-body{padding:0 18px 18px;}
+  .tts-panel-inner .panel-header .close-sheet{display:block;}
+  .side-col .panel-body,
+  .tts-panel-inner .panel-body{padding:0 18px 18px;}
   .account-bar{
     display:flex;
     align-items:center;
@@ -125,6 +129,33 @@
     background:rgba(0,0,0,0.5);
     z-index:80;
     display:none;
+  }
+  .tts-panel{
+    position:fixed;
+    left:12px;
+    right:12px;
+    bottom:76px;
+    max-width:420px;
+    margin:0 auto;
+    z-index:95;
+    transform:translateY(120%);
+    opacity:0;
+    transition:transform 0.25s ease, opacity 0.25s ease;
+    pointer-events:none;
+  }
+  .tts-panel.sheet-open{
+    transform:translateY(0);
+    opacity:1;
+    pointer-events:auto;
+  }
+  .tts-panel-inner{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:14px 14px 10px 10px;
+    overflow:hidden;
+    max-height:70vh;
+    overflow-y:auto;
+    box-shadow:0 -8px 28px rgba(0,0,0,0.4);
   }
   @media (max-width:899px){
     .layout{flex-direction:column;}
@@ -390,21 +421,8 @@
 
   <div class="row">
     <div class="checkbox-row"><input type="checkbox" id="shuffleMode"> Shuffle (random cue, then your line — requires character name above)</div>
-    <div class="checkbox-row"><input type="checkbox" id="speakOthers"> Read other characters' lines aloud</div>
     <div class="checkbox-row"><input type="checkbox" id="hintMode"> Show first-letter hints for hidden lines</div>
   </div>
-
-  <label>Text-to-speech language</label>
-  <select id="ttsLang">
-    <option value="ro-RO">Română (Romanian)</option>
-    <option value="en-US">English (US)</option>
-    <option value="en-GB">English (UK)</option>
-    <option value="fr-FR">Français</option>
-    <option value="es-ES">Español</option>
-    <option value="de-DE">Deutsch</option>
-    <option value="it-IT">Italiano</option>
-  </select>
-  <div class="hint" id="voiceHint">Checking available voices…</div>
 
   <label>Screenplay</label>
   <input type="text" id="screenplayName" list="screenplayOptions" placeholder="e.g. Romeo and Juliet">
@@ -502,6 +520,31 @@
 <div class="scenes-backdrop" id="scenesBackdrop" onclick="closeScenesSheet()"></div>
 
 </div><!-- /layout -->
+
+<div class="tts-panel" id="ttsPanelWrap">
+  <div class="tts-panel-inner">
+    <div class="panel-header">
+      <span>Text-to-Speech</span>
+      <button class="close-sheet" onclick="closeTtsSheet()" title="Close" aria-label="Close">&times;</button>
+    </div>
+    <div class="panel-body">
+      <div class="checkbox-row"><input type="checkbox" id="speakOthers" onchange="onSpeakToggleChange()"> Read other characters' lines aloud</div>
+
+      <label>Text-to-speech language</label>
+      <select id="ttsLang" onchange="onTtsLangChange()">
+        <option value="ro-RO">Română (Romanian)</option>
+        <option value="en-US">English (US)</option>
+        <option value="en-GB">English (UK)</option>
+        <option value="fr-FR">Français</option>
+        <option value="es-ES">Español</option>
+        <option value="de-DE">Deutsch</option>
+        <option value="it-IT">Italiano</option>
+      </select>
+      <div class="hint" id="voiceHint">Checking available voices…</div>
+    </div>
+  </div>
+</div>
+<div class="scenes-backdrop" id="ttsBackdrop" onclick="closeTtsSheet()"></div>
 
 
 <script>
@@ -1055,6 +1098,35 @@ function speak(text){
   }catch(e){}
 }
 
+// Speaks whatever's currently on screen, if it's a line the app would
+// normally read aloud (i.e. not the user's own line waiting to be recalled).
+function speakCurrentLineIfApplicable(){
+  if(currentScreen !== "practice") return;
+  if(pos >= order.length) return;
+  const line = allLines[order[pos]];
+  if(line && !isMyLine(line)){
+    speak(line.text);
+  }
+}
+
+// Called the moment the "read other characters' lines aloud" toggle changes,
+// so turning it on mid-scene starts reading the line already on screen
+// instead of waiting for the next line.
+function onSpeakToggleChange(){
+  speakOn = document.getElementById("speakOthers").checked;
+  if(speakOn){
+    speakCurrentLineIfApplicable();
+  } else {
+    try{ window.speechSynthesis.cancel(); }catch(e){}
+  }
+}
+
+function onTtsLangChange(){
+  ttsLang = document.getElementById("ttsLang").value;
+  updateVoiceHint();
+  if(speakOn) speakCurrentLineIfApplicable();
+}
+
 function renderCurrent(){
   if(pos >= order.length){
     showDone();
@@ -1269,8 +1341,6 @@ function toggleTheme(){
 }
 
 document.addEventListener("DOMContentLoaded", ()=>{
-  const sel = document.getElementById("ttsLang");
-  if(sel) sel.addEventListener("change", updateVoiceHint);
   updateVoiceHint();
   renderSceneList();
   updateBottomBarVisibility();
@@ -1313,6 +1383,22 @@ function toggleScenesSheet(){
   const wrap = document.getElementById("scenesPanelWrap");
   if(wrap.classList.contains("sheet-open")) closeScenesSheet();
   else openScenesSheet();
+}
+
+function openTtsSheet(){
+  document.getElementById("ttsPanelWrap").classList.add("sheet-open");
+  document.getElementById("ttsBackdrop").style.display = "block";
+}
+
+function closeTtsSheet(){
+  document.getElementById("ttsPanelWrap").classList.remove("sheet-open");
+  document.getElementById("ttsBackdrop").style.display = "none";
+}
+
+function toggleTtsSheet(){
+  const wrap = document.getElementById("ttsPanelWrap");
+  if(wrap.classList.contains("sheet-open")) closeTtsSheet();
+  else openTtsSheet();
 }
 
 function updateBottomBarVisibility(){
@@ -1435,6 +1521,7 @@ document.addEventListener("DOMContentLoaded", ()=>{
   <button id="scenesBarBtn" onclick="toggleScenesSheet()">Saved Scenes</button>
   <div class="bar-right">
     <button id="homeBtn" class="theme-toggle-btn" onclick="backToSetup()" title="Home" aria-label="Home" style="display:none;">⌂</button>
+    <button id="ttsBtn" class="theme-toggle-btn" onclick="toggleTtsSheet()" title="Text-to-speech settings" aria-label="Text-to-speech settings"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8.5a6.5 6.5 0 1 1 13 0c0 6-6 6-6 10a3.5 3.5 0 1 1-7 0"/><path d="M15 8.5a2.5 2.5 0 0 0-5 0v1a2 2 0 1 1 0 4"/></svg></button>
     <button id="installBtn" title="Install App" aria-label="Install App"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg></button>
     <button id="themeToggleBtn" class="theme-toggle-btn" onclick="toggleTheme()" title="Switch theme" aria-label="Switch theme">☀</button>
   </div>
