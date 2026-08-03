@@ -105,6 +105,20 @@
     cursor:pointer;
   }
   .side-col .panel-body{padding:0 18px 18px;}
+  .account-bar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+  }
+  .account-bar #accountEmail{
+    font-size:0.78rem;
+    color:var(--muted);
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .account-bar button{padding:6px 12px;font-size:0.8rem;flex-shrink:0;}
   .scenes-backdrop{
     position:fixed;
     inset:0;
@@ -358,6 +372,10 @@
 
 <h1>STAGE WHISPER</h1>
 <div class="subtitle">Paste your script. Reveal one line at a time. Learn faster.</div>
+<div id="authArea" style="margin-bottom:16px;text-align:center;">
+  <button id="authBtn" onclick="handleAuthClick()">Sign in with Google</button>
+  <div id="authStatus" class="hint" style="display:none;margin-top:6px;"></div>
+</div>
 <button id="installBtn" style="display:none;">Install App</button>
 
 <div class="card" id="setup">
@@ -456,7 +474,19 @@
       <button class="close-sheet" onclick="closeScenesSheet()" title="Close" aria-label="Close">&times;</button>
     </div>
     <div class="panel-body">
-      <div class="row" style="margin-top:0;">
+      <div id="signedOutView">
+        <button onclick="swSignIn()" style="width:100%;">Sign in with Google</button>
+        <div class="hint">Sign in to sync your scenes across devices.</div>
+      </div>
+      <div id="signedInView" style="display:none;">
+        <div class="account-bar">
+          <span id="accountEmail"></span>
+          <button onclick="swSignOut()">Sign out</button>
+        </div>
+        <div id="syncStatus" class="hint"></div>
+      </div>
+
+      <div class="row" style="margin-top:14px;">
         <button onclick="exportScenes()" style="flex:1;">Export</button>
         <button onclick="document.getElementById('importFile').click()" style="flex:1;">Import</button>
       </div>
@@ -551,20 +581,97 @@ function loadScreenplays(){
 }
 
 function saveScreenplays(data){
+  let ok;
   if(storageWorks){
     try{
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      return true;
+      ok = true;
     }catch(e){
       // Storage quota exceeded (or similar). Keep working for this session,
       // but the caller needs to know it won't survive a refresh.
       memoryScreenplays = data;
-      return false;
+      ok = false;
     }
+  } else {
+    memoryScreenplays = data;
+    ok = true;
   }
-  memoryScreenplays = data;
-  return true;
+
+  // Fire-and-forget cloud sync if signed in. Local save above already
+  // happened regardless, so a flaky connection never blocks saving.
+  if(window.swCurrentUser && window.swPushCloud){
+    setSyncStatus("Syncing…");
+    window.swPushCloud(window.swCurrentUser.uid, data)
+      .then(()=> setSyncStatus("Synced"))
+      .catch((e)=>{
+        console.error("Cloud sync failed", e);
+        setSyncStatus("Sync failed — will retry on next change");
+      });
+  }
+
+  return ok;
 }
+
+function setSyncStatus(text){
+  const el = document.getElementById("syncStatus");
+  if(el) el.textContent = text;
+}
+
+// ---- Google sign-in integration (called from the Firebase module script) ----
+window.onSwSignedIn = async function(user){
+  const outView = document.getElementById("signedOutView");
+  const inView = document.getElementById("signedInView");
+  if(outView) outView.style.display = "none";
+  if(inView) inView.style.display = "block";
+  const emailEl = document.getElementById("accountEmail");
+  if(emailEl) emailEl.textContent = user.email || user.displayName || "Signed in";
+  setSyncStatus("Syncing…");
+
+  try{
+    const cloud = await window.swPullCloud(user.uid);
+    const local = loadScreenplays();
+
+    if(cloud === null){
+      // First time this account has synced — push whatever's on this device up.
+      if(Object.keys(local).length > 0){
+        await window.swPushCloud(user.uid, local);
+      }
+      setSyncStatus("Synced");
+      return;
+    }
+
+    // Merge: cloud wins on name collisions (assumed to be the more current
+    // copy from another device), but anything only on this device is kept.
+    const merged = JSON.parse(JSON.stringify(cloud));
+    let addedFromLocal = 0;
+    Object.keys(local).forEach(play=>{
+      if(!merged[play]) merged[play] = {};
+      Object.keys(local[play]).forEach(name=>{
+        if(!merged[play][name]){
+          merged[play][name] = local[play][name];
+          addedFromLocal++;
+        }
+      });
+    });
+
+    saveScreenplays(merged); // writes locally and pushes back to cloud
+    renderSceneList();
+    setSyncStatus("Synced");
+    if(addedFromLocal > 0){
+      alert(`Synced with your account. Added ${addedFromLocal} scene(s) that were only on this device.`);
+    }
+  }catch(e){
+    console.error(e);
+    setSyncStatus("Couldn't reach the cloud — using what's on this device");
+  }
+};
+
+window.onSwSignedOut = function(){
+  const outView = document.getElementById("signedOutView");
+  const inView = document.getElementById("signedInView");
+  if(outView) outView.style.display = "block";
+  if(inView) inView.style.display = "none";
+};
 
 function saveScene(){
   const raw = document.getElementById("scriptInput").value;
@@ -1300,6 +1407,58 @@ document.addEventListener("DOMContentLoaded", ()=>{
     <button id="themeToggleBtn" class="theme-toggle-btn" onclick="toggleTheme()" title="Switch theme" aria-label="Switch theme">☀</button>
   </div>
 </div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-app.js";
+  import {
+    getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
+  } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-auth.js";
+  import {
+    getFirestore, doc, getDoc, setDoc
+  } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDNoj3EbPvTZi8fIPhSj6id7HkVYYVb1z4",
+    authDomain: "nullvault-stagewhisper.firebaseapp.com",
+    projectId: "nullvault-stagewhisper",
+    storageBucket: "nullvault-stagewhisper.firebasestorage.app",
+    messagingSenderId: "878820162278",
+    appId: "1:878820162278:web:ccf492e98bfaaf5d955927"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  const provider = new GoogleAuthProvider();
+
+  window.swSignIn = async function(){
+    try{
+      await signInWithPopup(auth, provider);
+    }catch(e){
+      console.error(e);
+      alert("Sign-in didn't go through: " + (e && e.message ? e.message : "unknown error"));
+    }
+  };
+
+  window.swSignOut = function(){
+    signOut(auth);
+  };
+
+  window.swPullCloud = async function(uid){
+    const snap = await getDoc(doc(db, "users", uid));
+    return snap.exists() ? (snap.data().screenplays || {}) : null;
+  };
+
+  window.swPushCloud = async function(uid, screenplays){
+    await setDoc(doc(db, "users", uid), { screenplays, updatedAt: Date.now() });
+  };
+
+  onAuthStateChanged(auth, (user)=>{
+    window.swCurrentUser = user || null;
+    if(user && window.onSwSignedIn) window.onSwSignedIn(user);
+    if(!user && window.onSwSignedOut) window.onSwSignedOut();
+  });
+</script>
 
 </body>
 </html>

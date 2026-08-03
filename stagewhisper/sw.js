@@ -1,4 +1,4 @@
-const CACHE_NAME = "stage-whisper-v3";
+const CACHE_NAME = "stage-whisper-v6";
 const ASSETS = [
   "./index.html",
   "./manifest.json",
@@ -45,4 +45,4 @@ self.addEventListener("fetch", (event) => {
       return cached || networkFetch;
     })
   );
- });
+});
