@@ -79,15 +79,13 @@
     width:300px;
     flex-shrink:0;
   }
-  .side-col details{
+  .side-col-inner{
     background:var(--panel);
     border:1px solid var(--border);
     border-radius:10px;
     overflow:hidden;
   }
-  .side-col summary{
-    cursor:pointer;
-    list-style:none;
+  .side-col .panel-header{
     padding:16px 18px;
     color:var(--cyan);
     font-size:0.85rem;
@@ -97,17 +95,49 @@
     justify-content:space-between;
     align-items:center;
   }
-  .side-col summary::-webkit-details-marker{display:none;}
-  .side-col summary::after{content:"▾";transition:transform 0.2s;color:var(--muted);}
-  .side-col details[open] summary::after{transform:rotate(180deg);}
+  .side-col .panel-header .close-sheet{
+    display:none;
+    background:none;
+    border:none;
+    color:var(--muted);
+    font-size:1.2rem;
+    padding:0 4px;
+    cursor:pointer;
+  }
   .side-col .panel-body{padding:0 18px 18px;}
-  @media (min-width:900px){
-    .side-col summary{pointer-events:none;}
-    .side-col summary::after{display:none;}
+  .scenes-backdrop{
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.5);
+    z-index:80;
+    display:none;
   }
   @media (max-width:899px){
     .layout{flex-direction:column;}
-    .side-col{width:100%;}
+    .side-col{
+      width:auto;
+      position:fixed;
+      left:12px;
+      right:12px;
+      bottom:76px;
+      max-height:65vh;
+      z-index:90;
+      transform:translateY(120%);
+      opacity:0;
+      transition:transform 0.25s ease, opacity 0.25s ease;
+      pointer-events:none;
+    }
+    .side-col.sheet-open{
+      transform:translateY(0);
+      opacity:1;
+      pointer-events:auto;
+    }
+    .side-col-inner{
+      max-height:65vh;
+      overflow-y:auto;
+      box-shadow:0 -8px 28px rgba(0,0,0,0.4);
+    }
+    .side-col .panel-header .close-sheet{display:block;}
   }
   h1{
     color:var(--neon);
@@ -134,10 +164,21 @@
     background:var(--panel);
     border-top:1px solid var(--border);
     display:flex;
-    justify-content:flex-end;
+    justify-content:space-between;
     align-items:center;
     padding:10px 16px;
     z-index:100;
+    gap:10px;
+  }
+  .bar-right{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-left:auto;
+  }
+  #scenesBarBtn{
+    display:none;
+    padding:8px 16px;
   }
   .theme-toggle-btn{
     width:40px;
@@ -380,7 +421,6 @@
     <button id="hideBtn" onclick="hideAgain()">Hide Again</button>
     <button onclick="restart()">Restart</button>
     <button onclick="reshuffle()">Reshuffle</button>
-    <button onclick="backToSetup()">Edit Script</button>
   </div>
 
   <div class="score-row" id="scoreRow" style="display:none;">
@@ -409,20 +449,26 @@
 
 </div><!-- /main-col -->
 
-<aside class="side-col">
-  <details id="scenesDetails">
-    <summary>Saved Scenes</summary>
+<aside class="side-col" id="scenesPanelWrap">
+  <div class="side-col-inner">
+    <div class="panel-header">
+      <span>Saved Scenes</span>
+      <button class="close-sheet" onclick="closeScenesSheet()" title="Close" aria-label="Close">&times;</button>
+    </div>
     <div class="panel-body">
       <div class="row" style="margin-top:0;">
         <button onclick="exportScenes()" style="flex:1;">Export</button>
         <button onclick="document.getElementById('importFile').click()" style="flex:1;">Import</button>
       </div>
       <input type="file" id="importFile" accept="application/json,.json" style="display:none;" onchange="importScenesFile(event)">
+      <input type="text" id="sceneSearch" placeholder="Search screenplays or scenes…" style="margin-top:14px;" oninput="renderSceneList()">
       <div id="sceneList" style="margin-top:14px;"></div>
       <div id="noScenes" class="hint">No saved scenes yet. Save one from the editor, or import a file.</div>
+      <div id="noMatches" class="hint" style="display:none;">No screenplays or scenes match your search.</div>
     </div>
-  </details>
+  </div>
 </aside>
+<div class="scenes-backdrop" id="scenesBackdrop" onclick="closeScenesSheet()"></div>
 
 </div><!-- /layout -->
 
@@ -508,10 +554,16 @@ function saveScreenplays(data){
   if(storageWorks){
     try{
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      return;
-    }catch(e){ /* fall through to memory */ }
+      return true;
+    }catch(e){
+      // Storage quota exceeded (or similar). Keep working for this session,
+      // but the caller needs to know it won't survive a refresh.
+      memoryScreenplays = data;
+      return false;
+    }
   }
   memoryScreenplays = data;
+  return true;
 }
 
 function saveScene(){
@@ -540,9 +592,16 @@ function saveScene(){
     hint: document.getElementById("hintMode").checked,
     ttsLang: document.getElementById("ttsLang").value
   };
-  saveScreenplays(data);
+  const saved = saveScreenplays(data);
   document.getElementById("sceneName").value = "";
   renderSceneList();
+  warnIfNotPersisted(saved);
+}
+
+function warnIfNotPersisted(saved){
+  if(!saved){
+    alert("Your browser's storage is full, so this couldn't be permanently saved. It'll stay available for the rest of this session, but will be lost on refresh. Try exporting your scenes and deleting some older screenplays to free up space.");
+  }
 }
 
 function loadScene(play, name){
@@ -558,6 +617,7 @@ function loadScene(play, name){
   document.getElementById("screenplayName").value = play;
   document.getElementById("sceneName").value = name;
   updateVoiceHint();
+  closeScenesSheet();
   window.scrollTo({top:0, behavior:"smooth"});
 }
 
@@ -586,6 +646,8 @@ function renderSceneList(){
   const plays = Object.keys(data);
   const list = document.getElementById("sceneList");
   const empty = document.getElementById("noScenes");
+  const noMatches = document.getElementById("noMatches");
+  const searchBox = document.getElementById("sceneSearch");
 
   // keep the "save as" screenplay datalist up to date
   const datalist = document.getElementById("screenplayOptions");
@@ -596,16 +658,37 @@ function renderSceneList(){
   if(plays.length===0){
     list.innerHTML = "";
     empty.style.display = "block";
+    noMatches.style.display = "none";
+    if(searchBox) searchBox.style.display = "none";
     return;
   }
   empty.style.display = "none";
+
+  // Only bother showing search once there's enough to actually need it.
+  const totalScenes = plays.reduce((sum,p)=>sum + Object.keys(data[p]).length, 0);
+  if(searchBox) searchBox.style.display = (plays.length + totalScenes > 8) ? "block" : "none";
+
+  const term = (searchBox && searchBox.value.trim().toLowerCase()) || "";
+
   let html = "";
   if(!storageWorks){
     html += `<div class="storage-warning">This browser tab can't persist storage (private/incognito mode, or restricted preview). Scenes will only stay saved until you close this tab — export them to keep a copy. For lasting saves, open this file directly in a normal browser tab.</div>`;
   }
+
+  let anyRendered = false;
   plays.sort().forEach(play=>{
     const scenes = data[play];
-    const names = Object.keys(scenes).sort();
+    let names = Object.keys(scenes).sort();
+
+    if(term){
+      const playMatches = play.toLowerCase().includes(term);
+      if(!playMatches){
+        names = names.filter(n=>n.toLowerCase().includes(term));
+      }
+      if(!playMatches && names.length===0) return; // nothing in this group matches
+    }
+
+    anyRendered = true;
     html += `<div class="screenplay-group">
       <div class="screenplay-header">
         <span class="title">${escapeHtml(play)}</span>
@@ -627,7 +710,9 @@ function renderSceneList(){
     });
     html += `</div>`;
   });
+
   list.innerHTML = html;
+  noMatches.style.display = (term && !anyRendered) ? "block" : "none";
 }
 
 function exportScenes(){
@@ -697,9 +782,13 @@ function importScenesFile(event){
       Object.assign(existing[play], incoming[play]);
       sceneCount += Object.keys(incoming[play]).length;
     });
-    saveScreenplays(existing);
+    const saved = saveScreenplays(existing);
     renderSceneList();
-    alert(`Imported ${sceneCount} scene(s) across ${Object.keys(incoming).length} screenplay(s).`);
+    if(saved){
+      alert(`Imported ${sceneCount} scene(s) across ${Object.keys(incoming).length} screenplay(s).`);
+    } else {
+      alert(`Imported ${sceneCount} scene(s), but your browser's storage is full — none of this import was permanently saved. It'll stay available for the rest of this session only. Try exporting what you can, deleting some older screenplays, and importing again in smaller batches.`);
+    }
     event.target.value = "";
   };
   reader.readAsText(file);
@@ -831,6 +920,8 @@ function startPractice(){
   document.getElementById("practice").style.display = "flex";
   document.getElementById("scoreRow").style.display = cueMode ? "flex" : "none";
   document.querySelector(".side-col").style.display = "none";
+  closeScenesSheet();
+  updateBottomBarVisibility();
   updateScore();
   renderCurrent();
 }
@@ -983,6 +1074,7 @@ function showDone(){
   } else {
     redoBtn.style.display = "none";
   }
+  updateBottomBarVisibility();
 }
 
 function redoMissed(){
@@ -1025,8 +1117,9 @@ function backToSetup(){
   document.getElementById("done").style.display = "none";
   document.getElementById("setup").style.display = "block";
   document.querySelector(".side-col").style.display = "block";
+  closeScenesSheet();
   renderSceneList();
-  syncSidebar();
+  updateBottomBarVisibility();
 }
 
 function changeFont(delta){
@@ -1060,15 +1153,40 @@ document.addEventListener("DOMContentLoaded", ()=>{
   if(sel) sel.addEventListener("change", updateVoiceHint);
   updateVoiceHint();
   renderSceneList();
-  syncSidebar();
+  updateBottomBarVisibility();
   setTheme(document.documentElement.getAttribute("data-theme") || "dark");
 });
-window.addEventListener("resize", syncSidebar);
+window.addEventListener("resize", updateBottomBarVisibility);
 
-function syncSidebar(){
-  const d = document.getElementById("scenesDetails");
-  if(!d) return;
-  if(window.innerWidth >= 900) d.open = true;
+// ---- Saved-scenes bottom sheet (mobile) ----
+function openScenesSheet(){
+  document.getElementById("scenesPanelWrap").classList.add("sheet-open");
+  document.getElementById("scenesBackdrop").style.display = "block";
+}
+
+function closeScenesSheet(){
+  document.getElementById("scenesPanelWrap").classList.remove("sheet-open");
+  document.getElementById("scenesBackdrop").style.display = "none";
+}
+
+function toggleScenesSheet(){
+  const wrap = document.getElementById("scenesPanelWrap");
+  if(wrap.classList.contains("sheet-open")) closeScenesSheet();
+  else openScenesSheet();
+}
+
+function updateBottomBarVisibility(){
+  const isMobile = window.innerWidth < 900;
+  const setupVisible = document.getElementById("setup").style.display !== "none";
+  const practiceVisible = document.getElementById("practice").style.display !== "none";
+  const doneVisible = document.getElementById("done").style.display !== "none";
+
+  const scenesBtn = document.getElementById("scenesBarBtn");
+  if(scenesBtn) scenesBtn.style.display = (isMobile && setupVisible) ? "inline-block" : "none";
+  if(!isMobile || !setupVisible) closeScenesSheet();
+
+  const homeBtn = document.getElementById("homeBtn");
+  if(homeBtn) homeBtn.style.display = (practiceVisible || doneVisible) ? "flex" : "none";
 }
 
 document.addEventListener("keydown", (e)=>{
@@ -1176,7 +1294,11 @@ document.addEventListener("DOMContentLoaded", ()=>{
 });
 </script>
 <div class="bottom-bar">
-  <button id="themeToggleBtn" class="theme-toggle-btn" onclick="toggleTheme()" title="Switch theme" aria-label="Switch theme">☀</button>
+  <button id="scenesBarBtn" onclick="toggleScenesSheet()">Saved Scenes</button>
+  <div class="bar-right">
+    <button id="homeBtn" class="theme-toggle-btn" onclick="backToSetup()" title="Home" aria-label="Home" style="display:none;">⌂</button>
+    <button id="themeToggleBtn" class="theme-toggle-btn" onclick="toggleTheme()" title="Switch theme" aria-label="Switch theme">☀</button>
+  </div>
 </div>
 
 </body>
