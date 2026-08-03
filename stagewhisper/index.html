@@ -1423,7 +1423,7 @@ document.addEventListener("DOMContentLoaded", ()=>{
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-app.js";
   import {
-    getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged
+    getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
   } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-auth.js";
   import {
     getFirestore, doc, getDoc, setDoc
@@ -1443,16 +1443,13 @@ document.addEventListener("DOMContentLoaded", ()=>{
   const db = getFirestore(app);
   const provider = new GoogleAuthProvider();
 
-  // Redirect-based sign-in instead of a popup: several browsers (Firefox's
-  // Enhanced Tracking Protection, Brave Shields, Edge's Tracking Prevention)
-  // block the storage/postMessage handoff a popup needs to report back to
-  // the opener, which shows up as the popup flashing open and closing with
-  // nothing happening. A full-page redirect avoids that entirely.
-  window.swSignIn = function(){
-    signInWithRedirect(auth, provider).catch((e)=>{
+  window.swSignIn = async function(){
+    try{
+      await signInWithPopup(auth, provider);
+    }catch(e){
       console.error(e);
       alert("Sign-in didn't go through: " + (e && e.message ? e.message : "unknown error"));
-    });
+    }
   };
 
   window.swSignOut = function(){
@@ -1467,15 +1464,6 @@ document.addEventListener("DOMContentLoaded", ()=>{
   window.swPushCloud = async function(uid, screenplays){
     await setDoc(doc(db, "users", uid), { screenplays, updatedAt: Date.now() });
   };
-
-  // Surfaces errors from the redirect round-trip itself (e.g. the domain
-  // isn't in Firebase's authorized domains list, or the user's browser
-  // blocked the redirect). Successful sign-ins are still picked up by
-  // onAuthStateChanged below.
-  getRedirectResult(auth).catch((e)=>{
-    console.error(e);
-    alert("Sign-in didn't go through: " + (e && e.message ? e.message : "unknown error"));
-  });
 
   onAuthStateChanged(auth, (user)=>{
     window.swCurrentUser = user || null;
