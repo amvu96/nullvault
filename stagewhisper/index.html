@@ -1275,8 +1275,28 @@ document.addEventListener("DOMContentLoaded", ()=>{
   renderSceneList();
   updateBottomBarVisibility();
   setTheme(document.documentElement.getAttribute("data-theme") || "dark");
+  lockPortraitIfPossible();
 });
 window.addEventListener("resize", updateBottomBarVisibility);
+
+// ---- Lock to portrait when running as an installed app ----
+// The Screen Orientation lock API only takes effect in a standalone/fullscreen
+// display context (i.e. installed as a PWA) — browsers ignore it for a page
+// open in a normal tab, so this is a silent no-op there.
+function lockPortraitIfPossible(){
+  try{
+    if(screen.orientation && typeof screen.orientation.lock === "function"){
+      screen.orientation.lock("portrait").catch(()=>{ /* not permitted in this context — ignore */ });
+    }
+  }catch(e){ /* Screen Orientation API unsupported — ignore */ }
+}
+
+if(window.matchMedia("(display-mode: standalone)").addEventListener){
+  window.matchMedia("(display-mode: standalone)").addEventListener("change", (e)=>{
+    if(e.matches) lockPortraitIfPossible();
+  });
+}
+window.addEventListener("appinstalled", lockPortraitIfPossible);
 
 // ---- Saved-scenes bottom sheet (mobile) ----
 function openScenesSheet(){
