@@ -290,6 +290,14 @@
             justify-content: center;
             font-size: 1.1rem;
             line-height: 1;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text);
+            cursor: pointer;
+            transition: 0.15s;
+        }
+        .theme-toggle-btn:hover {
+            background: rgba(255,255,255,0.05);
         }
         .card {
             background: var(--panel);
@@ -1517,18 +1525,15 @@
         async function checkHintsExist(play, scene) {
             if (!window.swCurrentUser) return null;
             try {
-                const { getFirestore, doc, getDoc } = await importFirestore();
+                const { getFirestore, collection, query, where, getDocs } = await importFirestore();
                 const db = getFirestore();
-                // We need to check if any hint document exists under this scene path
-                // Use a collection group query or list subcollections
-                // Since we don't know the character, we'll try a simpler approach:
-                // We'll list all characters by checking common ones? No, better to use a query.
-                // Actually, we can use a collection group query on "hints" with filters.
-                // But for simplicity, we'll use a known character from the scene data.
-                // Instead, let's use a different approach: we'll query for any doc under the scene path.
-                // Since Firestore doesn't support listing subcollections directly without a known document,
-                // we'll use a collection group query.
-                const { collection, query, where, getDocs } = await importFirestore();
+                // Use a collection group query to find all hint docs for this play/scene
+                // Since we store hints under users/{uid}/hints/{play}/{scene}/{character}
+                // We can query the subcollection 'hints' with filters on the path segments.
+                // But Firestore doesn't support filtering on document path segments directly.
+                // Alternative: store play and scene as fields in the hint document.
+                // We'll store them when saving.
+                // So we'll query where play == play and scene == scene.
                 const q = query(
                     collection(db, "users", window.swCurrentUser.uid, "hints"),
                     where("play", "==", play),
@@ -1775,6 +1780,7 @@
             try {
                 const hash = await computeScriptHash(scriptText);
                 const hints = await callMistralAPI(scriptText, character);
+                // Save with play and scene fields for querying
                 await saveHintsToFirestore(play, scene, character, hints, hash);
                 // Update cache
                 const key = `${play}||${scene}`;
@@ -1790,7 +1796,7 @@
             }
         }
 
-        // ---- Modified saveScene to include aiMode ----
+        // ---- Modified saveScene to include aiMode and store play/scene fields in hint docs ----
         const origSaveScene = saveScene;
         saveScene = function() {
             const raw = document.getElementById("scriptInput").value;
@@ -2654,14 +2660,14 @@
 
         function updateBottomBarVisibility() {
             const isMobile = window.innerWidth < 900;
-            const setupVisible = currentScreen === "setup";
-
             const scenesBtn = document.getElementById("scenesBarBtn");
-            if (scenesBtn) scenesBtn.style.display = (isMobile && setupVisible) ? "inline-block" : "none";
-            if (!isMobile || !setupVisible) closeScenesSheet();
+            // Show on mobile always (since side panel is hidden), hide on desktop (side panel visible)
+            if (scenesBtn) scenesBtn.style.display = isMobile ? "inline-block" : "none";
 
             const homeBtn = document.getElementById("homeBtn");
             if (homeBtn) homeBtn.style.display = (currentScreen === "practice" || currentScreen === "done") ? "flex" : "none";
+
+            // AI button: always show, but we already have it in the bar
         }
 
         function lockPortraitIfPossible() {
@@ -2721,6 +2727,15 @@
                         openApiKeyModal();
                         showToast("Please set your Mistral API key to use AI Mode.", "warning");
                     }
+                }
+            });
+
+            // AI button in bottom bar
+            document.getElementById("aiBarBtn").addEventListener("click", function() {
+                if (window.swCurrentUser) {
+                    openApiKeyModal();
+                } else {
+                    showToast("Please sign in to manage AI settings.", "warning");
                 }
             });
         });
@@ -2834,6 +2849,7 @@
         <div class="bar-right">
             <button id="homeBtn" class="theme-toggle-btn" onclick="backToSetup()" title="Home" aria-label="Home" style="display:none;">⌂</button>
             <button id="ttsBtn" class="theme-toggle-btn" onclick="toggleTtsSheet()" title="Text-to-speech settings" aria-label="Text-to-speech settings"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8.5a6.5 6.5 0 1 1 13 0c0 6-6 6-6 10a3.5 3.5 0 1 1-7 0"/><path d="M15 8.5a2.5 2.5 0 0 0-5 0v1a2 2 0 1 1 0 4"/></svg></button>
+            <button id="aiBarBtn" class="theme-toggle-btn" title="AI settings (Mistral API key)" aria-label="AI settings">🧠</button>
             <button id="installBtn" title="Install App" aria-label="Install App"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg></button>
             <button id="themeToggleBtn" class="theme-toggle-btn" onclick="toggleTheme()" title="Switch theme" aria-label="Switch theme">☀</button>
         </div>
