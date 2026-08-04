@@ -443,6 +443,128 @@
             padding-bottom: 8px;
         }
 
+        /* AI Mode */
+        .ai-key-btn {
+            padding: 2px 9px;
+            font-size: 0.7rem;
+            border-radius: 20px;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+        .ai-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.55);
+            z-index: 250;
+            display: none;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        .ai-modal.open {
+            display: flex;
+        }
+        .ai-modal-inner {
+            max-width: 420px;
+            width: 100%;
+            margin-top: 12vh;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
+        }
+        .ai-modal-inner h3 {
+            margin: 0 0 10px;
+            color: var(--cyan);
+            font-size: 0.9rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+        .ai-modal-inner input {
+            width: 100%;
+        }
+        .ai-modal-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 14px;
+        }
+        .ai-modal-actions button {
+            flex: 1;
+        }
+        .ai-badge {
+            display: inline-flex;
+            align-items: center;
+            font-size: 0.62rem;
+            letter-spacing: 0.5px;
+            padding: 2px 7px;
+            border-radius: 20px;
+            background: var(--border);
+            color: var(--muted);
+            border: 1px solid var(--border);
+            margin-left: 6px;
+            cursor: pointer;
+            text-transform: uppercase;
+        }
+        .ai-badge:hover {
+            background: var(--muted);
+            color: var(--panel);
+        }
+        .ai-hint {
+            margin-top: 10px;
+            font-size: 0.8rem;
+            font-style: italic;
+            color: var(--muted);
+            display: none;
+        }
+        .ai-toast {
+            position: fixed;
+            left: 16px;
+            right: 16px;
+            max-width: 500px;
+            margin: 0 auto;
+            bottom: calc(var(--bottom-bar-h) + 10px);
+            background: var(--panel);
+            border: 1px solid var(--cyan);
+            color: var(--text);
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            z-index: 200;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
+            display: none;
+        }
+        .ai-toast.warn {
+            border-color: var(--danger);
+        }
+        .ai-loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.55);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 300;
+            flex-direction: column;
+            gap: 14px;
+            color: var(--text);
+            font-size: 0.9rem;
+            text-align: center;
+            padding: 20px;
+        }
+        .ai-spinner {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            border: 3px solid var(--border);
+            border-top-color: var(--neon);
+            animation: ai-spin 0.8s linear infinite;
+        }
+        @keyframes ai-spin {
+            to { transform: rotate(360deg); }
+        }
+
         /* Practice view */
         #practice {
             display: none;
@@ -732,6 +854,11 @@
                 <input type="text" id="myChar" placeholder="e.g. JULIET">
                 <div class="hint">When set, everyone else's lines auto-display as your cue — only <i>your</i> lines stay hidden until you press the button.</div>
 
+                <div class="checkbox-row" style="margin-bottom:10px;">
+                    <input type="checkbox" id="aiMode" onchange="handleAiModeToggle()"> AI Mode (contextual hints for your lines)
+                    <button type="button" class="ai-key-btn" onclick="openAiKeyModal()" title="Manage Mistral API key" aria-label="Manage Mistral API key">Key</button>
+                </div>
+
                 <div class="row">
                     <div class="checkbox-row"><input type="checkbox" id="shuffleMode"> Shuffle (random cue, then your line — requires character name above)</div>
                     <div class="checkbox-row"><input type="checkbox" id="hintMode"> Show first-letter hints for hidden lines</div>
@@ -760,6 +887,7 @@
                     <div class="context-line" id="contextLine"></div>
                     <div class="char-name" id="charName"></div>
                     <div class="line-text" id="lineText">Press start below</div>
+                    <div class="ai-hint" id="aiHintText"></div>
                 </div>
 
                 <button class="big-btn" id="mainBtn" onclick="handlePress()">NEXT LINE</button>
@@ -865,6 +993,25 @@
     </div>
     <div class="scenes-backdrop" id="ttsBackdrop" onclick="closeTtsSheet()"></div>
 
+    <div class="ai-modal" id="aiKeyModal">
+        <div class="ai-modal-inner">
+            <h3>Mistral API Key</h3>
+            <div class="hint" style="margin-bottom:10px;">AI Mode uses your own Mistral API key to generate contextual hints for your lines. It's stored only in this browser's local storage and sent only to Mistral's API — never anywhere else.</div>
+            <input type="password" id="mistralKeyInput" placeholder="Paste your Mistral API key" autocomplete="off">
+            <div class="ai-modal-actions">
+                <button onclick="saveAiKey()">Save</button>
+                <button onclick="clearAiKey()">Clear</button>
+                <button onclick="closeAiKeyModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="ai-toast" id="aiToast"></div>
+
+    <div class="ai-loading-overlay" id="aiLoadingOverlay">
+        <div class="ai-spinner"></div>
+        <div>Generating AI hints…</div>
+    </div>
 
     <script>
         let allLines = [];
@@ -883,6 +1030,10 @@
         let fontSize = 1.3;
         let voices = [];
         let ttsLang = "ro-RO";
+        let aiMode = false;
+        let currentHints = null;
+        const MISTRAL_KEY_STORAGE = "mistralApiKey";
+        window.swHintsIndex = window.swHintsIndex || new Set();
 
         const STORAGE_KEY = "lineRunnerScreenplays";
         const OLD_STORAGE_KEY = "lineRunnerScenes";
@@ -1023,6 +1174,7 @@
                 console.error(e);
                 setSyncStatus("Couldn't reach the cloud — using what's on this device");
             }
+            refreshHintsIndex();
         };
 
         window.onSwSignedOut = function() {
@@ -1030,6 +1182,8 @@
             const inView = document.getElementById("signedInView");
             if (outView) outView.style.display = "block";
             if (inView) inView.style.display = "none";
+            window.swHintsIndex = new Set();
+            renderSceneList();
         };
 
         function saveScene() {
@@ -1061,6 +1215,7 @@
                 shuffle: document.getElementById("shuffleMode").checked,
                 speak: document.getElementById("speakOthers").checked,
                 hint: document.getElementById("hintMode").checked,
+                ai: document.getElementById("aiMode").checked,
                 ttsLang: document.getElementById("ttsLang").value
             };
             if (isNew) {
@@ -1088,6 +1243,251 @@
             btns.forEach(btn => btn.disabled = !hasScript);
         }
 
+        /* ---------------- AI Mode ---------------- */
+
+        function openAiKeyModal() {
+            const input = document.getElementById("mistralKeyInput");
+            if (input) input.value = localStorage.getItem(MISTRAL_KEY_STORAGE) || "";
+            document.getElementById("aiKeyModal").classList.add("open");
+        }
+
+        function closeAiKeyModal() {
+            document.getElementById("aiKeyModal").classList.remove("open");
+        }
+
+        function saveAiKey() {
+            const input = document.getElementById("mistralKeyInput");
+            const val = input ? input.value.trim() : "";
+            if (!val) {
+                alert("Paste a Mistral API key first, or use Clear to remove the saved key.");
+                return;
+            }
+            localStorage.setItem(MISTRAL_KEY_STORAGE, val);
+            closeAiKeyModal();
+            showAiToast("Mistral API key saved.");
+        }
+
+        function clearAiKey() {
+            localStorage.removeItem(MISTRAL_KEY_STORAGE);
+            const input = document.getElementById("mistralKeyInput");
+            if (input) input.value = "";
+            showAiToast("Mistral API key cleared.");
+        }
+
+        function handleAiModeToggle() {
+            const checked = document.getElementById("aiMode").checked;
+            if (checked && !localStorage.getItem(MISTRAL_KEY_STORAGE)) {
+                openAiKeyModal();
+            }
+        }
+
+        let aiToastTimer = null;
+        function showAiToast(msg, warn) {
+            const el = document.getElementById("aiToast");
+            if (!el) return;
+            el.textContent = msg;
+            el.className = "ai-toast" + (warn ? " warn" : "");
+            el.style.display = "block";
+            clearTimeout(aiToastTimer);
+            aiToastTimer = setTimeout(() => { el.style.display = "none"; }, 6000);
+        }
+
+        function showAiLoading(on) {
+            const el = document.getElementById("aiLoadingOverlay");
+            if (el) el.style.display = on ? "flex" : "none";
+        }
+
+        async function sha256Hex(str) {
+            try {
+                const enc = new TextEncoder().encode(str);
+                const buf = await crypto.subtle.digest("SHA-256", enc);
+                return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+            } catch (e) {
+                // Fallback change-detection hash if SubtleCrypto isn't available (e.g. non-HTTPS context)
+                let h = 0;
+                for (let i = 0; i < str.length; i++) {
+                    h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
+                }
+                return "fallback-" + (h >>> 0).toString(16) + "-" + str.length;
+            }
+        }
+
+        function hintsDocId(play, scene, character) {
+            const clean = s => (s || "").toString().trim().toUpperCase()
+                .replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "X";
+            return clean(play) + "--" + clean(scene) + "--" + clean(character);
+        }
+
+        async function fetchHintsDoc(play, scene, character) {
+            if (!window.swCurrentUser || !window.swGetHintsDoc) return null;
+            try {
+                return await window.swGetHintsDoc(window.swCurrentUser.uid, hintsDocId(play, scene, character));
+            } catch (e) {
+                return null;
+            }
+        }
+
+        async function saveHintsDoc(play, scene, character, hints, scriptHash) {
+            if (!window.swCurrentUser || !window.swSaveHintsDoc) return;
+            try {
+                await window.swSaveHintsDoc(window.swCurrentUser.uid, hintsDocId(play, scene, character), {
+                    play, scene,
+                    character: character.toUpperCase(),
+                    hints, scriptHash
+                });
+                await refreshHintsIndex();
+            } catch (e) {
+                console.error("Failed to save AI hints", e);
+            }
+        }
+
+        async function refreshHintsIndex() {
+            if (!window.swCurrentUser || !window.swListHints) {
+                window.swHintsIndex = new Set();
+                renderSceneList();
+                return;
+            }
+            try {
+                const docs = await window.swListHints(window.swCurrentUser.uid);
+                const set = new Set();
+                docs.forEach(d => { if (d && d.play && d.scene) set.add(d.play + "::" + d.scene); });
+                window.swHintsIndex = set;
+            } catch (e) {
+                window.swHintsIndex = new Set();
+            }
+            renderSceneList();
+        }
+
+        async function callMistralForHints(character, lines) {
+            const key = localStorage.getItem(MISTRAL_KEY_STORAGE);
+            if (!key) throw new Error("no-api-key");
+
+            const scriptText = lines.map(l => l.character ? `${l.character}: ${l.text}` : l.text).join("\n");
+            const systemPrompt = "You are a theatre rehearsal assistant. I will give you a complete script and the name of one character. For every line spoken by that character, provide a very short (1-sentence) hint about the subtext, emotional state, or character objective behind that line. The hint must NOT repeat the line itself – it should help the actor remember the intention. Return your response as a JSON array where each element corresponds to a line of the script, but only fill in entries for lines spoken by the target character. For lines not spoken by the character, return null. The array must have exactly the same number of elements as the number of lines in the script.";
+            const userMsg = "Character: " + character + "\nScript:\n" + scriptText;
+
+            let res;
+            try {
+                res = await fetch("https://api.mistral.ai/v1/chat/completions", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": "Bearer " + key
+                    },
+                    body: JSON.stringify({
+                        model: "mistral-small-latest",
+                        messages: [
+                            { role: "system", content: systemPrompt },
+                            { role: "user", content: userMsg }
+                        ]
+                    })
+                });
+            } catch (netErr) {
+                throw new Error("network-error");
+            }
+
+            if (res.status === 401 || res.status === 403) throw new Error("unauthorized");
+            if (res.status === 429) throw new Error("rate-limited");
+            if (!res.ok) throw new Error("bad-response");
+
+            const data = await res.json();
+            const content = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+            if (!content) throw new Error("bad-response");
+
+            let jsonText = content.trim();
+            const fenced = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/i);
+            if (fenced) jsonText = fenced[1].trim();
+            const start = jsonText.indexOf("[");
+            const end = jsonText.lastIndexOf("]");
+            if (start !== -1 && end !== -1 && end > start) {
+                jsonText = jsonText.slice(start, end + 1);
+            }
+
+            let parsed;
+            try {
+                parsed = JSON.parse(jsonText);
+            } catch (parseErr) {
+                throw new Error("bad-response");
+            }
+            if (!Array.isArray(parsed)) throw new Error("bad-response");
+
+            if (parsed.length < lines.length) {
+                parsed = parsed.concat(new Array(lines.length - parsed.length).fill(null));
+            } else if (parsed.length > lines.length) {
+                parsed = parsed.slice(0, lines.length);
+            }
+            return parsed;
+        }
+
+        async function loadOrGenerateHints(raw) {
+            const play = document.getElementById("screenplayName").value.trim();
+            const scene = document.getElementById("sceneName").value.trim();
+            let hash = null;
+            try {
+                hash = await sha256Hex(raw);
+            } catch (e) {}
+
+            if (play && scene) {
+                const existing = await fetchHintsDoc(play, scene, myChar);
+                if (existing && hash && existing.scriptHash === hash && Array.isArray(existing.hints)) {
+                    return existing.hints;
+                }
+            } else if (!window.swCurrentUser) {
+                showAiToast("Sign in and save this scene (with a screenplay + scene name) to reuse AI hints next time. Generating for this run only…");
+            }
+
+            showAiLoading(true);
+            try {
+                const hints = await callMistralForHints(myChar, allLines);
+                if (play && scene && window.swCurrentUser) {
+                    await saveHintsDoc(play, scene, myChar, hints, hash);
+                }
+                return hints;
+            } finally {
+                showAiLoading(false);
+            }
+        }
+
+        function aiErrorMessage(e) {
+            const msg = (e && e.message) || "";
+            switch (msg) {
+                case "no-api-key": return "No Mistral API key set — continuing without AI hints.";
+                case "unauthorized": return "Mistral API key looks invalid — continuing without AI hints.";
+                case "rate-limited": return "Mistral API rate limit reached — continuing without AI hints.";
+                case "network-error": return "Couldn't reach the Mistral API — continuing without AI hints.";
+                case "bad-response": return "Couldn't read the AI response — continuing without AI hints.";
+                default: return "AI hints unavailable right now — continuing without them.";
+            }
+        }
+
+        async function confirmRegenerateHints(play, name) {
+            if (!confirm(`Regenerate AI hints for "${name}"? This calls the Mistral API again and overwrites the saved hints.`)) return;
+            const data = loadScreenplays();
+            const s = data[play] && data[play][name];
+            if (!s) return;
+            const character = (s.myChar || "").trim().toUpperCase();
+            if (!character) {
+                alert("This scene has no character name set, so AI hints can't be generated for it. Load it, set your character, and save it first.");
+                return;
+            }
+            if (!localStorage.getItem(MISTRAL_KEY_STORAGE)) {
+                openAiKeyModal();
+                return;
+            }
+            showAiLoading(true);
+            try {
+                const lines = parseScript(s.script);
+                const hints = await callMistralForHints(character, lines);
+                const hash = await sha256Hex(s.script);
+                await saveHintsDoc(play, name, character, hints, hash);
+                showAiToast(`AI hints regenerated for "${name}".`);
+            } catch (e) {
+                showAiToast(aiErrorMessage(e), true);
+            } finally {
+                showAiLoading(false);
+            }
+        }
+
         function loadScene(play, name) {
             const data = loadScreenplays();
             const s = data[play] && data[play][name];
@@ -1097,6 +1497,7 @@
             document.getElementById("shuffleMode").checked = !!s.shuffle;
             document.getElementById("speakOthers").checked = !!s.speak;
             document.getElementById("hintMode").checked = !!s.hint;
+            document.getElementById("aiMode").checked = !!s.ai;
             document.getElementById("ttsLang").value = s.ttsLang || "ro-RO";
             document.getElementById("screenplayName").value = play;
             document.getElementById("sceneName").value = name;
@@ -1189,10 +1590,12 @@
                 names.forEach(name => {
                     const lineCount = scenes[name].script.split("\n").map(r => r.trim()).filter(r => r).length;
                     const charLabel = scenes[name].myChar ? ` · as ${scenes[name].myChar}` : "";
+                    const hasHints = window.swHintsIndex && window.swHintsIndex.has(play + "::" + name);
+                    const aiBadge = hasHints ? `<span class="ai-badge" onclick="event.stopPropagation();confirmRegenerateHints('${escapeAttr(play)}','${escapeAttr(name)}')" title="AI hints saved for this scene — tap to regenerate" aria-label="AI hints saved — tap to regenerate">AI</span>` : "";
                     html += `<div class="scene-row" data-scene="${escapeAttr(name)}">
                 ${draggable ? `<span class="drag-handle" title="Drag to reorder" aria-label="Drag to reorder">⠿</span>` : ""}
                 <div class="scene-info">
-                  <div class="name">${escapeHtml(name)}</div>
+                  <div class="name">${escapeHtml(name)}${aiBadge}</div>
                   <div class="meta">${lineCount} lines${charLabel}</div>
                 </div>
                 <div class="scene-actions">
@@ -1517,6 +1920,7 @@
                 document.getElementById('shuffleMode').checked = !!firstScene.shuffle;
                 document.getElementById('speakOthers').checked = !!firstScene.speak;
                 document.getElementById('hintMode').checked = !!firstScene.hint;
+                document.getElementById('aiMode').checked = !!firstScene.ai;
                 document.getElementById('ttsLang').value = firstScene.ttsLang || 'ro-RO';
                 document.getElementById('screenplayName').value = play;
                 document.getElementById('sceneName').value = '';
@@ -1526,7 +1930,7 @@
             startPractice();
         }
 
-        function startPractice() {
+        async function startPractice() {
             const raw = document.getElementById("scriptInput").value;
             if (raw.trim().length === 0) {
                 alert("Paste in your script first.");
@@ -1540,12 +1944,33 @@
                 alert("Shuffle mode needs your character name (above) so it knows which lines are yours.");
                 return;
             }
+            aiMode = document.getElementById("aiMode").checked;
+            if (aiMode && !cueMode) {
+                alert("AI Mode needs your character name (above) so it knows whose lines to generate hints for.");
+                return;
+            }
+            if (aiMode && !localStorage.getItem(MISTRAL_KEY_STORAGE)) {
+                openAiKeyModal();
+                showAiToast("Add your Mistral API key, then press Start Practice again.", true);
+                return;
+            }
             speakOn = document.getElementById("speakOthers").checked;
             hintOn = document.getElementById("hintMode").checked;
             ttsLang = document.getElementById("ttsLang").value;
             gotIt = 0;
             missed = 0;
             missedSet = new Set();
+            currentHints = null;
+
+            if (aiMode) {
+                try {
+                    currentHints = await loadOrGenerateHints(raw);
+                } catch (e) {
+                    currentHints = null;
+                    showAiToast(aiErrorMessage(e), true);
+                }
+            }
+
             order = buildOrder();
             pos = 0;
             revealed = false;
@@ -1672,6 +2097,17 @@
                     }
                 }
             }
+
+            const aiHintEl = document.getElementById("aiHintText");
+            if (aiHintEl) {
+                const hintText = aiMode && mine && currentHints ? currentHints[order[pos]] : null;
+                if (hintText) {
+                    aiHintEl.textContent = "🎭 " + hintText;
+                    aiHintEl.style.display = "block";
+                } else {
+                    aiHintEl.style.display = "none";
+                }
+            }
         }
 
         function handlePress() {
@@ -1783,6 +2219,7 @@
             document.getElementById("setup").style.display = "block";
             document.querySelector(".side-col").style.display = "flex";
             currentScreen = "setup";
+            currentHints = null;
             closeScenesSheet();
             renderSceneList();
             updateBottomBarVisibility();
@@ -2030,7 +2467,7 @@
             getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
         } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-auth.js";
         import {
-            getFirestore, doc, getDoc, setDoc
+            getFirestore, doc, getDoc, setDoc, collection, getDocs, serverTimestamp
         } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-firestore.js";
 
         const firebaseConfig = {
@@ -2067,6 +2504,26 @@
 
         window.swPushCloud = async function(uid, screenplays) {
             await setDoc(doc(db, "users", uid), { screenplays, updatedAt: Date.now() });
+        };
+
+        // AI hints: users/{uid}/hints/{play--scene--character}
+        window.swGetHintsDoc = async function(uid, docId) {
+            const snap = await getDoc(doc(db, "users", uid, "hints", docId));
+            return snap.exists() ? snap.data() : null;
+        };
+
+        window.swSaveHintsDoc = async function(uid, docId, data) {
+            await setDoc(doc(db, "users", uid, "hints", docId), {
+                ...data,
+                generatedAt: serverTimestamp()
+            });
+        };
+
+        window.swListHints = async function(uid) {
+            const snap = await getDocs(collection(db, "users", uid, "hints"));
+            const arr = [];
+            snap.forEach(d => arr.push(d.data()));
+            return arr;
         };
 
         onAuthStateChanged(auth, (user) => {
