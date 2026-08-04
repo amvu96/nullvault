@@ -632,13 +632,7 @@
         .screenplay-header .header-actions .del:hover {
             background: rgba(255, 95, 109, 0.1);
         }
-        .play-all-btn {
-            border-color: var(--cyan);
-            color: var(--cyan);
-        }
-        .play-all-btn:hover {
-            background: rgba(58, 214, 255, 0.1);
-        }
+        /* play-all button uses default button styles (green) */
         footer {
             color: var(--muted);
             font-size: 0.7rem;
@@ -1101,9 +1095,7 @@
               <div class="screenplay-header">
                 <span class="title">${escapeHtml(play)}</span>
                 <div class="header-actions">
-                  <button class="play-all-btn" onclick="playAllScenes('${escapeAttr(play)}')" title="Play all scenes from this screenplay" aria-label="Play all scenes">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
-                  </button>
+                  <button onclick="playAllScenes('${escapeAttr(play)}')" title="Play all scenes from this screenplay" aria-label="Play all scenes">Play All</button>
                   <button class="del" onclick="deleteScreenplay('${escapeAttr(play)}')">&times;</button>
                 </div>
               </div>
