@@ -35,7 +35,6 @@
             --bg-gradient-2: #060809;
             --input-bg: #080b0c;
             --bottom-bar-h: 60px;
-            --hint-color: #8aa8a0;
         }
         [data-theme="light"] {
             --bg: #f2f5f4;
@@ -50,11 +49,11 @@
             --bg-gradient-1: #f7faf9;
             --bg-gradient-2: #e8eeec;
             --input-bg: #eef2f1;
-            --hint-color: #4a6b62;
         }
         * {
             box-sizing: border-box;
         }
+        /* ----- disable pull-to-refresh on Android PWA ----- */
         html,
         body {
             overscroll-behavior: contain;
@@ -290,14 +289,6 @@
             justify-content: center;
             font-size: 1.1rem;
             line-height: 1;
-            border: 1px solid var(--border);
-            background: transparent;
-            color: var(--text);
-            cursor: pointer;
-            transition: 0.15s;
-        }
-        .theme-toggle-btn:hover {
-            background: rgba(255,255,255,0.05);
         }
         .card {
             background: var(--panel);
@@ -512,23 +503,10 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            flex-direction: column;
-            gap: 4px;
         }
         .line-hidden {
             color: var(--muted);
             letter-spacing: 3px;
-        }
-        .ai-hint-text {
-            font-size: 0.75rem;
-            color: var(--hint-color);
-            font-style: italic;
-            letter-spacing: 0.3px;
-            max-width: 90%;
-            margin: 4px auto 0;
-            line-height: 1.4;
-            opacity: 0.85;
-            font-family: 'Courier New', ui-monospace, monospace;
         }
         .big-btn {
             width: 100%;
@@ -657,45 +635,11 @@
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
-            display: flex;
-            align-items: center;
-            gap: 6px;
         }
         .scene-info .meta {
             color: var(--muted);
             font-size: 0.7rem;
             margin-top: 2px;
-        }
-        .ai-badge {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            background: var(--border);
-            color: var(--muted);
-            font-size: 0.55rem;
-            font-weight: bold;
-            padding: 1px 6px;
-            border-radius: 10px;
-            letter-spacing: 0.5px;
-            cursor: pointer;
-            flex-shrink: 0;
-            transition: background 0.2s, color 0.2s;
-            border: none;
-            height: 18px;
-            line-height: 1;
-            font-family: inherit;
-        }
-        .ai-badge:hover {
-            background: var(--neon-dim);
-            color: var(--neon);
-        }
-        .ai-badge.has-hints {
-            background: var(--neon-dim);
-            color: var(--neon);
-            opacity: 0.7;
-        }
-        .ai-badge.has-hints:hover {
-            opacity: 1;
         }
         .scene-actions {
             display: flex;
@@ -769,186 +713,9 @@
             margin-top: 30px;
             text-align: center;
         }
-
-        /* API Key Modal */
-        #apiKeyModal {
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.7);
-            z-index: 200;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            padding: 24px;
-        }
-        #apiKeyModal.open {
-            display: flex;
-        }
-        #apiKeyModal .modal-box {
-            background: var(--panel);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            max-width: 440px;
-            width: 100%;
-            padding: 28px 24px 24px;
-            box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
-        }
-        #apiKeyModal .modal-box h2 {
-            color: var(--neon);
-            font-size: 1.1rem;
-            margin: 0 0 6px;
-            letter-spacing: 1px;
-        }
-        #apiKeyModal .modal-box p {
-            color: var(--muted);
-            font-size: 0.85rem;
-            margin: 6px 0 16px;
-            line-height: 1.5;
-        }
-        #apiKeyModal .modal-box input {
-            width: 100%;
-            background: var(--input-bg);
-            border: 1px solid var(--border);
-            color: var(--text);
-            border-radius: 6px;
-            padding: 10px 12px;
-            font-family: inherit;
-            font-size: 0.95rem;
-        }
-        #apiKeyModal .modal-box .modal-actions {
-            display: flex;
-            gap: 10px;
-            margin-top: 16px;
-            justify-content: flex-end;
-        }
-        #apiKeyModal .modal-box .modal-actions button {
-            padding: 8px 20px;
-        }
-        #apiKeyModal .modal-box .modal-actions .primary-btn {
-            background: var(--neon);
-            color: #04140c;
-            border: none;
-            font-weight: bold;
-        }
-        #apiKeyModal .modal-box .modal-actions .primary-btn:hover {
-            box-shadow: 0 0 16px rgba(57, 255, 154, 0.4);
-        }
-        #apiKeyModal .modal-box .key-status {
-            font-size: 0.75rem;
-            margin-top: 10px;
-            color: var(--muted);
-        }
-        #apiKeyModal .modal-box .key-status .clear-link {
-            color: var(--danger);
-            cursor: pointer;
-            text-decoration: underline;
-            background: none;
-            border: none;
-            font-family: inherit;
-            font-size: 0.75rem;
-            padding: 0 4px;
-        }
-        #apiKeyModal .modal-box .key-status .clear-link:hover {
-            opacity: 0.7;
-        }
-
-        /* AI Loading Overlay */
-        #aiLoadingOverlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.65);
-            z-index: 150;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
-            gap: 16px;
-        }
-        #aiLoadingOverlay.open {
-            display: flex;
-        }
-        #aiLoadingOverlay .spinner {
-            width: 40px;
-            height: 40px;
-            border: 3px solid var(--border);
-            border-top-color: var(--neon);
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
-        }
-        #aiLoadingOverlay .load-text {
-            color: var(--text);
-            font-size: 0.95rem;
-            letter-spacing: 1px;
-        }
-        #aiLoadingOverlay .load-sub {
-            color: var(--muted);
-            font-size: 0.75rem;
-        }
-
-        /* Toast notification */
-        .toast {
-            position: fixed;
-            bottom: 80px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: var(--panel);
-            border: 1px solid var(--border);
-            color: var(--text);
-            padding: 12px 20px;
-            border-radius: 8px;
-            font-size: 0.85rem;
-            z-index: 300;
-            max-width: 90%;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-            opacity: 0;
-            transition: opacity 0.25s ease;
-            pointer-events: none;
-            text-align: center;
-        }
-        .toast.show {
-            opacity: 1;
-        }
-        .toast.warning {
-            border-color: var(--danger);
-        }
-        .toast.success {
-            border-color: var(--neon);
-        }
     </style>
 </head>
 <body>
-
-    <!-- Toast -->
-    <div class="toast" id="toast"></div>
-
-    <!-- AI Loading Overlay -->
-    <div id="aiLoadingOverlay">
-        <div class="spinner"></div>
-        <div class="load-text" id="aiLoadText">Generating AI hints…</div>
-        <div class="load-sub">This may take 10–20 seconds</div>
-    </div>
-
-    <!-- API Key Modal -->
-    <div id="apiKeyModal">
-        <div class="modal-box">
-            <h2>Mistral API Key</h2>
-            <p>Enter your Mistral API key to enable AI hints. Your key is stored locally in your browser and never sent anywhere except to Mistral's API.</p>
-            <input type="password" id="apiKeyInput" placeholder="sk-…" autocomplete="off">
-            <div class="key-status" id="keyStatus">
-                <span id="keyStatusText"></span>
-                <button class="clear-link" id="clearKeyBtn" style="display:none;">clear key</button>
-            </div>
-            <div class="modal-actions">
-                <button onclick="closeApiKeyModal()">Cancel</button>
-                <button class="primary-btn" onclick="saveApiKey()">Save Key</button>
-            </div>
-        </div>
-    </div>
 
     <div class="layout">
         <div class="main-col">
@@ -966,7 +733,6 @@
                 <div class="hint">When set, everyone else's lines auto-display as your cue — only <i>your</i> lines stay hidden until you press the button.</div>
 
                 <div class="row">
-                    <div class="checkbox-row"><input type="checkbox" id="aiMode"> AI Mode (contextual hints for your lines)</div>
                     <div class="checkbox-row"><input type="checkbox" id="shuffleMode"> Shuffle (random cue, then your line — requires character name above)</div>
                     <div class="checkbox-row"><input type="checkbox" id="hintMode"> Show first-letter hints for hidden lines</div>
                 </div>
@@ -1110,8 +876,6 @@
         let shuffleOn = false;
         let speakOn = false;
         let hintOn = false;
-        let aiModeOn = false;
-        let aiHints = [];
         let gotIt = 0,
             missed = 0;
         let currentScreen = "setup";
@@ -1120,20 +884,10 @@
         let voices = [];
         let ttsLang = "ro-RO";
 
-        // AI state
-        let aiHintsLoaded = false;
-        let currentPlay = "";
-        let currentScene = "";
-        let currentScriptRaw = "";
-
         const STORAGE_KEY = "lineRunnerScreenplays";
         const OLD_STORAGE_KEY = "lineRunnerScenes";
-        const MISTRAL_KEY_STORAGE = "mistralApiKey";
         let storageWorks = true;
         let memoryScreenplays = {};
-
-        // Firestore hint cache (in-memory)
-        let hintCache = new Map();
 
         function testStorage() {
             try {
@@ -1241,7 +995,6 @@
                         await window.swPushCloud(user.uid, local);
                     }
                     setSyncStatus("Synced");
-                    renderSceneList();
                     return;
                 }
                 const merged = JSON.parse(JSON.stringify(cloud));
@@ -1264,7 +1017,7 @@
                 renderSceneList();
                 setSyncStatus("Synced");
                 if (addedFromLocal > 0) {
-                    showToast(`Synced with your account. Added ${addedFromLocal} scene(s) that were only on this device.`, "success");
+                    alert(`Synced with your account. Added ${addedFromLocal} scene(s) that were only on this device.`);
                 }
             } catch (e) {
                 console.error(e);
@@ -1277,324 +1030,106 @@
             const inView = document.getElementById("signedInView");
             if (outView) outView.style.display = "block";
             if (inView) inView.style.display = "none";
-            renderSceneList();
         };
 
-        // ---- Toast ----
-        let toastTimeout = null;
-
-        function showToast(msg, type = "info") {
-            const el = document.getElementById("toast");
-            if (!el) return;
-            el.textContent = msg;
-            el.className = "toast show";
-            if (type === "warning") el.classList.add("warning");
-            else if (type === "success") el.classList.add("success");
-            clearTimeout(toastTimeout);
-            toastTimeout = setTimeout(() => { el.classList.remove("show"); }, 4000);
-        }
-
-        // ---- API Key Management ----
-        function getApiKey() {
-            try { return localStorage.getItem(MISTRAL_KEY_STORAGE) || ""; } catch (e) { return ""; }
-        }
-
-        function setApiKey(key) {
-            try { localStorage.setItem(MISTRAL_KEY_STORAGE, key); } catch (e) {}
-        }
-
-        function clearApiKey() {
-            try { localStorage.removeItem(MISTRAL_KEY_STORAGE); } catch (e) {}
-        }
-
-        function openApiKeyModal() {
-            const modal = document.getElementById("apiKeyModal");
-            modal.classList.add("open");
-            const input = document.getElementById("apiKeyInput");
-            input.value = getApiKey();
-            input.type = "password";
-            input.focus();
-            updateKeyStatus();
-        }
-
-        function closeApiKeyModal() {
-            document.getElementById("apiKeyModal").classList.remove("open");
-        }
-
-        function updateKeyStatus() {
-            const key = getApiKey();
-            const textEl = document.getElementById("keyStatusText");
-            const clearBtn = document.getElementById("clearKeyBtn");
-            if (key && key.startsWith("sk-")) {
-                const masked = key.slice(0, 6) + "…" + key.slice(-4);
-                textEl.textContent = `Key set: ${masked}`;
-                clearBtn.style.display = "inline";
-            } else if (key) {
-                textEl.textContent = "Key set (invalid format)";
-                clearBtn.style.display = "inline";
-            } else {
-                textEl.textContent = "No key set";
-                clearBtn.style.display = "none";
-            }
-        }
-
-        function saveApiKey() {
-            const input = document.getElementById("apiKeyInput");
-            const key = input.value.trim();
-            if (!key) {
-                showToast("Please enter your Mistral API key.", "warning");
+        function saveScene() {
+            const raw = document.getElementById("scriptInput").value;
+            if (raw.trim().length === 0) {
+                alert("Paste in a script before saving.");
                 return;
             }
-            if (!key.startsWith("sk-")) {
-                showToast("API key should start with 'sk-'.", "warning");
+            const play = document.getElementById("screenplayName").value.trim();
+            if (!play) {
+                alert("Give this screenplay a name first (so scenes can be grouped under it).");
                 return;
             }
-            setApiKey(key);
-            updateKeyStatus();
-            closeApiKeyModal();
-            showToast("API key saved successfully.", "success");
-            // If AI mode is on, re-run the check
-            if (document.getElementById("aiMode").checked) {
-                document.getElementById("aiMode").checked = true;
+            const name = document.getElementById("sceneName").value.trim();
+            if (!name) {
+                alert("Give this scene a name first.");
+                return;
             }
-        }
-
-        document.getElementById("clearKeyBtn").addEventListener("click", function() {
-            if (confirm("Clear your stored Mistral API key?")) {
-                clearApiKey();
-                updateKeyStatus();
-                document.getElementById("apiKeyInput").value = "";
-                showToast("API key cleared.", "success");
+            if (name === "__order") {
+                alert("That name is reserved internally — please pick a different scene name.");
+                return;
             }
-        });
-
-        // ---- AI Hint Functions ----
-        async function computeScriptHash(text) {
-            const encoder = new TextEncoder();
-            const data = encoder.encode(text);
-            const hash = await crypto.subtle.digest("SHA-256", data);
-            return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, "0")).join("");
-        }
-
-        function getHintDocPath(play, scene, character) {
-            // Sanitize for Firestore path
-            const safePlay = play.replace(/[^a-zA-Z0-9\-_]/g, "_");
-            const safeScene = scene.replace(/[^a-zA-Z0-9\-_]/g, "_");
-            const safeChar = character.replace(/[^a-zA-Z0-9\-_]/g, "_");
-            return `users/${window.swCurrentUser.uid}/hints/${safePlay}/${safeScene}/${safeChar}`;
-        }
-
-        async function loadHintsFromFirestore(play, scene, character, scriptHash) {
-            if (!window.swCurrentUser) return null;
-            try {
-                const { getFirestore, doc, getDoc } = await importFirestore();
-                const db = getFirestore();
-                const path = getHintDocPath(play, scene, character);
-                const snap = await getDoc(doc(db, ...path.split("/")));
-                if (!snap.exists()) return null;
-                const data = snap.data();
-                if (data.scriptHash === scriptHash && Array.isArray(data.hints)) {
-                    return data.hints;
-                }
-                return null;
-            } catch (e) {
-                console.warn("Failed to load hints from Firestore:", e);
-                return null;
-            }
-        }
-
-        async function saveHintsToFirestore(play, scene, character, hints, scriptHash) {
-            if (!window.swCurrentUser) return false;
-            try {
-                const { getFirestore, doc, setDoc, serverTimestamp } = await importFirestore();
-                const db = getFirestore();
-                const path = getHintDocPath(play, scene, character);
-                await setDoc(doc(db, ...path.split("/")), {
-                    character: character.toUpperCase(),
-                    hints: hints,
-                    scriptHash: scriptHash,
-                    generatedAt: serverTimestamp()
-                });
-                return true;
-            } catch (e) {
-                console.warn("Failed to save hints to Firestore:", e);
-                return false;
-            }
-        }
-
-        async function importFirestore() {
-            // Dynamic import of Firestore functions
-            const mod = await import("https://www.gstatic.com/firebasejs/12.17.0/firebase-firestore.js");
-            return mod;
-        }
-
-        async function callMistralAPI(scriptText, character) {
-            const apiKey = getApiKey();
-            if (!apiKey || !apiKey.startsWith("sk-")) {
-                throw new Error("Invalid or missing Mistral API key.");
-            }
-
-            const lines = scriptText.split("\n").map(l => l.trim()).filter(l => l.length > 0);
-            const lineCount = lines.length;
-
-            const systemPrompt = `You are a theatre rehearsal assistant. I will give you a complete script and the name of one character. For every line spoken by that character, provide a very short (1‑sentence) hint about the subtext, emotional state, or character objective behind that line. The hint must NOT repeat the line itself – it should help the actor remember the intention. Return your response as a JSON array where each element corresponds to a line of the script, but only fill in entries for lines spoken by the target character. For lines not spoken by the character, return null. The array must have exactly ${lineCount} elements.`;
-
-            const userMessage = `Character: ${character}\nScript:\n${scriptText}`;
-
-            const response = await fetch("https://api.mistral.ai/v1/chat/completions", {
-                method: "POST",
-                headers: {
-                    "Authorization": `Bearer ${apiKey}`,
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    model: "mistral-small-latest",
-                    messages: [
-                        { role: "system", content: systemPrompt },
-                        { role: "user", content: userMessage }
-                    ],
-                    temperature: 0.6,
-                    max_tokens: 3000
-                })
-            });
-
-            if (!response.ok) {
-                const errText = await response.text();
-                let errMsg = `Mistral API error (${response.status})`;
-                try {
-                    const errJson = JSON.parse(errText);
-                    if (errJson.error && errJson.error.message) errMsg = errJson.error.message;
-                } catch (e) {}
-                throw new Error(errMsg);
-            }
-
-            const data = await response.json();
-            const content = data.choices?.[0]?.message?.content;
-            if (!content) throw new Error("No content in Mistral response");
-
-            // Parse the JSON array from the response
-            let parsed;
-            try {
-                // Try to extract JSON from the content (it might be wrapped in markdown)
-                const jsonMatch = content.match(/\[[\s\S]*\]/);
-                if (jsonMatch) {
-                    parsed = JSON.parse(jsonMatch[0]);
-                } else {
-                    parsed = JSON.parse(content);
-                }
-            } catch (e) {
-                throw new Error("Failed to parse Mistral response as JSON.");
-            }
-
-            if (!Array.isArray(parsed)) {
-                throw new Error("Mistral response is not an array.");
-            }
-
-            if (parsed.length !== lineCount) {
-                // Try to pad or truncate
-                if (parsed.length < lineCount) {
-                    // Pad with nulls
-                    while (parsed.length < lineCount) parsed.push(null);
-                } else {
-                    parsed = parsed.slice(0, lineCount);
-                }
-            }
-
-            // Ensure all entries are strings or null
-            return parsed.map(item => (typeof item === "string" && item.length > 0) ? item : null);
-        }
-
-        async function generateAndSaveHints(play, scene, character, scriptText) {
-            const hash = await computeScriptHash(scriptText);
-
-            // Check cache first
-            const cached = await loadHintsFromFirestore(play, scene, character, hash);
-            if (cached) {
-                return cached;
-            }
-
-            // Call Mistral
-            const hints = await callMistralAPI(scriptText, character);
-
-            // Save to Firestore
-            await saveHintsToFirestore(play, scene, character, hints, hash);
-
-            return hints;
-        }
-
-        async function checkHintsExist(play, scene) {
-            if (!window.swCurrentUser) return null;
-            try {
-                const { getFirestore, collection, query, where, getDocs } = await importFirestore();
-                const db = getFirestore();
-                // Use a collection group query to find all hint docs for this play/scene
-                // Since we store hints under users/{uid}/hints/{play}/{scene}/{character}
-                // We can query the subcollection 'hints' with filters on the path segments.
-                // But Firestore doesn't support filtering on document path segments directly.
-                // Alternative: store play and scene as fields in the hint document.
-                // We'll store them when saving.
-                // So we'll query where play == play and scene == scene.
-                const q = query(
-                    collection(db, "users", window.swCurrentUser.uid, "hints"),
-                    where("play", "==", play),
-                    where("scene", "==", scene)
-                );
-                const snap = await getDocs(q);
-                if (snap.empty) return null;
-                const results = [];
-                snap.forEach(doc => {
-                    results.push({
-                        character: doc.data().character || "unknown",
-                        docId: doc.id
-                    });
-                });
-                return results;
-            } catch (e) {
-                console.warn("Failed to check hints existence:", e);
-                return null;
-            }
-        }
-
-        // ---- Scene list with AI badges ----
-        let hintBadgeCache = {};
-
-        async function updateSceneBadges() {
-            if (!window.swCurrentUser) return;
             const data = loadScreenplays();
-            const plays = Object.keys(data);
-            for (const play of plays) {
-                const scenes = data[play];
-                const names = getSceneNames(scenes);
-                for (const name of names) {
-                    const key = `${play}||${name}`;
-                    if (hintBadgeCache[key] === undefined) {
-                        const exists = await checkHintsExist(play, name);
-                        hintBadgeCache[key] = exists;
-                    }
-                    // Update UI
-                    const row = document.querySelector(`.scene-row[data-scene="${CSS.escape(name)}"][data-play="${CSS.escape(play)}"]`);
-                    if (row) {
-                        const badge = row.querySelector(".ai-badge");
-                        if (badge) {
-                            const has = hintBadgeCache[key];
-                            if (has && has.length > 0) {
-                                badge.classList.add("has-hints");
-                                badge.textContent = `AI${has.length > 1 ? `+${has.length-1}` : ""}`;
-                                badge.title = has.map(h => `"${h.character}"`).join(", ");
-                            } else {
-                                badge.classList.remove("has-hints");
-                                badge.textContent = "AI";
-                                badge.title = "No AI hints stored";
-                            }
-                        }
-                    }
-                }
+            if (!data[play]) data[play] = {};
+            const isNew = !(name in data[play]);
+            data[play][name] = {
+                script: raw,
+                myChar: document.getElementById("myChar").value.trim(),
+                shuffle: document.getElementById("shuffleMode").checked,
+                speak: document.getElementById("speakOthers").checked,
+                hint: document.getElementById("hintMode").checked,
+                ttsLang: document.getElementById("ttsLang").value
+            };
+            if (isNew) {
+                if (!Array.isArray(data[play].__order)) data[play].__order = getSceneNames(data[play]).filter(n => n !==
+                name);
+                data[play].__order.push(name);
+            }
+            const saved = saveScreenplays(data);
+            document.getElementById("sceneName").value = "";
+            renderSceneList();
+            warnIfNotPersisted(saved);
+        }
+
+        function warnIfNotPersisted(saved) {
+            if (!saved) {
+                alert(
+                    "Your browser's storage is full, so this couldn't be permanently saved. It'll stay available for the rest of this session, but will be lost on refresh. Try exporting your scenes and deleting some older screenplays to free up space."
+                    );
             }
         }
 
-        // ---- Modified renderSceneList with AI badges ----
-        const origRenderSceneList = renderSceneList;
-        renderSceneList = function() {
+        function updateStartButtonState() {
+            const hasScript = document.getElementById("scriptInput").value.trim().length > 0;
+            const btns = document.querySelectorAll(".start-practice-btn");
+            btns.forEach(btn => btn.disabled = !hasScript);
+        }
+
+        function loadScene(play, name) {
+            const data = loadScreenplays();
+            const s = data[play] && data[play][name];
+            if (!s) return;
+            document.getElementById("scriptInput").value = s.script;
+            document.getElementById("myChar").value = s.myChar || "";
+            document.getElementById("shuffleMode").checked = !!s.shuffle;
+            document.getElementById("speakOthers").checked = !!s.speak;
+            document.getElementById("hintMode").checked = !!s.hint;
+            document.getElementById("ttsLang").value = s.ttsLang || "ro-RO";
+            document.getElementById("screenplayName").value = play;
+            document.getElementById("sceneName").value = name;
+            updateVoiceHint();
+            updateStartButtonState();
+            closeScenesSheet();
+            window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+
+        function deleteScene(play, name) {
+            if (!confirm(`Delete saved scene "${name}" from "${play}"?`)) return;
+            const data = loadScreenplays();
+            if (data[play]) {
+                delete data[play][name];
+                if (Array.isArray(data[play].__order)) {
+                    data[play].__order = data[play].__order.filter(n => n !== name);
+                }
+                if (getSceneNames(data[play]).length === 0) delete data[play];
+            }
+            saveScreenplays(data);
+            renderSceneList();
+        }
+
+        function deleteScreenplay(play) {
+            const data = loadScreenplays();
+            const count = data[play] ? Object.keys(data[play]).length : 0;
+            if (!confirm(`Delete "${play}" and all ${count} scene(s) under it?`)) return;
+            delete data[play];
+            saveScreenplays(data);
+            renderSceneList();
+        }
+
+        function renderSceneList() {
             const data = loadScreenplays();
             const plays = Object.keys(data);
             const list = document.getElementById("sceneList");
@@ -1652,25 +1187,12 @@
               </div>
               <div class="scene-rows" data-play="${escapeAttr(play)}">`;
                 names.forEach(name => {
-                    const sceneData = scenes[name];
-                    const lineCount = sceneData.script.split("\n").map(r => r.trim()).filter(r => r).length;
-                    const charLabel = sceneData.myChar ? ` · as ${sceneData.myChar}` : "";
-                    const key = `${play}||${name}`;
-                    const hasHints = hintBadgeCache[key];
-                    const badgeText = (hasHints && hasHints.length > 0) ?
-                        `AI${hasHints.length > 1 ? `+${hasHints.length-1}` : ""}` :
-                        "AI";
-                    const badgeTitle = (hasHints && hasHints.length > 0) ?
-                        hasHints.map(h => `"${h.character}"`).join(", ") :
-                        "No AI hints stored";
-                    const badgeClass = (hasHints && hasHints.length > 0) ? "ai-badge has-hints" : "ai-badge";
-                    html += `<div class="scene-row" data-scene="${escapeAttr(name)}" data-play="${escapeAttr(play)}">
+                    const lineCount = scenes[name].script.split("\n").map(r => r.trim()).filter(r => r).length;
+                    const charLabel = scenes[name].myChar ? ` · as ${scenes[name].myChar}` : "";
+                    html += `<div class="scene-row" data-scene="${escapeAttr(name)}">
                 ${draggable ? `<span class="drag-handle" title="Drag to reorder" aria-label="Drag to reorder">⠿</span>` : ""}
                 <div class="scene-info">
-                  <div class="name">
-                    ${escapeHtml(name)}
-                    <span class="${badgeClass}" title="${badgeTitle}" data-play="${escapeAttr(play)}" data-scene="${escapeAttr(name)}">${badgeText}</span>
-                  </div>
+                  <div class="name">${escapeHtml(name)}</div>
                   <div class="meta">${lineCount} lines${charLabel}</div>
                 </div>
                 <div class="scene-actions">
@@ -1685,398 +1207,217 @@
             list.innerHTML = html;
             noMatches.style.display = (term && !anyRendered) ? "block" : "none";
             attachDragHandlers();
+        }
 
-            // Attach badge click handlers for regeneration
-            document.querySelectorAll(".ai-badge").forEach(badge => {
-                badge.addEventListener("click", function(e) {
-                    e.stopPropagation();
-                    const play = this.dataset.play;
-                    const scene = this.dataset.scene;
-                    if (play && scene) {
-                        regenerateHints(play, scene);
-                    }
-                });
+        let dragCtx = null;
+
+        function attachDragHandlers() {
+            document.querySelectorAll(".drag-handle").forEach(handle => {
+                handle.addEventListener("pointerdown", onDragHandleDown);
             });
+        }
 
-            // If user is signed in, update badges asynchronously
-            if (window.swCurrentUser) {
-                // Refresh badge cache for visible scenes
-                const visibleRows = document.querySelectorAll(".scene-row");
-                const keys = [];
-                visibleRows.forEach(row => {
-                    const p = row.dataset.play;
-                    const s = row.dataset.scene;
-                    if (p && s) {
-                        const key = `${p}||${s}`;
-                        if (hintBadgeCache[key] === undefined) {
-                            keys.push({ play: p, scene: s, key: key });
-                        }
-                    }
+        function onDragHandleDown(e) {
+            const handle = e.currentTarget;
+            const row = handle.closest(".scene-row");
+            const container = row && row.closest(".scene-rows");
+            if (!row || !container) return;
+            e.preventDefault();
+            dragCtx = {
+                row,
+                container,
+                play: container.dataset.play,
+                pointerId: e.pointerId
+            };
+            row.classList.add("dragging");
+            document.body.classList.add("dragging-active");
+            try { handle.setPointerCapture(e.pointerId); } catch (err) {}
+            document.addEventListener("pointermove", onDragMove);
+            document.addEventListener("pointerup", endDrag);
+            document.addEventListener("pointercancel", endDrag);
+        }
+
+        function onDragMove(e) {
+            if (!dragCtx) return;
+            const { row, container } = dragCtx;
+            const y = e.clientY;
+
+            const scrollParent = container.closest(".side-col-inner, .tts-panel-inner");
+            if (scrollParent) {
+                const prect = scrollParent.getBoundingClientRect();
+                const edge = 32;
+                if (y < prect.top + edge) {
+                    scrollParent.scrollTop -= 12;
+                } else if (y > prect.bottom - edge) {
+                    scrollParent.scrollTop += 12;
+                }
+            }
+
+            const siblings = Array.from(container.querySelectorAll(".scene-row")).filter(el => el !== row);
+            let target = null;
+            for (const sib of siblings) {
+                const rect = sib.getBoundingClientRect();
+                const mid = rect.top + rect.height / 2;
+                if (y < mid) {
+                    target = sib;
+                    break;
+                }
+            }
+
+            if (target) {
+                if (row.nextElementSibling !== target) {
+                    container.insertBefore(row, target);
+                }
+            } else if (container.lastElementChild !== row) {
+                container.appendChild(row);
+            }
+        }
+
+        function endDrag() {
+            if (!dragCtx) return;
+            const { row, container, play } = dragCtx;
+            row.classList.remove("dragging");
+            document.body.classList.remove("dragging-active");
+            document.removeEventListener("pointermove", onDragMove);
+            document.removeEventListener("pointerup", endDrag);
+            document.removeEventListener("pointercancel", endDrag);
+
+            const newOrder = Array.from(container.querySelectorAll(".scene-row")).map(r => r.dataset.scene);
+            const data = loadScreenplays();
+            if (data[play]) {
+                data[play].__order = newOrder;
+                saveScreenplays(data);
+            }
+            dragCtx = null;
+        }
+
+        function exportScenes() {
+            const data = loadScreenplays();
+            if (Object.keys(data).length === 0) {
+                alert("No saved scenes to export yet.");
+                return;
+            }
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            const stamp = new Date().toISOString().slice(0, 10);
+            a.href = url;
+            a.download = `stage-whisper-scenes-${stamp}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function importScenesFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                let imported;
+                try {
+                    imported = JSON.parse(e.target.result);
+                } catch (err) {
+                    alert("That file isn't valid scene JSON.");
+                    event.target.value = "";
+                    return;
+                }
+                if (typeof imported !== "object" || imported === null || Object.keys(imported).length === 0) {
+                    alert("No scenes found in that file.");
+                    event.target.value = "";
+                    return;
+                }
+
+                let incoming;
+                if (isFlatSceneFormat(imported)) {
+                    let playName = prompt(
+                        "This file has scenes without a screenplay grouping. What screenplay should they be filed under?",
+                        "Imported Scenes");
+                    if (playName === null) { event.target.value = ""; return; }
+                    playName = playName.trim() || "Imported Scenes";
+                    incoming = { [playName]: imported };
+                } else {
+                    incoming = imported;
+                }
+
+                const existing = loadScreenplays();
+                const collisions = [];
+                Object.keys(incoming).forEach(play => {
+                    Object.keys(incoming[play]).filter(n => n !== "__order").forEach(name => {
+                        if (existing[play] && existing[play][name]) collisions.push(`${play} / ${name}`);
+                    });
                 });
-                if (keys.length > 0) {
-                    Promise.all(keys.map(async ({ play, scene, key }) => {
-                        const exists = await checkHintsExist(play, scene);
-                        hintBadgeCache[key] = exists;
-                        // Update the badge in the DOM
-                        const row = document.querySelector(`.scene-row[data-scene="${CSS.escape(scene)}"][data-play="${CSS.escape(play)}"]`);
-                        if (row) {
-                            const badge = row.querySelector(".ai-badge");
-                            if (badge) {
-                                const has = hintBadgeCache[key];
-                                if (has && has.length > 0) {
-                                    badge.classList.add("has-hints");
-                                    badge.textContent = `AI${has.length > 1 ? `+${has.length-1}` : ""}`;
-                                    badge.title = has.map(h => `"${h.character}"`).join(", ");
-                                } else {
-                                    badge.classList.remove("has-hints");
-                                    badge.textContent = "AI";
-                                    badge.title = "No AI hints stored";
-                                }
-                            }
-                        }
-                    })).catch(() => {});
+                if (collisions.length > 0) {
+                    const ok = confirm(
+                        `${collisions.length} scene(s) share a name with ones you already have and will be overwritten:\n${collisions.slice(0,8).join("\n")}${collisions.length>8 ? "\n…" : ""}\n\nContinue?`
+                        );
+                    if (!ok) { event.target.value = ""; return; }
                 }
-            }
-        };
 
-        // ---- Regenerate hints ----
-        async function regenerateHints(play, scene) {
-            if (!window.swCurrentUser) {
-                showToast("Please sign in to regenerate AI hints.", "warning");
-                return;
-            }
-            const data = loadScreenplays();
-            const sceneData = data[play] && data[play][scene];
-            if (!sceneData) {
-                showToast("Scene not found.", "warning");
-                return;
-            }
-            const character = sceneData.myChar ? sceneData.myChar.toUpperCase().trim() : "";
-            if (!character) {
-                showToast("This scene doesn't have a character set. Load it and set your character name first.", "warning");
-                return;
-            }
-            const scriptText = sceneData.script || "";
-            if (!scriptText.trim()) {
-                showToast("Scene script is empty.", "warning");
-                return;
-            }
-
-            const apiKey = getApiKey();
-            if (!apiKey || !apiKey.startsWith("sk-")) {
-                openApiKeyModal();
-                showToast("Please set your Mistral API key first.", "warning");
-                return;
-            }
-
-            if (!confirm(`Regenerate AI hints for "${scene}" (character: ${character})? This will replace any existing hints.`)) {
-                return;
-            }
-
-            // Show loading overlay
-            document.getElementById("aiLoadText").textContent = `Generating AI hints for ${character}…`;
-            document.getElementById("aiLoadingOverlay").classList.add("open");
-
-            try {
-                const hash = await computeScriptHash(scriptText);
-                const hints = await callMistralAPI(scriptText, character);
-                // Save with play and scene fields for querying
-                await saveHintsToFirestore(play, scene, character, hints, hash);
-                // Update cache
-                const key = `${play}||${scene}`;
-                const exists = await checkHintsExist(play, scene);
-                hintBadgeCache[key] = exists;
-                showToast(`AI hints regenerated for "${scene}".`, "success");
+                let sceneCount = 0;
+                Object.keys(incoming).forEach(play => {
+                    if (!existing[play]) existing[play] = {};
+                    const existingOrder = getSceneNames(existing[play]);
+                    const incomingOrder = getSceneNames(incoming[play]);
+                    Object.assign(existing[play], incoming[play]);
+                    const combinedOrder = existingOrder.slice();
+                    incomingOrder.forEach(n => { if (!combinedOrder.includes(n)) combinedOrder.push(n); });
+                    existing[play].__order = combinedOrder;
+                    sceneCount += incomingOrder.filter(n => n !== "__order").length;
+                });
+                const saved = saveScreenplays(existing);
                 renderSceneList();
-            } catch (err) {
-                showToast(`Failed to regenerate hints: ${err.message}`, "warning");
-                console.error(err);
-            } finally {
-                document.getElementById("aiLoadingOverlay").classList.remove("open");
-            }
+                if (saved) {
+                    alert(`Imported ${sceneCount} scene(s) across ${Object.keys(incoming).length} screenplay(s).`);
+                } else {
+                    alert(
+                        `Imported ${sceneCount} scene(s), but your browser's storage is full — none of this import was permanently saved. It'll stay available for the rest of this session only. Try exporting what you can, deleting some older screenplays, and importing again in smaller batches.`
+                        );
+                }
+                event.target.value = "";
+            };
+            reader.readAsText(file);
         }
 
-        // ---- Modified saveScene to include aiMode and store play/scene fields in hint docs ----
-        const origSaveScene = saveScene;
-        saveScene = function() {
-            const raw = document.getElementById("scriptInput").value;
-            if (raw.trim().length === 0) {
-                alert("Paste in a script before saving.");
-                return;
-            }
-            const play = document.getElementById("screenplayName").value.trim();
-            if (!play) {
-                alert("Give this screenplay a name first (so scenes can be grouped under it).");
-                return;
-            }
-            const name = document.getElementById("sceneName").value.trim();
-            if (!name) {
-                alert("Give this scene a name first.");
-                return;
-            }
-            if (name === "__order") {
-                alert("That name is reserved internally — please pick a different scene name.");
-                return;
-            }
-            const data = loadScreenplays();
-            if (!data[play]) data[play] = {};
-            const isNew = !(name in data[play]);
-            data[play][name] = {
-                script: raw,
-                myChar: document.getElementById("myChar").value.trim(),
-                shuffle: document.getElementById("shuffleMode").checked,
-                speak: document.getElementById("speakOthers").checked,
-                hint: document.getElementById("hintMode").checked,
-                aiMode: document.getElementById("aiMode").checked,
-                ttsLang: document.getElementById("ttsLang").value
-            };
-            if (isNew) {
-                if (!Array.isArray(data[play].__order)) data[play].__order = getSceneNames(data[play]).filter(n => n !==
-                name);
-                data[play].__order.push(name);
-            }
-            const saved = saveScreenplays(data);
-            document.getElementById("sceneName").value = "";
-            renderSceneList();
-            warnIfNotPersisted(saved);
-        };
+        function escapeHtml(s) {
+            return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" } [c]));
+        }
 
-        // ---- Modified loadScene to include aiMode ----
-        const origLoadScene = loadScene;
-        loadScene = function(play, name) {
-            const data = loadScreenplays();
-            const s = data[play] && data[play][name];
-            if (!s) return;
-            document.getElementById("scriptInput").value = s.script;
-            document.getElementById("myChar").value = s.myChar || "";
-            document.getElementById("shuffleMode").checked = !!s.shuffle;
-            document.getElementById("speakOthers").checked = !!s.speak;
-            document.getElementById("hintMode").checked = !!s.hint;
-            document.getElementById("aiMode").checked = !!s.aiMode;
-            document.getElementById("ttsLang").value = s.ttsLang || "ro-RO";
-            document.getElementById("screenplayName").value = play;
-            document.getElementById("sceneName").value = name;
+        function escapeAttr(s) {
+            return s.replace(/'/g, "\\'");
+        }
+
+        function loadVoices() {
+            voices = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
             updateVoiceHint();
-            updateStartButtonState();
-            closeScenesSheet();
-            window.scrollTo({ top: 0, behavior: "smooth" });
-            // If AI mode is on and user is signed in, check key
-            if (s.aiMode && window.swCurrentUser) {
-                const key = getApiKey();
-                if (!key || !key.startsWith("sk-")) {
-                    // Don't force modal, but show a subtle hint
-                    showToast("AI Mode is on — set your Mistral API key in the AI settings.", "warning");
-                }
-            }
-        };
-
-        // ---- Modified startPractice with AI hints ----
-        const origStartPractice = startPractice;
-        startPractice = async function() {
-            const raw = document.getElementById("scriptInput").value;
-            if (raw.trim().length === 0) {
-                alert("Paste in your script first.");
-                return;
-            }
-            allLines = parseScript(raw);
-            myChar = document.getElementById("myChar").value.trim().toUpperCase();
-            cueMode = myChar.length > 0;
-            shuffleOn = document.getElementById("shuffleMode").checked;
-            if (shuffleOn && !cueMode) {
-                alert("Shuffle mode needs your character name (above) so it knows which lines are yours.");
-                return;
-            }
-            speakOn = document.getElementById("speakOthers").checked;
-            hintOn = document.getElementById("hintMode").checked;
-            aiModeOn = document.getElementById("aiMode").checked;
-            ttsLang = document.getElementById("ttsLang").value;
-            gotIt = 0;
-            missed = 0;
-            missedSet = new Set();
-            aiHints = [];
-            aiHintsLoaded = false;
-            currentScriptRaw = raw;
-            currentPlay = document.getElementById("screenplayName").value.trim();
-            currentScene = document.getElementById("sceneName").value.trim();
-
-            // AI Mode: check key and generate hints
-            if (aiModeOn && cueMode) {
-                if (!window.swCurrentUser) {
-                    showToast("Please sign in to use AI Mode.", "warning");
-                    aiModeOn = false;
-                } else {
-                    const apiKey = getApiKey();
-                    if (!apiKey || !apiKey.startsWith("sk-")) {
-                        openApiKeyModal();
-                        showToast("Please set your Mistral API key to use AI Mode.", "warning");
-                        aiModeOn = false;
-                    } else {
-                        // Generate hints
-                        try {
-                            document.getElementById("aiLoadText").textContent = `Generating AI hints for ${myChar}…`;
-                            document.getElementById("aiLoadingOverlay").classList.add("open");
-
-                            const playName = currentPlay || "Untitled Screenplay";
-                            const sceneName = currentScene || "Untitled Scene";
-
-                            // Check Firestore cache
-                            const hash = await computeScriptHash(raw);
-                            const cached = await loadHintsFromFirestore(playName, sceneName, myChar, hash);
-                            if (cached) {
-                                aiHints = cached;
-                                aiHintsLoaded = true;
-                                showToast(`AI hints loaded from cache for ${myChar}.`, "success");
-                            } else {
-                                // Generate new hints
-                                aiHints = await callMistralAPI(raw, myChar);
-                                await saveHintsToFirestore(playName, sceneName, myChar, aiHints, hash);
-                                aiHintsLoaded = true;
-                                // Update cache for badge
-                                const key = `${playName}||${sceneName}`;
-                                const exists = await checkHintsExist(playName, sceneName);
-                                hintBadgeCache[key] = exists;
-                                renderSceneList();
-                                showToast(`AI hints generated for ${myChar}.`, "success");
-                            }
-                        } catch (err) {
-                            showToast(`AI hint generation failed: ${err.message}. Continuing without hints.`, "warning");
-                            console.error(err);
-                            aiHints = [];
-                            aiHintsLoaded = false;
-                        } finally {
-                            document.getElementById("aiLoadingOverlay").classList.remove("open");
-                        }
-                    }
-                }
-            }
-
-            order = buildOrder();
-            pos = 0;
-            revealed = false;
-
-            document.getElementById("setup").style.display = "none";
-            document.getElementById("done").style.display = "none";
-            document.getElementById("practice").style.display = "flex";
-            document.getElementById("scoreRow").style.display = cueMode ? "flex" : "none";
-            document.querySelector(".side-col").style.display = "none";
-            currentScreen = "practice";
-            closeScenesSheet();
-            updateBottomBarVisibility();
-            updateScore();
-            renderCurrent();
-        };
-
-        // ---- Modified renderCurrent with AI hints ----
-        const origRenderCurrent = renderCurrent;
-        renderCurrent = function() {
-            if (pos >= order.length) {
-                showDone();
-                return;
-            }
-            const line = allLines[order[pos]];
-            const total = order.length;
-            document.getElementById("progressText").textContent = `LINE ${pos+1} / ${total}`;
-            document.getElementById("progressFill").style.width = `${(pos/total)*100}%`;
-            document.getElementById("charName").textContent = line.character ? line.character : "";
-            document.getElementById("lineText").style.fontSize = fontSize + "rem";
-
-            if (pos > 0) {
-                const prev = allLines[order[pos - 1]];
-                const prevLabel = prev.character ? prev.character + ": " : "";
-                document.getElementById("contextLine").textContent = "Previous: " + prevLabel + prev.text;
-            } else {
-                document.getElementById("contextLine").textContent = "";
-            }
-
-            const mine = isMyLine(line);
-            const mainBtn = document.getElementById("mainBtn");
-            const scoreRow = document.getElementById("scoreRow");
-            const scoreButtons = document.getElementById("scoreButtons");
-            const hideBtn = document.getElementById("hideBtn");
-
-            hideBtn.style.display = (cueMode ? mine : true) ? "inline-block" : "none";
-
-            // Get AI hint for this line
-            let hintText = null;
-            if (aiHintsLoaded && aiHints.length > order.length) {
-                // Hint array might be longer than order if padding was added
-                const idx = order[pos];
-                if (idx < aiHints.length && aiHints[idx] && typeof aiHints[idx] === "string") {
-                    hintText = aiHints[idx];
-                }
-            } else if (aiHintsLoaded && order[pos] < aiHints.length) {
-                const idx = order[pos];
-                if (aiHints[idx] && typeof aiHints[idx] === "string") {
-                    hintText = aiHints[idx];
-                }
-            }
-
-            // Build line display with hint
-            const lineTextEl = document.getElementById("lineText");
-
-            if (mine && !revealed) {
-                lineTextEl.className = "line-text line-hidden";
-                let displayText = hintOn ? firstLetterHint(line.text) : "· · · your line · · ·";
-                let hintHtml = "";
-                if (hintText) {
-                    hintHtml = `<div class="ai-hint-text">💡 ${hintText}</div>`;
-                }
-                lineTextEl.innerHTML = displayText + hintHtml;
-                mainBtn.textContent = "REVEAL MY LINE";
-                mainBtn.className = "big-btn cue";
-                scoreRow.style.display = "none";
-                scoreButtons.style.display = "none";
-            } else if (mine && revealed) {
-                lineTextEl.className = "line-text";
-                let hintHtml = "";
-                if (hintText) {
-                    hintHtml = `<div class="ai-hint-text">💡 ${hintText}</div>`;
-                }
-                lineTextEl.innerHTML = line.text + hintHtml;
-                mainBtn.textContent = "NEXT LINE";
-                mainBtn.className = "big-btn";
-                if (cueMode) {
-                    scoreRow.style.display = "flex";
-                    scoreButtons.style.display = "flex";
-                }
-            } else {
-                if (cueMode) {
-                    lineTextEl.className = "line-text";
-                    let hintHtml = "";
-                    // For other characters, don't show AI hints (they're for the user's lines only)
-                    lineTextEl.innerHTML = line.text;
-                    mainBtn.textContent = "NEXT LINE";
-                    mainBtn.className = "big-btn";
-                    if (!revealed) { speak(line.text);
-                        revealed = true; }
-                    scoreRow.style.display = "none";
-                    scoreButtons.style.display = "none";
-                } else {
-                    if (!revealed) {
-                        lineTextEl.className = "line-text line-hidden";
-                        let displayText = hintOn ? firstLetterHint(line.text) :
-                            "· · · press to reveal · · ·";
-                        lineTextEl.innerHTML = displayText;
-                        mainBtn.textContent = "REVEAL";
-                        mainBtn.className = "big-btn cue";
-                    } else {
-                        lineTextEl.className = "line-text";
-                        lineTextEl.innerHTML = line.text;
-                        mainBtn.textContent = "NEXT LINE";
-                        mainBtn.className = "big-btn";
-                    }
-                }
-            }
-        };
-
-        // ---- Helper: CSS.escape polyfill for older browsers ----
-        if (!CSS.escape) {
-            CSS.escape = function(value) {
-                return String(value).replace(/([^\w-])/g, '\\$1');
-            };
+        }
+        if (window.speechSynthesis) {
+            loadVoices();
+            window.speechSynthesis.onvoiceschanged = loadVoices;
         }
 
-        // ---- Everything else from original (keep all functions) ----
+        function updateVoiceHint() {
+            const sel = document.getElementById("ttsLang");
+            if (!sel) return;
+            const lang = sel.value;
+            const match = pickVoice(lang);
+            const hintEl = document.getElementById("voiceHint");
+            if (!hintEl) return;
+            if (match) {
+                hintEl.textContent = `Voice found: ${match.name} (${match.lang})`;
+            } else {
+                hintEl.textContent =
+                    `No ${lang} voice installed on this device — speech may fall back to a default voice or stay silent. (On Android/Chrome: Settings → Languages → Text-to-speech, add the language.)`;
+            }
+        }
+
+        function pickVoice(lang) {
+            if (!voices.length) return null;
+            const base = lang.split("-")[0];
+            return voices.find(v => v.lang === lang) ||
+                voices.find(v => v.lang && v.lang.toLowerCase().startsWith(base)) ||
+                null;
+        }
 
         function parseScript(raw) {
             const rows = raw.split("\n").map(r => r.trim()).filter(r => r.length > 0);
@@ -2136,6 +1477,91 @@
             }).join(" ");
         }
 
+        function playAllScenes(play) {
+            const data = loadScreenplays();
+            const screenplay = data[play];
+            if (!screenplay) {
+                alert('Screenplay not found.');
+                return;
+            }
+
+            const sceneNames = getSceneNames(screenplay);
+            if (sceneNames.length === 0) {
+                alert('No scenes found in this screenplay.');
+                return;
+            }
+
+            let combinedScript = '';
+            let firstScene = null;
+
+            sceneNames.forEach(name => {
+                const scene = screenplay[name];
+                if (!firstScene) {
+                    firstScene = scene;
+                }
+                if (scene.script) {
+                    combinedScript += scene.script + '\n\n';
+                }
+            });
+
+            if (!combinedScript.trim()) {
+                alert('No script content found in these scenes.');
+                return;
+            }
+
+            document.getElementById('scriptInput').value = combinedScript.trim();
+            updateStartButtonState();
+
+            if (firstScene) {
+                document.getElementById('myChar').value = firstScene.myChar || '';
+                document.getElementById('shuffleMode').checked = !!firstScene.shuffle;
+                document.getElementById('speakOthers').checked = !!firstScene.speak;
+                document.getElementById('hintMode').checked = !!firstScene.hint;
+                document.getElementById('ttsLang').value = firstScene.ttsLang || 'ro-RO';
+                document.getElementById('screenplayName').value = play;
+                document.getElementById('sceneName').value = '';
+            }
+
+            closeScenesSheet();
+            startPractice();
+        }
+
+        function startPractice() {
+            const raw = document.getElementById("scriptInput").value;
+            if (raw.trim().length === 0) {
+                alert("Paste in your script first.");
+                return;
+            }
+            allLines = parseScript(raw);
+            myChar = document.getElementById("myChar").value.trim().toUpperCase();
+            cueMode = myChar.length > 0;
+            shuffleOn = document.getElementById("shuffleMode").checked;
+            if (shuffleOn && !cueMode) {
+                alert("Shuffle mode needs your character name (above) so it knows which lines are yours.");
+                return;
+            }
+            speakOn = document.getElementById("speakOthers").checked;
+            hintOn = document.getElementById("hintMode").checked;
+            ttsLang = document.getElementById("ttsLang").value;
+            gotIt = 0;
+            missed = 0;
+            missedSet = new Set();
+            order = buildOrder();
+            pos = 0;
+            revealed = false;
+
+            document.getElementById("setup").style.display = "none";
+            document.getElementById("done").style.display = "none";
+            document.getElementById("practice").style.display = "flex";
+            document.getElementById("scoreRow").style.display = cueMode ? "flex" : "none";
+            document.querySelector(".side-col").style.display = "none";
+            currentScreen = "practice";
+            closeScenesSheet();
+            updateBottomBarVisibility();
+            updateScore();
+            renderCurrent();
+        }
+
         function isMyLine(line) {
             return cueMode && line.character && line.character.toUpperCase() === myChar;
         }
@@ -2175,6 +1601,77 @@
             ttsLang = document.getElementById("ttsLang").value;
             updateVoiceHint();
             if (speakOn) speakCurrentLineIfApplicable();
+        }
+
+        function renderCurrent() {
+            if (pos >= order.length) {
+                showDone();
+                return;
+            }
+            const line = allLines[order[pos]];
+            const total = order.length;
+            document.getElementById("progressText").textContent = `LINE ${pos+1} / ${total}`;
+            document.getElementById("progressFill").style.width = `${(pos/total)*100}%`;
+            document.getElementById("charName").textContent = line.character ? line.character : "";
+            document.getElementById("lineText").style.fontSize = fontSize + "rem";
+
+            if (pos > 0) {
+                const prev = allLines[order[pos - 1]];
+                const prevLabel = prev.character ? prev.character + ": " : "";
+                document.getElementById("contextLine").textContent = "Previous: " + prevLabel + prev.text;
+            } else {
+                document.getElementById("contextLine").textContent = "";
+            }
+
+            const mine = isMyLine(line);
+            const mainBtn = document.getElementById("mainBtn");
+            const scoreRow = document.getElementById("scoreRow");
+            const scoreButtons = document.getElementById("scoreButtons");
+            const hideBtn = document.getElementById("hideBtn");
+
+            hideBtn.style.display = (cueMode ? mine : true) ? "inline-block" : "none";
+
+            if (mine && !revealed) {
+                document.getElementById("lineText").className = "line-text line-hidden";
+                document.getElementById("lineText").textContent = hintOn ? firstLetterHint(line.text) : "· · · your line · · ·";
+                mainBtn.textContent = "REVEAL MY LINE";
+                mainBtn.className = "big-btn cue";
+                scoreRow.style.display = "none";
+                scoreButtons.style.display = "none";
+            } else if (mine && revealed) {
+                document.getElementById("lineText").className = "line-text";
+                document.getElementById("lineText").textContent = line.text;
+                mainBtn.textContent = "NEXT LINE";
+                mainBtn.className = "big-btn";
+                if (cueMode) {
+                    scoreRow.style.display = "flex";
+                    scoreButtons.style.display = "flex";
+                }
+            } else {
+                if (cueMode) {
+                    document.getElementById("lineText").className = "line-text";
+                    document.getElementById("lineText").textContent = line.text;
+                    mainBtn.textContent = "NEXT LINE";
+                    mainBtn.className = "big-btn";
+                    if (!revealed) { speak(line.text);
+                        revealed = true; }
+                    scoreRow.style.display = "none";
+                    scoreButtons.style.display = "none";
+                } else {
+                    if (!revealed) {
+                        document.getElementById("lineText").className = "line-text line-hidden";
+                        document.getElementById("lineText").textContent = hintOn ? firstLetterHint(line.text) :
+                            "· · · press to reveal · · ·";
+                        mainBtn.textContent = "REVEAL";
+                        mainBtn.className = "big-btn cue";
+                    } else {
+                        document.getElementById("lineText").className = "line-text";
+                        document.getElementById("lineText").textContent = line.text;
+                        mainBtn.textContent = "NEXT LINE";
+                        mainBtn.className = "big-btn";
+                    }
+                }
+            }
         }
 
         function handlePress() {
@@ -2317,315 +1814,67 @@
             setTheme(current === "dark" ? "light" : "dark");
         }
 
-        function loadVoices() {
-            voices = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
+        document.addEventListener("DOMContentLoaded", () => {
             updateVoiceHint();
-        }
-        if (window.speechSynthesis) {
-            loadVoices();
-            window.speechSynthesis.onvoiceschanged = loadVoices;
-        }
-
-        function updateVoiceHint() {
-            const sel = document.getElementById("ttsLang");
-            if (!sel) return;
-            const lang = sel.value;
-            const match = pickVoice(lang);
-            const hintEl = document.getElementById("voiceHint");
-            if (!hintEl) return;
-            if (match) {
-                hintEl.textContent = `Voice found: ${match.name} (${match.lang})`;
-            } else {
-                hintEl.textContent =
-                    `No ${lang} voice installed on this device — speech may fall back to a default voice or stay silent. (On Android/Chrome: Settings → Languages → Text-to-speech, add the language.)`;
-            }
-        }
-
-        function pickVoice(lang) {
-            if (!voices.length) return null;
-            const base = lang.split("-")[0];
-            return voices.find(v => v.lang === lang) ||
-                voices.find(v => v.lang && v.lang.toLowerCase().startsWith(base)) ||
-                null;
-        }
-
-        function playAllScenes(play) {
-            const data = loadScreenplays();
-            const screenplay = data[play];
-            if (!screenplay) {
-                alert('Screenplay not found.');
-                return;
-            }
-
-            const sceneNames = getSceneNames(screenplay);
-            if (sceneNames.length === 0) {
-                alert('No scenes found in this screenplay.');
-                return;
-            }
-
-            let combinedScript = '';
-            let firstScene = null;
-
-            sceneNames.forEach(name => {
-                const scene = screenplay[name];
-                if (!firstScene) {
-                    firstScene = scene;
-                }
-                if (scene.script) {
-                    combinedScript += scene.script + '\n\n';
-                }
-            });
-
-            if (!combinedScript.trim()) {
-                alert('No script content found in these scenes.');
-                return;
-            }
-
-            document.getElementById('scriptInput').value = combinedScript.trim();
+            renderSceneList();
+            updateBottomBarVisibility();
             updateStartButtonState();
+            setTheme(document.documentElement.getAttribute("data-theme") || "dark");
+            lockPortraitIfPossible();
+            disablePullToRefresh();
+        });
+        window.addEventListener("resize", updateBottomBarVisibility);
 
-            if (firstScene) {
-                document.getElementById('myChar').value = firstScene.myChar || '';
-                document.getElementById('shuffleMode').checked = !!firstScene.shuffle;
-                document.getElementById('speakOthers').checked = !!firstScene.speak;
-                document.getElementById('hintMode').checked = !!firstScene.hint;
-                document.getElementById('aiMode').checked = !!firstScene.aiMode;
-                document.getElementById('ttsLang').value = firstScene.ttsLang || 'ro-RO';
-                document.getElementById('screenplayName').value = play;
-                document.getElementById('sceneName').value = '';
-            }
-
-            closeScenesSheet();
-            startPractice();
-        }
-
-        function updateStartButtonState() {
-            const hasScript = document.getElementById("scriptInput").value.trim().length > 0;
-            const btns = document.querySelectorAll(".start-practice-btn");
-            btns.forEach(btn => btn.disabled = !hasScript);
-        }
-
-        function warnIfNotPersisted(saved) {
-            if (!saved) {
-                alert(
-                    "Your browser's storage is full, so this couldn't be permanently saved. It'll stay available for the rest of this session, but will be lost on refresh. Try exporting your scenes and deleting some older screenplays to free up space."
-                );
-            }
-        }
-
-        function deleteScene(play, name) {
-            if (!confirm(`Delete saved scene "${name}" from "${play}"?`)) return;
-            const data = loadScreenplays();
-            if (data[play]) {
-                delete data[play][name];
-                if (Array.isArray(data[play].__order)) {
-                    data[play].__order = data[play].__order.filter(n => n !== name);
+        function lockPortraitIfPossible() {
+            try {
+                if (screen.orientation && typeof screen.orientation.lock === "function") {
+                    screen.orientation.lock("portrait").catch(() => {});
                 }
-                if (getSceneNames(data[play]).length === 0) delete data[play];
-                // Also clear hint cache for this scene
-                const key = `${play}||${name}`;
-                delete hintBadgeCache[key];
-            }
-            saveScreenplays(data);
-            renderSceneList();
+            } catch (e) {}
         }
 
-        function deleteScreenplay(play) {
-            const data = loadScreenplays();
-            const count = data[play] ? Object.keys(data[play]).length : 0;
-            if (!confirm(`Delete "${play}" and all ${count} scene(s) under it?`)) return;
-            // Clear hint cache for all scenes in this screenplay
-            if (data[play]) {
-                getSceneNames(data[play]).forEach(name => {
-                    const key = `${play}||${name}`;
-                    delete hintBadgeCache[key];
-                });
-            }
-            delete data[play];
-            saveScreenplays(data);
-            renderSceneList();
-        }
-
-        function exportScenes() {
-            const data = loadScreenplays();
-            if (Object.keys(data).length === 0) {
-                alert("No saved scenes to export yet.");
-                return;
-            }
-            const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            const stamp = new Date().toISOString().slice(0, 10);
-            a.href = url;
-            a.download = `stage-whisper-scenes-${stamp}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
-
-        function importScenesFile(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                let imported;
-                try {
-                    imported = JSON.parse(e.target.result);
-                } catch (err) {
-                    alert("That file isn't valid scene JSON.");
-                    event.target.value = "";
-                    return;
-                }
-                if (typeof imported !== "object" || imported === null || Object.keys(imported).length === 0) {
-                    alert("No scenes found in that file.");
-                    event.target.value = "";
-                    return;
-                }
-
-                let incoming;
-                if (isFlatSceneFormat(imported)) {
-                    let playName = prompt(
-                        "This file has scenes without a screenplay grouping. What screenplay should they be filed under?",
-                        "Imported Scenes");
-                    if (playName === null) { event.target.value = ""; return; }
-                    playName = playName.trim() || "Imported Scenes";
-                    incoming = { [playName]: imported };
-                } else {
-                    incoming = imported;
-                }
-
-                const existing = loadScreenplays();
-                const collisions = [];
-                Object.keys(incoming).forEach(play => {
-                    Object.keys(incoming[play]).filter(n => n !== "__order").forEach(name => {
-                        if (existing[play] && existing[play][name]) collisions.push(`${play} / ${name}`);
-                    });
-                });
-                if (collisions.length > 0) {
-                    const ok = confirm(
-                        `${collisions.length} scene(s) share a name with ones you already have and will be overwritten:\n${collisions.slice(0,8).join("\n")}${collisions.length>8 ? "\n…" : ""}\n\nContinue?`
-                    );
-                    if (!ok) { event.target.value = ""; return; }
-                }
-
-                let sceneCount = 0;
-                Object.keys(incoming).forEach(play => {
-                    if (!existing[play]) existing[play] = {};
-                    const existingOrder = getSceneNames(existing[play]);
-                    const incomingOrder = getSceneNames(incoming[play]);
-                    Object.assign(existing[play], incoming[play]);
-                    const combinedOrder = existingOrder.slice();
-                    incomingOrder.forEach(n => { if (!combinedOrder.includes(n)) combinedOrder.push(n); });
-                    existing[play].__order = combinedOrder;
-                    sceneCount += incomingOrder.filter(n => n !== "__order").length;
-                });
-                const saved = saveScreenplays(existing);
-                // Clear hint cache
-                hintBadgeCache = {};
-                renderSceneList();
-                if (saved) {
-                    alert(`Imported ${sceneCount} scene(s) across ${Object.keys(incoming).length} screenplay(s).`);
-                } else {
-                    alert(
-                        `Imported ${sceneCount} scene(s), but your browser's storage is full — none of this import was permanently saved. It'll stay available for the rest of this session only. Try exporting what you can, deleting some older screenplays, and importing again in smaller batches.`
-                    );
-                }
-                event.target.value = "";
-            };
-            reader.readAsText(file);
-        }
-
-        function escapeHtml(s) {
-            return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" } [c]));
-        }
-
-        function escapeAttr(s) {
-            return s.replace(/'/g, "\\'");
-        }
-
-        let dragCtx = null;
-
-        function attachDragHandlers() {
-            document.querySelectorAll(".drag-handle").forEach(handle => {
-                handle.addEventListener("pointerdown", onDragHandleDown);
+        if (window.matchMedia("(display-mode: standalone)").addEventListener) {
+            window.matchMedia("(display-mode: standalone)").addEventListener("change", (e) => {
+                if (e.matches) lockPortraitIfPossible();
             });
         }
+        window.addEventListener("appinstalled", lockPortraitIfPossible);
 
-        function onDragHandleDown(e) {
-            const handle = e.currentTarget;
-            const row = handle.closest(".scene-row");
-            const container = row && row.closest(".scene-rows");
-            if (!row || !container) return;
-            e.preventDefault();
-            dragCtx = {
-                row,
-                container,
-                play: container.dataset.play,
-                pointerId: e.pointerId
-            };
-            row.classList.add("dragging");
-            document.body.classList.add("dragging-active");
-            try { handle.setPointerCapture(e.pointerId); } catch (err) {}
-            document.addEventListener("pointermove", onDragMove);
-            document.addEventListener("pointerup", endDrag);
-            document.addEventListener("pointercancel", endDrag);
+        // ----- disable pull-to-refresh on Android PWA (touch handler) -----
+        function disablePullToRefresh() {
+            let startY = 0;
+            let startX = 0;
+            const threshold = 10;
+            let isDraggingDown = false;
+
+            document.addEventListener('touchstart', function(e) {
+                const t = e.touches[0];
+                startY = t.clientY;
+                startX = t.clientX;
+                isDraggingDown = false;
+            }, { passive: true });
+
+            document.addEventListener('touchmove', function(e) {
+                if (e.touches.length !== 1) return;
+                const t = e.touches[0];
+                const dy = t.clientY - startY;
+                const dx = t.clientX - startX;
+                // only prevent if dragging mostly downward and at the top of the page
+                if (dy > threshold && Math.abs(dx) < threshold * 2) {
+                    const scrollTop = document.documentElement.scrollTop || document.body.scrollTop || 0;
+                    if (scrollTop <= 0) {
+                        e.preventDefault();
+                        isDraggingDown = true;
+                    }
+                }
+            }, { passive: false });
+
+            document.addEventListener('touchend', function(e) {
+                isDraggingDown = false;
+            }, { passive: true });
         }
 
-        function onDragMove(e) {
-            if (!dragCtx) return;
-            const { row, container } = dragCtx;
-            const y = e.clientY;
-
-            const scrollParent = container.closest(".side-col-inner, .tts-panel-inner");
-            if (scrollParent) {
-                const prect = scrollParent.getBoundingClientRect();
-                const edge = 32;
-                if (y < prect.top + edge) {
-                    scrollParent.scrollTop -= 12;
-                } else if (y > prect.bottom - edge) {
-                    scrollParent.scrollTop += 12;
-                }
-            }
-
-            const siblings = Array.from(container.querySelectorAll(".scene-row")).filter(el => el !== row);
-            let target = null;
-            for (const sib of siblings) {
-                const rect = sib.getBoundingClientRect();
-                const mid = rect.top + rect.height / 2;
-                if (y < mid) {
-                    target = sib;
-                    break;
-                }
-            }
-
-            if (target) {
-                if (row.nextElementSibling !== target) {
-                    container.insertBefore(row, target);
-                }
-            } else if (container.lastElementChild !== row) {
-                container.appendChild(row);
-            }
-        }
-
-        function endDrag() {
-            if (!dragCtx) return;
-            const { row, container, play } = dragCtx;
-            row.classList.remove("dragging");
-            document.body.classList.remove("dragging-active");
-            document.removeEventListener("pointermove", onDragMove);
-            document.removeEventListener("pointerup", endDrag);
-            document.removeEventListener("pointercancel", endDrag);
-
-            const newOrder = Array.from(container.querySelectorAll(".scene-row")).map(r => r.dataset.scene);
-            const data = loadScreenplays();
-            if (data[play]) {
-                data[play].__order = newOrder;
-                saveScreenplays(data);
-            }
-            dragCtx = null;
-        }
-
+        // ---- Sheets ----
         function openScenesSheet() {
             document.getElementById("scenesPanelWrap").classList.add("sheet-open");
             document.getElementById("scenesBackdrop").style.display = "block";
@@ -2660,94 +1909,15 @@
 
         function updateBottomBarVisibility() {
             const isMobile = window.innerWidth < 900;
+            const setupVisible = currentScreen === "setup";
+
             const scenesBtn = document.getElementById("scenesBarBtn");
-            // Show on mobile always (since side panel is hidden), hide on desktop (side panel visible)
-            if (scenesBtn) scenesBtn.style.display = isMobile ? "inline-block" : "none";
+            if (scenesBtn) scenesBtn.style.display = (isMobile && setupVisible) ? "inline-block" : "none";
+            if (!isMobile || !setupVisible) closeScenesSheet();
 
             const homeBtn = document.getElementById("homeBtn");
             if (homeBtn) homeBtn.style.display = (currentScreen === "practice" || currentScreen === "done") ? "flex" : "none";
-
-            // AI button: always show, but we already have it in the bar
         }
-
-        function lockPortraitIfPossible() {
-            try {
-                if (screen.orientation && typeof screen.orientation.lock === "function") {
-                    screen.orientation.lock("portrait").catch(() => {});
-                }
-            } catch (e) {}
-        }
-
-        function disablePullToRefresh() {
-            let startY = 0;
-            let startX = 0;
-            const threshold = 10;
-            let isDraggingDown = false;
-
-            document.addEventListener('touchstart', function(e) {
-                const t = e.touches[0];
-                startY = t.clientY;
-                startX = t.clientX;
-                isDraggingDown = false;
-            }, { passive: true });
-
-            document.addEventListener('touchmove', function(e) {
-                if (e.touches.length !== 1) return;
-                const t = e.touches[0];
-                const dy = t.clientY - startY;
-                const dx = t.clientX - startX;
-                if (dy > threshold && Math.abs(dx) < threshold * 2) {
-                    const scrollTop = document.documentElement.scrollTop || document.body.scrollTop || 0;
-                    if (scrollTop <= 0) {
-                        e.preventDefault();
-                        isDraggingDown = true;
-                    }
-                }
-            }, { passive: false });
-
-            document.addEventListener('touchend', function(e) {
-                isDraggingDown = false;
-            }, { passive: true });
-        }
-
-        document.addEventListener("DOMContentLoaded", () => {
-            updateVoiceHint();
-            renderSceneList();
-            updateBottomBarVisibility();
-            updateStartButtonState();
-            setTheme(document.documentElement.getAttribute("data-theme") || "dark");
-            lockPortraitIfPossible();
-            disablePullToRefresh();
-
-            // AI Mode toggle: check key when enabled
-            document.getElementById("aiMode").addEventListener("change", function() {
-                if (this.checked && window.swCurrentUser) {
-                    const key = getApiKey();
-                    if (!key || !key.startsWith("sk-")) {
-                        openApiKeyModal();
-                        showToast("Please set your Mistral API key to use AI Mode.", "warning");
-                    }
-                }
-            });
-
-            // AI button in bottom bar
-            document.getElementById("aiBarBtn").addEventListener("click", function() {
-                if (window.swCurrentUser) {
-                    openApiKeyModal();
-                } else {
-                    showToast("Please sign in to manage AI settings.", "warning");
-                }
-            });
-        });
-
-        window.addEventListener("resize", updateBottomBarVisibility);
-
-        if (window.matchMedia("(display-mode: standalone)").addEventListener) {
-            window.matchMedia("(display-mode: standalone)").addEventListener("change", (e) => {
-                if (e.matches) lockPortraitIfPossible();
-            });
-        }
-        window.addEventListener("appinstalled", lockPortraitIfPossible);
 
         document.addEventListener("keydown", (e) => {
             if (document.getElementById("practice").style.display !== "flex") return;
@@ -2849,7 +2019,6 @@
         <div class="bar-right">
             <button id="homeBtn" class="theme-toggle-btn" onclick="backToSetup()" title="Home" aria-label="Home" style="display:none;">⌂</button>
             <button id="ttsBtn" class="theme-toggle-btn" onclick="toggleTtsSheet()" title="Text-to-speech settings" aria-label="Text-to-speech settings"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8.5a6.5 6.5 0 1 1 13 0c0 6-6 6-6 10a3.5 3.5 0 1 1-7 0"/><path d="M15 8.5a2.5 2.5 0 0 0-5 0v1a2 2 0 1 1 0 4"/></svg></button>
-            <button id="aiBarBtn" class="theme-toggle-btn" title="AI settings (Mistral API key)" aria-label="AI settings">🧠</button>
             <button id="installBtn" title="Install App" aria-label="Install App"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg></button>
             <button id="themeToggleBtn" class="theme-toggle-btn" onclick="toggleTheme()" title="Switch theme" aria-label="Switch theme">☀</button>
         </div>
@@ -2861,7 +2030,7 @@
             getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
         } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-auth.js";
         import {
-            getFirestore, doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs
+            getFirestore, doc, getDoc, setDoc
         } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-firestore.js";
 
         const firebaseConfig = {
@@ -2900,18 +2069,10 @@
             await setDoc(doc(db, "users", uid), { screenplays, updatedAt: Date.now() });
         };
 
-        // Expose Firestore functions for AI hints
-        window.__firestore = { getFirestore, doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs };
-
         onAuthStateChanged(auth, (user) => {
             window.swCurrentUser = user || null;
             if (user && window.onSwSignedIn) window.onSwSignedIn(user);
             if (!user && window.onSwSignedOut) window.onSwSignedOut();
-            // Refresh scene list badges when auth state changes
-            if (user) {
-                hintBadgeCache = {};
-                renderSceneList();
-            }
         });
     </script>
 
