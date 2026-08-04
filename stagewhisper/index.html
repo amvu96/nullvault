@@ -34,6 +34,7 @@
             --bg-gradient-1: #0e1416;
             --bg-gradient-2: #060809;
             --input-bg: #080b0c;
+            --bottom-bar-h: 60px;
         }
         [data-theme="light"] {
             --bg: #f2f5f4;
@@ -367,6 +368,31 @@
         .primary:hover {
             box-shadow: 0 0 16px rgba(57, 255, 154, 0.6);
         }
+        .start-practice-btn {
+            position: fixed;
+            left: 16px;
+            right: 16px;
+            bottom: calc(var(--bottom-bar-h) + 10px);
+            width: auto;
+            max-width: 640px;
+            margin: 0 auto;
+            z-index: 70;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+        }
+
+        .start-practice-btn:disabled {
+            background: var(--border);
+            color: var(--muted);
+            cursor: not-allowed;
+            box-shadow: none;
+            opacity: 0.7;
+        }
+        .start-practice-btn:disabled:hover {
+            box-shadow: none;
+        }
+        #setup {
+            padding-bottom: calc(var(--bottom-bar-h) + 76px);
+        }
 
         /* Practice view */
         #practice {
@@ -651,7 +677,7 @@
 
             <div class="card" id="setup">
                 <label>Paste your script</label>
-                <textarea id="scriptInput" placeholder="One line per row. For cue practice, use format:&#10;JULIET: O Romeo, Romeo, wherefore art thou Romeo?&#10;ROMEO: Shall I hear more, or shall I speak at this?"></textarea>
+                <textarea id="scriptInput" oninput="updateStartButtonState()" placeholder="One line per row. For cue practice, use format:&#10;JULIET: O Romeo, Romeo, wherefore art thou Romeo?&#10;ROMEO: Shall I hear more, or shall I speak at this?"></textarea>
                 <div class="hint">Tip: use <b>CHARACTER: dialogue</b> per line to unlock cue mode (see below). Plain lines work fine too for a simple read-through.</div>
 
                 <label>Your character name (optional, enables cue mode)</label>
@@ -674,7 +700,7 @@
                 </div>
                 <div class="hint">Group scenes under a screenplay so you can keep separate roles — e.g. two characters from the same play — organized and easy to tell apart.</div>
 
-                <button class="primary" onclick="startPractice()">START PRACTICE</button>
+                <button class="primary start-practice-btn" id="startPracticeBtn" onclick="startPractice()" disabled>START PRACTICE</button>
             </div>
 
             <div id="practice">
@@ -1003,6 +1029,13 @@
             }
         }
 
+        function updateStartButtonState() {
+            const btn = document.getElementById("startPracticeBtn");
+            if (!btn) return;
+            const hasScript = document.getElementById("scriptInput").value.trim().length > 0;
+            btn.disabled = !hasScript;
+        }
+
         function loadScene(play, name) {
             const data = loadScreenplays();
             const s = data[play] && data[play][name];
@@ -1016,6 +1049,7 @@
             document.getElementById("screenplayName").value = play;
             document.getElementById("sceneName").value = name;
             updateVoiceHint();
+            updateStartButtonState();
             closeScenesSheet();
             window.scrollTo({ top: 0, behavior: "smooth" });
         }
@@ -1427,6 +1461,7 @@
 
             // Set the textarea with combined script
             document.getElementById('scriptInput').value = combinedScript.trim();
+            updateStartButtonState();
 
             // Set form fields from first scene
             if (firstScene) {
@@ -1706,6 +1741,7 @@
             closeScenesSheet();
             renderSceneList();
             updateBottomBarVisibility();
+            updateStartButtonState();
         }
 
         function changeFont(delta) {
@@ -1738,6 +1774,7 @@
             updateVoiceHint();
             renderSceneList();
             updateBottomBarVisibility();
+            updateStartButtonState();
             setTheme(document.documentElement.getAttribute("data-theme") || "dark");
             lockPortraitIfPossible();
         });
