@@ -1189,7 +1189,7 @@
             if (inView) inView.style.display = "none";
         };
 
-        function saveScene() {
+        async function saveScene() {
             const raw = document.getElementById("scriptInput").value;
             if (raw.trim().length === 0) {
                 alert("Paste in a script before saving.");
@@ -1560,7 +1560,7 @@
             window.scrollTo({ top: 0, behavior: "smooth" });
         }
 
-        function deleteScene(play, name) {
+        async function deleteScene(play, name) {
             if (!confirm(`Delete saved scene "${name}" from "${play}"?`)) return;
             const data = loadScreenplays();
             if (data[play]) {
@@ -1574,7 +1574,7 @@
             await renderSceneList();
         }
 
-        function deleteScreenplay(play) {
+        async function deleteScreenplay(play) {
             const data = loadScreenplays();
             const count = data[play] ? Object.keys(data[play]).length : 0;
             if (!confirm(`Delete "${play}" and all ${count} scene(s) under it?`)) return;
@@ -1659,12 +1659,13 @@
                     html += `<div class="scene-row" data-scene="${escapeAttr(name)}">
                 ${draggable ? `<span class="drag-handle" title="Drag to reorder" aria-label="Drag to reorder">⠿</span>` : ""}
                 <div class="scene-info">
-                  <div class="name">${escapeHtml(name)}<span class="ai-badge" onclick="loadAndRegenerate('${escapeAttr(play)}','${escapeAttr(name)}')" title="AI hints available - click to regenerate" style="display:${scenesWithHints.has(`${play}|${name}`) ? 'inline-flex' : 'none'};margin-left:6px;">AI</span></div>
+                  <div class="name">${escapeHtml(name)}</div>
                   <div class="meta">${lineCount} lines${charLabel}</div>
                 </div>
                 <div class="scene-actions">
                   <button onclick="loadScene('${escapeAttr(play)}','${escapeAttr(name)}')">Load</button>
                   <button class="del" onclick="deleteScene('${escapeAttr(play)}','${escapeAttr(name)}')">&times;</button>
+                  ${scenesWithHints.has(`${play}|${name}`) ? `<span class="ai-badge" onclick="loadAndRegenerate('${escapeAttr(play)}','${escapeAttr(name)}')" title="AI hints available - click to regenerate">AI</span>` : ''}
                 </div>
               </div>`;
                 });
@@ -1776,7 +1777,7 @@
             URL.revokeObjectURL(url);
         }
 
-        function importScenesFile(event) {
+        async function importScenesFile(event) {
             const file = event.target.files[0];
             if (!file) return;
             const reader = new FileReader();
@@ -1944,7 +1945,7 @@
             }).join(" ");
         }
 
-        function playAllScenes(play) {
+        async function playAllScenes(play) {
             const data = loadScreenplays();
             const screenplay = data[play];
             if (!screenplay) {
@@ -2326,7 +2327,7 @@
             renderCurrent();
         }
 
-        function backToSetup() {
+        async function backToSetup() {
             document.getElementById("practice").style.display = "none";
             document.getElementById("done").style.display = "none";
             document.getElementById("setup").style.display = "block";
@@ -2363,9 +2364,9 @@
             setTheme(current === "dark" ? "light" : "dark");
         }
 
-        document.addEventListener("DOMContentLoaded", () => {
+        document.addEventListener("DOMContentLoaded", async () => {
             updateVoiceHint();
-            renderSceneList();
+            await renderSceneList();
             updateBottomBarVisibility();
             updateStartButtonState();
             setTheme(document.documentElement.getAttribute("data-theme") || "dark");
