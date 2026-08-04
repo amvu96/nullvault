@@ -1,0 +1,2080 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Stage Whisper — Learn Your Lines</title>
+    <script>
+        try {
+            var t = localStorage.getItem("stageWhisperTheme");
+            document.documentElement.setAttribute("data-theme", t === "light" ? "light" : "dark");
+        } catch (e) {
+            document.documentElement.setAttribute("data-theme", "dark");
+        }
+    </script>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0a0e0f">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Stage Whisper">
+    <link rel="icon" href="icons/icon-192.png">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <style>
+        :root {
+            --bg: #0a0e0f;
+            --panel: #11171a;
+            --border: #1f2b2e;
+            --neon: #39ff9a;
+            --neon-dim: #1f8f5c;
+            --cyan: #3ad6ff;
+            --text: #d7e5e2;
+            --muted: #6b8079;
+            --danger: #ff5f6d;
+            --bg-gradient-1: #0e1416;
+            --bg-gradient-2: #060809;
+            --input-bg: #080b0c;
+            --bottom-bar-h: 60px;
+        }
+        [data-theme="light"] {
+            --bg: #f2f5f4;
+            --panel: #ffffff;
+            --border: #dbe4e1;
+            --neon: #0e8a4f;
+            --neon-dim: #0a6b3d;
+            --cyan: #0077b6;
+            --text: #182220;
+            --muted: #5c6b66;
+            --danger: #c8283a;
+            --bg-gradient-1: #f7faf9;
+            --bg-gradient-2: #e8eeec;
+            --input-bg: #eef2f1;
+        }
+        * {
+            box-sizing: border-box;
+        }
+        /* ----- disable pull-to-refresh on Android PWA ----- */
+        html,
+        body {
+            overscroll-behavior: contain;
+            overscroll-behavior-y: contain;
+            -webkit-overflow-scrolling: touch;
+            touch-action: pan-y pan-x;
+        }
+        body {
+            margin: 0;
+            background: radial-gradient(circle at top, var(--bg-gradient-1) 0%, var(--bg-gradient-2) 70%);
+            color: var(--text);
+            font-family: 'Courier New', ui-monospace, monospace;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 24px 16px 76px;
+        }
+        .layout {
+            display: flex;
+            align-items: flex-start;
+            gap: 24px;
+            width: 100%;
+            max-width: 980px;
+        }
+        .main-col {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .side-col {
+            width: 300px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+        .side-col-inner {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .side-col .panel-header,
+        .tts-panel-inner .panel-header {
+            padding: 16px 18px;
+            color: var(--cyan);
+            font-size: 0.85rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .side-col .panel-header .close-sheet,
+        .tts-panel-inner .panel-header .close-sheet {
+            display: none;
+            background: none;
+            border: none;
+            color: var(--muted);
+            font-size: 1.2rem;
+            padding: 0 4px;
+            cursor: pointer;
+        }
+        .tts-panel-inner .panel-header .close-sheet {
+            display: block;
+        }
+        .side-col .panel-body,
+        .tts-panel-inner .panel-body {
+            padding: 0 18px 18px;
+        }
+        .account-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        .account-bar #accountEmail {
+            font-size: 0.78rem;
+            color: var(--muted);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .account-bar button {
+            padding: 6px 12px;
+            font-size: 0.8rem;
+            flex-shrink: 0;
+        }
+        .scenes-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 80;
+            display: none;
+        }
+        .tts-panel {
+            position: fixed;
+            left: 12px;
+            right: 12px;
+            bottom: 76px;
+            max-width: 420px;
+            margin: 0 auto;
+            z-index: 95;
+            transform: translateY(120%);
+            opacity: 0;
+            transition: transform 0.25s ease, opacity 0.25s ease;
+            pointer-events: none;
+        }
+        .tts-panel.sheet-open {
+            transform: translateY(0);
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .tts-panel-inner {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 14px 14px 10px 10px;
+            overflow: hidden;
+            max-height: 70vh;
+            overflow-y: auto;
+            box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.4);
+        }
+        @media (max-width:899px) {
+            .layout {
+                flex-direction: column;
+            }
+            .side-col {
+                width: auto;
+                position: fixed;
+                left: 12px;
+                right: 12px;
+                bottom: 76px;
+                max-height: 65vh;
+                z-index: 90;
+                transform: translateY(120%);
+                opacity: 0;
+                transition: transform 0.25s ease, opacity 0.25s ease;
+                pointer-events: none;
+                gap: 0;
+            }
+            .side-col.sheet-open {
+                transform: translateY(0);
+                opacity: 1;
+                pointer-events: auto;
+            }
+            .side-col-inner {
+                max-height: 65vh;
+                overflow-y: auto;
+                box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.4);
+            }
+            .side-col .panel-header .close-sheet {
+                display: block;
+            }
+            .side-col .desktop-start-btn-wrapper {
+                display: none !important;
+            }
+        }
+        @media (min-width:900px) {
+            .side-col .desktop-start-btn-wrapper {
+                display: block !important;
+            }
+            .mobile-start-btn-wrapper {
+                display: none !important;
+            }
+            #setup {
+                padding-bottom: 8px !important;
+            }
+        }
+        h1 {
+            color: var(--neon);
+            text-shadow: 0 0 8px rgba(57, 255, 154, 0.5);
+            letter-spacing: 2px;
+            font-size: 1.4rem;
+            margin: 0 0 4px;
+        }
+        .subtitle {
+            color: var(--muted);
+            font-size: 0.85rem;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+        #installBtn {
+            width: 40px;
+            height: 40px;
+            padding: 0;
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            line-height: 1;
+            background: transparent;
+            border: 1px solid #3ad6ff;
+            color: #3ad6ff;
+        }
+        #installBtn:hover {
+            background: rgba(58, 214, 255, 0.15);
+        }
+        .bottom-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--panel);
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 16px;
+            z-index: 100;
+            gap: 10px;
+        }
+        .bar-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-left: auto;
+        }
+        #scenesBarBtn {
+            display: none;
+            padding: 8px 16px;
+        }
+        .theme-toggle-btn {
+            width: 40px;
+            height: 40px;
+            padding: 0;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            line-height: 1;
+        }
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 20px 20px 8px 20px;
+            width: 100%;
+            max-width: 640px;
+            box-shadow: 0 0 24px rgba(57, 255, 154, 0.05);
+        }
+        label {
+            display: block;
+            font-size: 0.8rem;
+            color: var(--cyan);
+            margin: 14px 0 6px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        label:first-of-type {
+            margin-top: 0;
+        }
+        textarea {
+            width: 100%;
+            min-height: 180px;
+            background: var(--input-bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: 6px;
+            padding: 12px;
+            font-family: inherit;
+            font-size: 0.95rem;
+            resize: vertical;
+        }
+        select {
+            width: 100%;
+            background: var(--input-bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: 6px;
+            padding: 10px 12px;
+            font-family: inherit;
+            font-size: 0.95rem;
+        }
+        input[type=text] {
+            width: 100%;
+            background: var(--input-bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: 6px;
+            padding: 10px 12px;
+            font-family: inherit;
+            font-size: 0.95rem;
+        }
+        .hint {
+            color: var(--muted);
+            font-size: 0.75rem;
+            margin-top: 6px;
+            line-height: 1.4;
+        }
+        .row {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-top: 14px;
+        }
+        .checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            color: var(--text);
+        }
+        .checkbox-row input {
+            accent-color: var(--neon);
+            width: 16px;
+            height: 16px;
+        }
+        button {
+            font-family: inherit;
+            cursor: pointer;
+            border-radius: 6px;
+            border: 1px solid var(--neon-dim);
+            background: transparent;
+            color: var(--neon);
+            padding: 10px 16px;
+            font-size: 0.9rem;
+            transition: all 0.15s;
+        }
+        button:hover {
+            background: rgba(57, 255, 154, 0.1);
+        }
+        .primary {
+            width: 100%;
+            margin-top: 20px;
+            padding: 14px;
+            font-size: 1.05rem;
+            background: var(--neon);
+            color: #04140c;
+            border: none;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+        .primary:hover {
+            box-shadow: 0 0 16px rgba(57, 255, 154, 0.6);
+        }
+        .mobile-start-btn-wrapper {
+            display: block;
+            width: 100%;
+            max-width: 640px;
+            margin: 0 auto;
+        }
+        .mobile-start-btn-wrapper .start-practice-btn {
+            position: fixed;
+            left: 16px;
+            right: 16px;
+            bottom: calc(var(--bottom-bar-h) + 10px);
+            width: auto;
+            max-width: 640px;
+            margin: 0 auto;
+            z-index: 70;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+        }
+        .desktop-start-btn-wrapper {
+            display: none;
+        }
+        .desktop-start-btn-wrapper .start-practice-btn {
+            width: 100%;
+            margin: 0;
+            box-shadow: 0 2px 12px rgba(57, 255, 154, 0.2);
+        }
+        .desktop-start-btn-wrapper .start-practice-btn:disabled {
+            background: var(--border);
+            color: var(--muted);
+            cursor: not-allowed;
+            box-shadow: none;
+            opacity: 0.7;
+        }
+        .desktop-start-btn-wrapper .start-practice-btn:disabled:hover {
+            box-shadow: none;
+        }
+        .start-practice-btn:disabled {
+            background: var(--border);
+            color: var(--muted);
+            cursor: not-allowed;
+            box-shadow: none;
+            opacity: 0.7;
+        }
+        .start-practice-btn:disabled:hover {
+            box-shadow: none;
+        }
+        #setup {
+            padding-bottom: 8px;
+        }
+
+        /* Practice view */
+        #practice {
+            display: none;
+            width: 100%;
+            max-width: 640px;
+            flex-direction: column;
+            align-items: center;
+        }
+        .stage {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            width: 100%;
+            padding: 22px;
+            text-align: center;
+            min-height: 220px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .progress {
+            color: var(--muted);
+            font-size: 0.8rem;
+            margin-bottom: 10px;
+            letter-spacing: 1px;
+        }
+        .progress-bar {
+            height: 4px;
+            background: var(--border);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: var(--neon);
+            box-shadow: 0 0 8px var(--neon);
+            transition: width 0.2s;
+        }
+        .context-line {
+            color: var(--muted);
+            font-size: 0.85rem;
+            margin-bottom: 14px;
+            min-height: 1.2em;
+        }
+        .char-name {
+            color: var(--cyan);
+            font-weight: bold;
+            letter-spacing: 1px;
+            font-size: 0.85rem;
+            margin-bottom: 8px;
+            min-height: 1.2em;
+        }
+        .line-text {
+            font-size: 1.3rem;
+            line-height: 1.5;
+            min-height: 2.6em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .line-hidden {
+            color: var(--muted);
+            letter-spacing: 3px;
+        }
+        .big-btn {
+            width: 100%;
+            margin-top: 22px;
+            padding: 22px;
+            font-size: 1.2rem;
+            background: var(--neon);
+            color: #04140c;
+            border: none;
+            font-weight: bold;
+            letter-spacing: 1px;
+            border-radius: 10px;
+        }
+        .big-btn:active {
+            transform: scale(0.98);
+        }
+        .big-btn.cue {
+            background: var(--cyan);
+        }
+        .controls-row {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+            margin-top: 14px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .controls-row button {
+            flex: 1;
+            min-width: 100px;
+        }
+        .score-row {
+            display: flex;
+            gap: 20px;
+            margin-top: 16px;
+            font-size: 0.85rem;
+            color: var(--muted);
+        }
+        .score-row span.good {
+            color: var(--neon);
+        }
+        .score-row span.bad {
+            color: var(--danger);
+        }
+        .score-btn.good {
+            border-color: var(--neon-dim);
+            color: var(--neon);
+        }
+        .score-btn.good:hover {
+            background: rgba(57, 255, 154, 0.1);
+        }
+        .score-btn.bad {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+        .score-btn.bad:hover {
+            background: rgba(255, 95, 109, 0.1);
+        }
+        .font-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 14px;
+        }
+        .font-controls button {
+            padding: 4px 10px;
+        }
+        #done {
+            display: none;
+            text-align: center;
+        }
+        #done h2 {
+            color: var(--neon);
+        }
+        .scene-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--input-bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px 12px 10px 4px;
+            margin-bottom: 8px;
+        }
+        .scene-row.dragging {
+            opacity: 0.6;
+            border-color: var(--neon-dim);
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+        }
+        .scene-rows {
+            display: flex;
+            flex-direction: column;
+        }
+        .drag-handle {
+            flex-shrink: 0;
+            width: 20px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--muted);
+            font-size: 1rem;
+            letter-spacing: -1px;
+            cursor: grab;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .drag-handle:active {
+            cursor: grabbing;
+            color: var(--neon);
+        }
+        body.dragging-active {
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        .scene-info {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-align: left;
+        }
+        .scene-info .name {
+            color: var(--text);
+            font-size: 0.9rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .scene-info .meta {
+            color: var(--muted);
+            font-size: 0.7rem;
+            margin-top: 2px;
+        }
+        .scene-actions {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+        .scene-actions button {
+            padding: 6px 10px;
+            font-size: 0.8rem;
+        }
+        .scene-actions button.del {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+        .scene-actions button.del:hover {
+            background: rgba(255, 95, 109, 0.1);
+        }
+        .storage-warning {
+            color: var(--danger);
+            font-size: 0.72rem;
+            margin-bottom: 10px;
+            line-height: 1.4;
+        }
+        .screenplay-group {
+            margin-bottom: 16px;
+        }
+        .screenplay-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .screenplay-header .title {
+            color: var(--neon);
+            font-size: 0.85rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .screenplay-header .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+        .screenplay-header .header-actions button {
+            padding: 4px 8px;
+            font-size: 0.75rem;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+            border-radius: 6px;
+            min-width: 28px;
+            min-height: 28px;
+        }
+        .screenplay-header .header-actions .del {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+        .screenplay-header .header-actions .del:hover {
+            background: rgba(255, 95, 109, 0.1);
+        }
+        footer {
+            color: var(--muted);
+            font-size: 0.7rem;
+            margin-top: 30px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="layout">
+        <div class="main-col">
+
+            <h1>STAGE WHISPER</h1>
+            <div class="subtitle">Paste your script. Reveal one line at a time. Learn faster.</div>
+
+            <div class="card" id="setup">
+                <label>Paste your script</label>
+                <textarea id="scriptInput" oninput="updateStartButtonState()" placeholder="One line per row. For cue practice, use format:&#10;JULIET: O Romeo, Romeo, wherefore art thou Romeo?&#10;ROMEO: Shall I hear more, or shall I speak at this?"></textarea>
+                <div class="hint">Tip: use <b>CHARACTER: dialogue</b> per line to unlock cue mode (see below). Plain lines work fine too for a simple read-through.</div>
+
+                <label>Your character name (optional, enables cue mode)</label>
+                <input type="text" id="myChar" placeholder="e.g. JULIET">
+                <div class="hint">When set, everyone else's lines auto-display as your cue — only <i>your</i> lines stay hidden until you press the button.</div>
+
+                <div class="row">
+                    <div class="checkbox-row"><input type="checkbox" id="shuffleMode"> Shuffle (random cue, then your line — requires character name above)</div>
+                    <div class="checkbox-row"><input type="checkbox" id="hintMode"> Show first-letter hints for hidden lines</div>
+                </div>
+
+                <label>Screenplay</label>
+                <input type="text" id="screenplayName" list="screenplayOptions" placeholder="e.g. Romeo and Juliet">
+                <datalist id="screenplayOptions"></datalist>
+
+                <label>Save this scene as</label>
+                <div style="display:flex;gap:8px;">
+                    <input type="text" id="sceneName" placeholder="e.g. Act 2 Scene 1 — Balcony">
+                    <button onclick="saveScene()" style="white-space:nowrap;">Save</button>
+                </div>
+                <div class="hint">Group scenes under a screenplay so you can keep separate roles — e.g. two characters from the same play — organized and easy to tell apart.</div>
+
+                <div class="mobile-start-btn-wrapper">
+                    <button class="primary start-practice-btn" id="startPracticeBtn" onclick="startPractice()" disabled>START PRACTICE</button>
+                </div>
+            </div>
+
+            <div id="practice">
+                <div class="stage">
+                    <div class="progress" id="progressText">LINE 1 / 1</div>
+                    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+                    <div class="context-line" id="contextLine"></div>
+                    <div class="char-name" id="charName"></div>
+                    <div class="line-text" id="lineText">Press start below</div>
+                </div>
+
+                <button class="big-btn" id="mainBtn" onclick="handlePress()">NEXT LINE</button>
+
+                <div class="controls-row" id="scoreButtons" style="display:none;">
+                    <button class="score-btn good" onclick="markScore(true)">Got it</button>
+                    <button class="score-btn bad" onclick="markScore(false)">Missed it</button>
+                </div>
+
+                <div class="controls-row">
+                    <button id="hideBtn" onclick="hideAgain()">Hide Again</button>
+                    <button onclick="restart()">Restart</button>
+                    <button onclick="reshuffle()">Reshuffle</button>
+                </div>
+
+                <div class="score-row" id="scoreRow" style="display:none;">
+                    <span>Got it: <span class="good" id="gotItCount">0</span></span>
+                    <span>Missed: <span class="bad" id="missedCount">0</span></span>
+                </div>
+
+                <div class="font-controls">
+                    <span style="color:var(--muted);font-size:0.75rem;">TEXT SIZE</span>
+                    <button onclick="changeFont(-1)">A-</button>
+                    <button onclick="changeFont(1)">A+</button>
+                </div>
+
+                <div class="hint" style="margin-top:14px;text-align:center;">Space / Enter = reveal or next &nbsp;•&nbsp; G = got it &nbsp;•&nbsp; M = missed it</div>
+            </div>
+
+            <div id="done">
+                <h2>Run complete</h2>
+                <div id="doneStats"></div>
+                <button class="primary" onclick="restart()">Run it again</button>
+                <button id="redoMissedBtn" style="display:none;margin-top:10px;width:100%;" onclick="redoMissed()">Redo missed lines only</button>
+                <button style="margin-top:10px;width:100%;" onclick="backToSetup()">Finish</button>
+            </div>
+
+            <footer>Everything stays in this browser tab — nothing is saved or uploaded, except scenes you choose to export.</footer>
+
+        </div>
+
+        <aside class="side-col" id="scenesPanelWrap">
+            <div class="desktop-start-btn-wrapper">
+                <button class="primary start-practice-btn" id="startPracticeBtnDesktop" onclick="startPractice()" disabled>START PRACTICE</button>
+            </div>
+
+            <div class="side-col-inner">
+                <div class="panel-header">
+                    <span>Saved Scenes</span>
+                    <button class="close-sheet" onclick="closeScenesSheet()" title="Close" aria-label="Close">&times;</button>
+                </div>
+                <div class="panel-body">
+                    <div id="signedOutView">
+                        <button onclick="swSignIn()" style="width:100%;">Sign in with Google</button>
+                        <div class="hint">Sign in to sync your scenes across devices.</div>
+                    </div>
+                    <div id="signedInView" style="display:none;">
+                        <div class="account-bar">
+                            <span id="accountEmail"></span>
+                            <button onclick="swSignOut()">Sign out</button>
+                        </div>
+                        <div id="syncStatus" class="hint"></div>
+                    </div>
+
+                    <div class="row" style="margin-top:14px;">
+                        <button onclick="exportScenes()" style="flex:1;">Export</button>
+                        <button onclick="document.getElementById('importFile').click()" style="flex:1;">Import</button>
+                    </div>
+                    <input type="file" id="importFile" accept="application/json,.json" style="display:none;" onchange="importScenesFile(event)">
+                    <input type="text" id="sceneSearch" placeholder="Search screenplays or scenes…" style="margin-top:14px;" oninput="renderSceneList()">
+                    <div id="sceneList" style="margin-top:14px;"></div>
+                    <div id="noScenes" class="hint">No saved scenes yet. Save one from the editor, or import a file.</div>
+                    <div id="noMatches" class="hint" style="display:none;">No screenplays or scenes match your search.</div>
+                </div>
+            </div>
+        </aside>
+        <div class="scenes-backdrop" id="scenesBackdrop" onclick="closeScenesSheet()"></div>
+
+    </div>
+
+    <div class="tts-panel" id="ttsPanelWrap">
+        <div class="tts-panel-inner">
+            <div class="panel-header">
+                <span>Text-to-Speech</span>
+                <button class="close-sheet" onclick="closeTtsSheet()" title="Close" aria-label="Close">&times;</button>
+            </div>
+            <div class="panel-body">
+                <div class="checkbox-row"><input type="checkbox" id="speakOthers" onchange="onSpeakToggleChange()"> Read other characters' lines aloud</div>
+
+                <label>Text-to-speech language</label>
+                <select id="ttsLang" onchange="onTtsLangChange()">
+                    <option value="ro-RO">Română (Romanian)</option>
+                    <option value="en-US">English (US)</option>
+                    <option value="en-GB">English (UK)</option>
+                    <option value="fr-FR">Français</option>
+                    <option value="es-ES">Español</option>
+                    <option value="de-DE">Deutsch</option>
+                    <option value="it-IT">Italiano</option>
+                </select>
+                <div class="hint" id="voiceHint">Checking available voices…</div>
+            </div>
+        </div>
+    </div>
+    <div class="scenes-backdrop" id="ttsBackdrop" onclick="closeTtsSheet()"></div>
+
+
+    <script>
+        let allLines = [];
+        let order = [];
+        let pos = 0;
+        let revealed = false;
+        let myChar = "";
+        let cueMode = false;
+        let shuffleOn = false;
+        let speakOn = false;
+        let hintOn = false;
+        let gotIt = 0,
+            missed = 0;
+        let currentScreen = "setup";
+        let missedSet = new Set();
+        let fontSize = 1.3;
+        let voices = [];
+        let ttsLang = "ro-RO";
+
+        const STORAGE_KEY = "lineRunnerScreenplays";
+        const OLD_STORAGE_KEY = "lineRunnerScenes";
+        let storageWorks = true;
+        let memoryScreenplays = {};
+
+        function testStorage() {
+            try {
+                localStorage.setItem("__lr_test__", "1");
+                localStorage.removeItem("__lr_test__");
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+        storageWorks = testStorage();
+
+        function looksLikeSceneObject(v) {
+            return v && typeof v === "object" && typeof v.script === "string";
+        }
+
+        function isFlatSceneFormat(obj) {
+            const vals = Object.values(obj);
+            if (vals.length === 0) return false;
+            return vals.every(looksLikeSceneObject);
+        }
+
+        function getSceneNames(scenes) {
+            const keys = Object.keys(scenes).filter(k => k !== "__order");
+            const saved = Array.isArray(scenes.__order) ? scenes.__order.filter(n => keys.includes(n)) : [];
+            keys.forEach(k => { if (!saved.includes(k)) saved.push(k); });
+            return saved;
+        }
+
+        function migrateOldScenesIfNeeded() {
+            if (!storageWorks) return;
+            try {
+                const hasNew = localStorage.getItem(STORAGE_KEY);
+                const oldRaw = localStorage.getItem(OLD_STORAGE_KEY);
+                if (!oldRaw) return;
+                const oldScenes = JSON.parse(oldRaw);
+                if (Object.keys(oldScenes).length === 0) {
+                    localStorage.removeItem(OLD_STORAGE_KEY);
+                    return;
+                }
+                const current = hasNew ? JSON.parse(hasNew) : {};
+                if (!current["My Scenes"]) current["My Scenes"] = {};
+                Object.assign(current["My Scenes"], oldScenes);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
+                localStorage.removeItem(OLD_STORAGE_KEY);
+            } catch (e) { /* ignore */ }
+        }
+        migrateOldScenesIfNeeded();
+
+        function loadScreenplays() {
+            if (storageWorks) {
+                try {
+                    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+                } catch (e) {
+                    return {};
+                }
+            }
+            return memoryScreenplays;
+        }
+
+        function saveScreenplays(data) {
+            let ok;
+            if (storageWorks) {
+                try {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+                    ok = true;
+                } catch (e) {
+                    memoryScreenplays = data;
+                    ok = false;
+                }
+            } else {
+                memoryScreenplays = data;
+                ok = true;
+            }
+            if (window.swCurrentUser && window.swPushCloud) {
+                setSyncStatus("Syncing…");
+                window.swPushCloud(window.swCurrentUser.uid, data)
+                    .then(() => setSyncStatus("Synced"))
+                    .catch((e) => {
+                        console.error("Cloud sync failed", e);
+                        setSyncStatus("Sync failed — will retry on next change");
+                    });
+            }
+            return ok;
+        }
+
+        function setSyncStatus(text) {
+            const el = document.getElementById("syncStatus");
+            if (el) el.textContent = text;
+        }
+
+        window.onSwSignedIn = async function(user) {
+            const outView = document.getElementById("signedOutView");
+            const inView = document.getElementById("signedInView");
+            if (outView) outView.style.display = "none";
+            if (inView) inView.style.display = "block";
+            const emailEl = document.getElementById("accountEmail");
+            if (emailEl) emailEl.textContent = user.email || user.displayName || "Signed in";
+            setSyncStatus("Syncing…");
+            try {
+                const cloud = await window.swPullCloud(user.uid);
+                const local = loadScreenplays();
+                if (cloud === null) {
+                    if (Object.keys(local).length > 0) {
+                        await window.swPushCloud(user.uid, local);
+                    }
+                    setSyncStatus("Synced");
+                    return;
+                }
+                const merged = JSON.parse(JSON.stringify(cloud));
+                let addedFromLocal = 0;
+                Object.keys(local).forEach(play => {
+                    if (!merged[play]) merged[play] = {};
+                    const cloudOrder = getSceneNames(merged[play]);
+                    const localOrder = getSceneNames(local[play]);
+                    Object.keys(local[play]).filter(n => n !== "__order").forEach(name => {
+                        if (!merged[play][name]) {
+                            merged[play][name] = local[play][name];
+                            addedFromLocal++;
+                        }
+                    });
+                    const combinedOrder = cloudOrder.slice();
+                    localOrder.forEach(n => { if (!combinedOrder.includes(n)) combinedOrder.push(n); });
+                    merged[play].__order = combinedOrder;
+                });
+                saveScreenplays(merged);
+                renderSceneList();
+                setSyncStatus("Synced");
+                if (addedFromLocal > 0) {
+                    alert(`Synced with your account. Added ${addedFromLocal} scene(s) that were only on this device.`);
+                }
+            } catch (e) {
+                console.error(e);
+                setSyncStatus("Couldn't reach the cloud — using what's on this device");
+            }
+        };
+
+        window.onSwSignedOut = function() {
+            const outView = document.getElementById("signedOutView");
+            const inView = document.getElementById("signedInView");
+            if (outView) outView.style.display = "block";
+            if (inView) inView.style.display = "none";
+        };
+
+        function saveScene() {
+            const raw = document.getElementById("scriptInput").value;
+            if (raw.trim().length === 0) {
+                alert("Paste in a script before saving.");
+                return;
+            }
+            const play = document.getElementById("screenplayName").value.trim();
+            if (!play) {
+                alert("Give this screenplay a name first (so scenes can be grouped under it).");
+                return;
+            }
+            const name = document.getElementById("sceneName").value.trim();
+            if (!name) {
+                alert("Give this scene a name first.");
+                return;
+            }
+            if (name === "__order") {
+                alert("That name is reserved internally — please pick a different scene name.");
+                return;
+            }
+            const data = loadScreenplays();
+            if (!data[play]) data[play] = {};
+            const isNew = !(name in data[play]);
+            data[play][name] = {
+                script: raw,
+                myChar: document.getElementById("myChar").value.trim(),
+                shuffle: document.getElementById("shuffleMode").checked,
+                speak: document.getElementById("speakOthers").checked,
+                hint: document.getElementById("hintMode").checked,
+                ttsLang: document.getElementById("ttsLang").value
+            };
+            if (isNew) {
+                if (!Array.isArray(data[play].__order)) data[play].__order = getSceneNames(data[play]).filter(n => n !==
+                name);
+                data[play].__order.push(name);
+            }
+            const saved = saveScreenplays(data);
+            document.getElementById("sceneName").value = "";
+            renderSceneList();
+            warnIfNotPersisted(saved);
+        }
+
+        function warnIfNotPersisted(saved) {
+            if (!saved) {
+                alert(
+                    "Your browser's storage is full, so this couldn't be permanently saved. It'll stay available for the rest of this session, but will be lost on refresh. Try exporting your scenes and deleting some older screenplays to free up space."
+                    );
+            }
+        }
+
+        function updateStartButtonState() {
+            const hasScript = document.getElementById("scriptInput").value.trim().length > 0;
+            const btns = document.querySelectorAll(".start-practice-btn");
+            btns.forEach(btn => btn.disabled = !hasScript);
+        }
+
+        function loadScene(play, name) {
+            const data = loadScreenplays();
+            const s = data[play] && data[play][name];
+            if (!s) return;
+            document.getElementById("scriptInput").value = s.script;
+            document.getElementById("myChar").value = s.myChar || "";
+            document.getElementById("shuffleMode").checked = !!s.shuffle;
+            document.getElementById("speakOthers").checked = !!s.speak;
+            document.getElementById("hintMode").checked = !!s.hint;
+            document.getElementById("ttsLang").value = s.ttsLang || "ro-RO";
+            document.getElementById("screenplayName").value = play;
+            document.getElementById("sceneName").value = name;
+            updateVoiceHint();
+            updateStartButtonState();
+            closeScenesSheet();
+            window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+
+        function deleteScene(play, name) {
+            if (!confirm(`Delete saved scene "${name}" from "${play}"?`)) return;
+            const data = loadScreenplays();
+            if (data[play]) {
+                delete data[play][name];
+                if (Array.isArray(data[play].__order)) {
+                    data[play].__order = data[play].__order.filter(n => n !== name);
+                }
+                if (getSceneNames(data[play]).length === 0) delete data[play];
+            }
+            saveScreenplays(data);
+            renderSceneList();
+        }
+
+        function deleteScreenplay(play) {
+            const data = loadScreenplays();
+            const count = data[play] ? Object.keys(data[play]).length : 0;
+            if (!confirm(`Delete "${play}" and all ${count} scene(s) under it?`)) return;
+            delete data[play];
+            saveScreenplays(data);
+            renderSceneList();
+        }
+
+        function renderSceneList() {
+            const data = loadScreenplays();
+            const plays = Object.keys(data);
+            const list = document.getElementById("sceneList");
+            const empty = document.getElementById("noScenes");
+            const noMatches = document.getElementById("noMatches");
+            const searchBox = document.getElementById("sceneSearch");
+
+            const datalist = document.getElementById("screenplayOptions");
+            if (datalist) {
+                datalist.innerHTML = plays.sort().map(p => `<option value="${escapeAttr(p)}">`).join("");
+            }
+
+            if (plays.length === 0) {
+                list.innerHTML = "";
+                empty.style.display = "block";
+                noMatches.style.display = "none";
+                if (searchBox) searchBox.style.display = "none";
+                return;
+            }
+            empty.style.display = "none";
+
+            const totalScenes = plays.reduce((sum, p) => sum + getSceneNames(data[p]).length, 0);
+            if (searchBox) searchBox.style.display = (plays.length + totalScenes > 8) ? "block" : "none";
+
+            const term = (searchBox && searchBox.value.trim().toLowerCase()) || "";
+            const draggable = !term;
+
+            let html = "";
+            if (!storageWorks) {
+                html +=
+                    `<div class="storage-warning">This browser tab can't persist storage (private/incognito mode, or restricted preview). Scenes will only stay saved until you close this tab — export them to keep a copy. For lasting saves, open this file directly in a normal browser tab.</div>`;
+            }
+
+            let anyRendered = false;
+            plays.sort().forEach(play => {
+                const scenes = data[play];
+                let names = getSceneNames(scenes);
+
+                if (term) {
+                    const playMatches = play.toLowerCase().includes(term);
+                    if (!playMatches) {
+                        names = names.filter(n => n.toLowerCase().includes(term));
+                    }
+                    if (!playMatches && names.length === 0) return;
+                }
+
+                anyRendered = true;
+                html += `<div class="screenplay-group">
+              <div class="screenplay-header">
+                <span class="title">${escapeHtml(play)}</span>
+                <div class="header-actions">
+                  <button onclick="playAllScenes('${escapeAttr(play)}')" title="Play all scenes from this screenplay" aria-label="Play all scenes">Play All</button>
+                  <button class="del" onclick="deleteScreenplay('${escapeAttr(play)}')">&times;</button>
+                </div>
+              </div>
+              <div class="scene-rows" data-play="${escapeAttr(play)}">`;
+                names.forEach(name => {
+                    const lineCount = scenes[name].script.split("\n").map(r => r.trim()).filter(r => r).length;
+                    const charLabel = scenes[name].myChar ? ` · as ${scenes[name].myChar}` : "";
+                    html += `<div class="scene-row" data-scene="${escapeAttr(name)}">
+                ${draggable ? `<span class="drag-handle" title="Drag to reorder" aria-label="Drag to reorder">⠿</span>` : ""}
+                <div class="scene-info">
+                  <div class="name">${escapeHtml(name)}</div>
+                  <div class="meta">${lineCount} lines${charLabel}</div>
+                </div>
+                <div class="scene-actions">
+                  <button onclick="loadScene('${escapeAttr(play)}','${escapeAttr(name)}')">Load</button>
+                  <button class="del" onclick="deleteScene('${escapeAttr(play)}','${escapeAttr(name)}')">&times;</button>
+                </div>
+              </div>`;
+                });
+                html += `</div></div>`;
+            });
+
+            list.innerHTML = html;
+            noMatches.style.display = (term && !anyRendered) ? "block" : "none";
+            attachDragHandlers();
+        }
+
+        let dragCtx = null;
+
+        function attachDragHandlers() {
+            document.querySelectorAll(".drag-handle").forEach(handle => {
+                handle.addEventListener("pointerdown", onDragHandleDown);
+            });
+        }
+
+        function onDragHandleDown(e) {
+            const handle = e.currentTarget;
+            const row = handle.closest(".scene-row");
+            const container = row && row.closest(".scene-rows");
+            if (!row || !container) return;
+            e.preventDefault();
+            dragCtx = {
+                row,
+                container,
+                play: container.dataset.play,
+                pointerId: e.pointerId
+            };
+            row.classList.add("dragging");
+            document.body.classList.add("dragging-active");
+            try { handle.setPointerCapture(e.pointerId); } catch (err) {}
+            document.addEventListener("pointermove", onDragMove);
+            document.addEventListener("pointerup", endDrag);
+            document.addEventListener("pointercancel", endDrag);
+        }
+
+        function onDragMove(e) {
+            if (!dragCtx) return;
+            const { row, container } = dragCtx;
+            const y = e.clientY;
+
+            const scrollParent = container.closest(".side-col-inner, .tts-panel-inner");
+            if (scrollParent) {
+                const prect = scrollParent.getBoundingClientRect();
+                const edge = 32;
+                if (y < prect.top + edge) {
+                    scrollParent.scrollTop -= 12;
+                } else if (y > prect.bottom - edge) {
+                    scrollParent.scrollTop += 12;
+                }
+            }
+
+            const siblings = Array.from(container.querySelectorAll(".scene-row")).filter(el => el !== row);
+            let target = null;
+            for (const sib of siblings) {
+                const rect = sib.getBoundingClientRect();
+                const mid = rect.top + rect.height / 2;
+                if (y < mid) {
+                    target = sib;
+                    break;
+                }
+            }
+
+            if (target) {
+                if (row.nextElementSibling !== target) {
+                    container.insertBefore(row, target);
+                }
+            } else if (container.lastElementChild !== row) {
+                container.appendChild(row);
+            }
+        }
+
+        function endDrag() {
+            if (!dragCtx) return;
+            const { row, container, play } = dragCtx;
+            row.classList.remove("dragging");
+            document.body.classList.remove("dragging-active");
+            document.removeEventListener("pointermove", onDragMove);
+            document.removeEventListener("pointerup", endDrag);
+            document.removeEventListener("pointercancel", endDrag);
+
+            const newOrder = Array.from(container.querySelectorAll(".scene-row")).map(r => r.dataset.scene);
+            const data = loadScreenplays();
+            if (data[play]) {
+                data[play].__order = newOrder;
+                saveScreenplays(data);
+            }
+            dragCtx = null;
+        }
+
+        function exportScenes() {
+            const data = loadScreenplays();
+            if (Object.keys(data).length === 0) {
+                alert("No saved scenes to export yet.");
+                return;
+            }
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            const stamp = new Date().toISOString().slice(0, 10);
+            a.href = url;
+            a.download = `stage-whisper-scenes-${stamp}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function importScenesFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                let imported;
+                try {
+                    imported = JSON.parse(e.target.result);
+                } catch (err) {
+                    alert("That file isn't valid scene JSON.");
+                    event.target.value = "";
+                    return;
+                }
+                if (typeof imported !== "object" || imported === null || Object.keys(imported).length === 0) {
+                    alert("No scenes found in that file.");
+                    event.target.value = "";
+                    return;
+                }
+
+                let incoming;
+                if (isFlatSceneFormat(imported)) {
+                    let playName = prompt(
+                        "This file has scenes without a screenplay grouping. What screenplay should they be filed under?",
+                        "Imported Scenes");
+                    if (playName === null) { event.target.value = ""; return; }
+                    playName = playName.trim() || "Imported Scenes";
+                    incoming = { [playName]: imported };
+                } else {
+                    incoming = imported;
+                }
+
+                const existing = loadScreenplays();
+                const collisions = [];
+                Object.keys(incoming).forEach(play => {
+                    Object.keys(incoming[play]).filter(n => n !== "__order").forEach(name => {
+                        if (existing[play] && existing[play][name]) collisions.push(`${play} / ${name}`);
+                    });
+                });
+                if (collisions.length > 0) {
+                    const ok = confirm(
+                        `${collisions.length} scene(s) share a name with ones you already have and will be overwritten:\n${collisions.slice(0,8).join("\n")}${collisions.length>8 ? "\n…" : ""}\n\nContinue?`
+                        );
+                    if (!ok) { event.target.value = ""; return; }
+                }
+
+                let sceneCount = 0;
+                Object.keys(incoming).forEach(play => {
+                    if (!existing[play]) existing[play] = {};
+                    const existingOrder = getSceneNames(existing[play]);
+                    const incomingOrder = getSceneNames(incoming[play]);
+                    Object.assign(existing[play], incoming[play]);
+                    const combinedOrder = existingOrder.slice();
+                    incomingOrder.forEach(n => { if (!combinedOrder.includes(n)) combinedOrder.push(n); });
+                    existing[play].__order = combinedOrder;
+                    sceneCount += incomingOrder.filter(n => n !== "__order").length;
+                });
+                const saved = saveScreenplays(existing);
+                renderSceneList();
+                if (saved) {
+                    alert(`Imported ${sceneCount} scene(s) across ${Object.keys(incoming).length} screenplay(s).`);
+                } else {
+                    alert(
+                        `Imported ${sceneCount} scene(s), but your browser's storage is full — none of this import was permanently saved. It'll stay available for the rest of this session only. Try exporting what you can, deleting some older screenplays, and importing again in smaller batches.`
+                        );
+                }
+                event.target.value = "";
+            };
+            reader.readAsText(file);
+        }
+
+        function escapeHtml(s) {
+            return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" } [c]));
+        }
+
+        function escapeAttr(s) {
+            return s.replace(/'/g, "\\'");
+        }
+
+        function loadVoices() {
+            voices = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
+            updateVoiceHint();
+        }
+        if (window.speechSynthesis) {
+            loadVoices();
+            window.speechSynthesis.onvoiceschanged = loadVoices;
+        }
+
+        function updateVoiceHint() {
+            const sel = document.getElementById("ttsLang");
+            if (!sel) return;
+            const lang = sel.value;
+            const match = pickVoice(lang);
+            const hintEl = document.getElementById("voiceHint");
+            if (!hintEl) return;
+            if (match) {
+                hintEl.textContent = `Voice found: ${match.name} (${match.lang})`;
+            } else {
+                hintEl.textContent =
+                    `No ${lang} voice installed on this device — speech may fall back to a default voice or stay silent. (On Android/Chrome: Settings → Languages → Text-to-speech, add the language.)`;
+            }
+        }
+
+        function pickVoice(lang) {
+            if (!voices.length) return null;
+            const base = lang.split("-")[0];
+            return voices.find(v => v.lang === lang) ||
+                voices.find(v => v.lang && v.lang.toLowerCase().startsWith(base)) ||
+                null;
+        }
+
+        function parseScript(raw) {
+            const rows = raw.split("\n").map(r => r.trim()).filter(r => r.length > 0);
+            const result = [];
+            rows.forEach(row => {
+                const m = row.match(/^([A-Za-z][A-Za-z0-9 '.\-]{0,30}):\s*(.+)$/);
+                if (m) {
+                    result.push({ character: m[1].trim(), text: m[2].trim() });
+                } else if (result.length > 0 && result[result.length - 1].character) {
+                    result[result.length - 1].text += " " + row;
+                } else {
+                    result.push({ character: null, text: row });
+                }
+            });
+            return result;
+        }
+
+        function shuffleArray(arr) {
+            const a = arr.slice();
+            for (let i = a.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [a[i], a[j]] = [a[j], a[i]];
+            }
+            return a;
+        }
+
+        function buildCuePairs(onlyIndices) {
+            const pairs = [];
+            for (let i = 0; i < allLines.length; i++) {
+                const line = allLines[i];
+                if (line.character && line.character.toUpperCase() === myChar) {
+                    if (onlyIndices && !onlyIndices.has(i)) continue;
+                    if (i > 0) pairs.push([i - 1, i]);
+                    else pairs.push([i]);
+                }
+            }
+            return pairs;
+        }
+
+        function buildOrder() {
+            if (shuffleOn) {
+                if (cueMode) {
+                    const pairs = shuffleArray(buildCuePairs());
+                    const flat = pairs.flat();
+                    return flat.length > 0 ? flat : allLines.map((_, i) => i);
+                }
+                return shuffleArray(allLines.map((_, i) => i));
+            }
+            return allLines.map((_, i) => i);
+        }
+
+        function firstLetterHint(text) {
+            return text.split(" ").map(w => {
+                const clean = w.replace(/[^A-Za-z']/g, "");
+                if (clean.length === 0) return w;
+                return w[0] + "_".repeat(Math.max(clean.length - 1, 0));
+            }).join(" ");
+        }
+
+        function playAllScenes(play) {
+            const data = loadScreenplays();
+            const screenplay = data[play];
+            if (!screenplay) {
+                alert('Screenplay not found.');
+                return;
+            }
+
+            const sceneNames = getSceneNames(screenplay);
+            if (sceneNames.length === 0) {
+                alert('No scenes found in this screenplay.');
+                return;
+            }
+
+            let combinedScript = '';
+            let firstScene = null;
+
+            sceneNames.forEach(name => {
+                const scene = screenplay[name];
+                if (!firstScene) {
+                    firstScene = scene;
+                }
+                if (scene.script) {
+                    combinedScript += scene.script + '\n\n';
+                }
+            });
+
+            if (!combinedScript.trim()) {
+                alert('No script content found in these scenes.');
+                return;
+            }
+
+            document.getElementById('scriptInput').value = combinedScript.trim();
+            updateStartButtonState();
+
+            if (firstScene) {
+                document.getElementById('myChar').value = firstScene.myChar || '';
+                document.getElementById('shuffleMode').checked = !!firstScene.shuffle;
+                document.getElementById('speakOthers').checked = !!firstScene.speak;
+                document.getElementById('hintMode').checked = !!firstScene.hint;
+                document.getElementById('ttsLang').value = firstScene.ttsLang || 'ro-RO';
+                document.getElementById('screenplayName').value = play;
+                document.getElementById('sceneName').value = '';
+            }
+
+            closeScenesSheet();
+            startPractice();
+        }
+
+        function startPractice() {
+            const raw = document.getElementById("scriptInput").value;
+            if (raw.trim().length === 0) {
+                alert("Paste in your script first.");
+                return;
+            }
+            allLines = parseScript(raw);
+            myChar = document.getElementById("myChar").value.trim().toUpperCase();
+            cueMode = myChar.length > 0;
+            shuffleOn = document.getElementById("shuffleMode").checked;
+            if (shuffleOn && !cueMode) {
+                alert("Shuffle mode needs your character name (above) so it knows which lines are yours.");
+                return;
+            }
+            speakOn = document.getElementById("speakOthers").checked;
+            hintOn = document.getElementById("hintMode").checked;
+            ttsLang = document.getElementById("ttsLang").value;
+            gotIt = 0;
+            missed = 0;
+            missedSet = new Set();
+            order = buildOrder();
+            pos = 0;
+            revealed = false;
+
+            document.getElementById("setup").style.display = "none";
+            document.getElementById("done").style.display = "none";
+            document.getElementById("practice").style.display = "flex";
+            document.getElementById("scoreRow").style.display = cueMode ? "flex" : "none";
+            document.querySelector(".side-col").style.display = "none";
+            currentScreen = "practice";
+            closeScenesSheet();
+            updateBottomBarVisibility();
+            updateScore();
+            renderCurrent();
+        }
+
+        function isMyLine(line) {
+            return cueMode && line.character && line.character.toUpperCase() === myChar;
+        }
+
+        function speak(text) {
+            if (!speakOn) return;
+            try {
+                window.speechSynthesis.cancel();
+                const u = new SpeechSynthesisUtterance(text);
+                u.rate = 0.95;
+                u.lang = ttsLang;
+                const v = pickVoice(ttsLang);
+                if (v) u.voice = v;
+                window.speechSynthesis.speak(u);
+            } catch (e) {}
+        }
+
+        function speakCurrentLineIfApplicable() {
+            if (currentScreen !== "practice") return;
+            if (pos >= order.length) return;
+            const line = allLines[order[pos]];
+            if (line && !isMyLine(line)) {
+                speak(line.text);
+            }
+        }
+
+        function onSpeakToggleChange() {
+            speakOn = document.getElementById("speakOthers").checked;
+            if (speakOn) {
+                speakCurrentLineIfApplicable();
+            } else {
+                try { window.speechSynthesis.cancel(); } catch (e) {}
+            }
+        }
+
+        function onTtsLangChange() {
+            ttsLang = document.getElementById("ttsLang").value;
+            updateVoiceHint();
+            if (speakOn) speakCurrentLineIfApplicable();
+        }
+
+        function renderCurrent() {
+            if (pos >= order.length) {
+                showDone();
+                return;
+            }
+            const line = allLines[order[pos]];
+            const total = order.length;
+            document.getElementById("progressText").textContent = `LINE ${pos+1} / ${total}`;
+            document.getElementById("progressFill").style.width = `${(pos/total)*100}%`;
+            document.getElementById("charName").textContent = line.character ? line.character : "";
+            document.getElementById("lineText").style.fontSize = fontSize + "rem";
+
+            if (pos > 0) {
+                const prev = allLines[order[pos - 1]];
+                const prevLabel = prev.character ? prev.character + ": " : "";
+                document.getElementById("contextLine").textContent = "Previous: " + prevLabel + prev.text;
+            } else {
+                document.getElementById("contextLine").textContent = "";
+            }
+
+            const mine = isMyLine(line);
+            const mainBtn = document.getElementById("mainBtn");
+            const scoreRow = document.getElementById("scoreRow");
+            const scoreButtons = document.getElementById("scoreButtons");
+            const hideBtn = document.getElementById("hideBtn");
+
+            hideBtn.style.display = (cueMode ? mine : true) ? "inline-block" : "none";
+
+            if (mine && !revealed) {
+                document.getElementById("lineText").className = "line-text line-hidden";
+                document.getElementById("lineText").textContent = hintOn ? firstLetterHint(line.text) : "· · · your line · · ·";
+                mainBtn.textContent = "REVEAL MY LINE";
+                mainBtn.className = "big-btn cue";
+                scoreRow.style.display = "none";
+                scoreButtons.style.display = "none";
+            } else if (mine && revealed) {
+                document.getElementById("lineText").className = "line-text";
+                document.getElementById("lineText").textContent = line.text;
+                mainBtn.textContent = "NEXT LINE";
+                mainBtn.className = "big-btn";
+                if (cueMode) {
+                    scoreRow.style.display = "flex";
+                    scoreButtons.style.display = "flex";
+                }
+            } else {
+                if (cueMode) {
+                    document.getElementById("lineText").className = "line-text";
+                    document.getElementById("lineText").textContent = line.text;
+                    mainBtn.textContent = "NEXT LINE";
+                    mainBtn.className = "big-btn";
+                    if (!revealed) { speak(line.text);
+                        revealed = true; }
+                    scoreRow.style.display = "none";
+                    scoreButtons.style.display = "none";
+                } else {
+                    if (!revealed) {
+                        document.getElementById("lineText").className = "line-text line-hidden";
+                        document.getElementById("lineText").textContent = hintOn ? firstLetterHint(line.text) :
+                            "· · · press to reveal · · ·";
+                        mainBtn.textContent = "REVEAL";
+                        mainBtn.className = "big-btn cue";
+                    } else {
+                        document.getElementById("lineText").className = "line-text";
+                        document.getElementById("lineText").textContent = line.text;
+                        mainBtn.textContent = "NEXT LINE";
+                        mainBtn.className = "big-btn";
+                    }
+                }
+            }
+        }
+
+        function handlePress() {
+            const line = allLines[order[pos]];
+            const mine = isMyLine(line);
+            if ((mine || !cueMode) && !revealed) {
+                revealed = true;
+                renderCurrent();
+                return;
+            }
+            pos++;
+            revealed = false;
+            renderCurrent();
+        }
+
+        function hideAgain() {
+            const line = allLines[order[pos]];
+            const mine = isMyLine(line);
+            if (mine || !cueMode) {
+                revealed = false;
+                renderCurrent();
+            }
+        }
+
+        function markScore(good) {
+            const idx = order[pos];
+            if (good) {
+                gotIt++;
+                missedSet.delete(idx);
+            } else {
+                missed++;
+                missedSet.add(idx);
+            }
+            updateScore();
+            handlePress();
+        }
+
+        function updateScore() {
+            document.getElementById("gotItCount").textContent = gotIt;
+            document.getElementById("missedCount").textContent = missed;
+        }
+
+        function showDone() {
+            document.getElementById("practice").style.display = "none";
+            document.getElementById("done").style.display = "block";
+            currentScreen = "done";
+            let stats = `<p>${order.length} lines run through.</p>`;
+            if (cueMode) {
+                stats +=
+                    `<p style="color:var(--neon)">Got it: ${gotIt} &nbsp;&nbsp; <span style="color:var(--danger)">Missed: ${missed}</span></p>`;
+            }
+            document.getElementById("doneStats").innerHTML = stats;
+            const redoBtn = document.getElementById("redoMissedBtn");
+            if (cueMode && missedSet.size > 0) {
+                redoBtn.style.display = "block";
+                redoBtn.textContent = `Redo missed lines only (${missedSet.size})`;
+            } else {
+                redoBtn.style.display = "none";
+            }
+            updateBottomBarVisibility();
+        }
+
+        function redoMissed() {
+            if (missedSet.size === 0) return;
+            const pairs = shuffleArray(buildCuePairs(missedSet));
+            order = pairs.flat();
+            pos = 0;
+            revealed = false;
+            gotIt = 0;
+            missed = 0;
+            updateScore();
+            document.getElementById("done").style.display = "none";
+            document.getElementById("practice").style.display = "flex";
+            document.getElementById("scoreRow").style.display = "flex";
+            currentScreen = "practice";
+            updateBottomBarVisibility();
+            renderCurrent();
+        }
+
+        function restart() {
+            pos = 0;
+            revealed = false;
+            gotIt = 0;
+            missed = 0;
+            missedSet = new Set();
+            updateScore();
+            document.getElementById("done").style.display = "none";
+            document.getElementById("practice").style.display = "flex";
+            document.getElementById("scoreRow").style.display = cueMode ? "flex" : "none";
+            currentScreen = "practice";
+            updateBottomBarVisibility();
+            renderCurrent();
+        }
+
+        function reshuffle() {
+            order = buildOrder();
+            pos = 0;
+            revealed = false;
+            document.getElementById("done").style.display = "none";
+            document.getElementById("practice").style.display = "flex";
+            currentScreen = "practice";
+            updateBottomBarVisibility();
+            renderCurrent();
+        }
+
+        function backToSetup() {
+            document.getElementById("practice").style.display = "none";
+            document.getElementById("done").style.display = "none";
+            document.getElementById("setup").style.display = "block";
+            document.querySelector(".side-col").style.display = "flex";
+            currentScreen = "setup";
+            closeScenesSheet();
+            renderSceneList();
+            updateBottomBarVisibility();
+            updateStartButtonState();
+        }
+
+        function changeFont(delta) {
+            fontSize = Math.min(2.2, Math.max(0.9, fontSize + delta * 0.1));
+            renderCurrent();
+        }
+
+        function setTheme(theme) {
+            document.documentElement.setAttribute("data-theme", theme);
+            try { localStorage.setItem("stageWhisperTheme", theme); } catch (e) {}
+            const btn = document.getElementById("themeToggleBtn");
+            if (btn) {
+                btn.textContent = theme === "dark" ? "☀" : "☾";
+                btn.title = theme === "dark" ? "Switch to day theme" : "Switch to dark theme";
+                btn.setAttribute("aria-label", btn.title);
+            }
+            const meta = document.querySelector('meta[name="theme-color"]');
+            if (meta) {
+                meta.setAttribute("content", theme === "dark" ? "#0a0e0f" : "#f2f5f4");
+            }
+        }
+
+        function toggleTheme() {
+            const current = document.documentElement.getAttribute("data-theme") || "dark";
+            setTheme(current === "dark" ? "light" : "dark");
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            updateVoiceHint();
+            renderSceneList();
+            updateBottomBarVisibility();
+            updateStartButtonState();
+            setTheme(document.documentElement.getAttribute("data-theme") || "dark");
+            lockPortraitIfPossible();
+            disablePullToRefresh();
+        });
+        window.addEventListener("resize", updateBottomBarVisibility);
+
+        function lockPortraitIfPossible() {
+            try {
+                if (screen.orientation && typeof screen.orientation.lock === "function") {
+                    screen.orientation.lock("portrait").catch(() => {});
+                }
+            } catch (e) {}
+        }
+
+        if (window.matchMedia("(display-mode: standalone)").addEventListener) {
+            window.matchMedia("(display-mode: standalone)").addEventListener("change", (e) => {
+                if (e.matches) lockPortraitIfPossible();
+            });
+        }
+        window.addEventListener("appinstalled", lockPortraitIfPossible);
+
+        // ----- disable pull-to-refresh on Android PWA (touch handler) -----
+        function disablePullToRefresh() {
+            let startY = 0;
+            let startX = 0;
+            const threshold = 10;
+            let isDraggingDown = false;
+
+            document.addEventListener('touchstart', function(e) {
+                const t = e.touches[0];
+                startY = t.clientY;
+                startX = t.clientX;
+                isDraggingDown = false;
+            }, { passive: true });
+
+            document.addEventListener('touchmove', function(e) {
+                if (e.touches.length !== 1) return;
+                const t = e.touches[0];
+                const dy = t.clientY - startY;
+                const dx = t.clientX - startX;
+                // only prevent if dragging mostly downward and at the top of the page
+                if (dy > threshold && Math.abs(dx) < threshold * 2) {
+                    const scrollTop = document.documentElement.scrollTop || document.body.scrollTop || 0;
+                    if (scrollTop <= 0) {
+                        e.preventDefault();
+                        isDraggingDown = true;
+                    }
+                }
+            }, { passive: false });
+
+            document.addEventListener('touchend', function(e) {
+                isDraggingDown = false;
+            }, { passive: true });
+        }
+
+        // ---- Sheets ----
+        function openScenesSheet() {
+            document.getElementById("scenesPanelWrap").classList.add("sheet-open");
+            document.getElementById("scenesBackdrop").style.display = "block";
+        }
+
+        function closeScenesSheet() {
+            document.getElementById("scenesPanelWrap").classList.remove("sheet-open");
+            document.getElementById("scenesBackdrop").style.display = "none";
+        }
+
+        function toggleScenesSheet() {
+            const wrap = document.getElementById("scenesPanelWrap");
+            if (wrap.classList.contains("sheet-open")) closeScenesSheet();
+            else openScenesSheet();
+        }
+
+        function openTtsSheet() {
+            document.getElementById("ttsPanelWrap").classList.add("sheet-open");
+            document.getElementById("ttsBackdrop").style.display = "block";
+        }
+
+        function closeTtsSheet() {
+            document.getElementById("ttsPanelWrap").classList.remove("sheet-open");
+            document.getElementById("ttsBackdrop").style.display = "none";
+        }
+
+        function toggleTtsSheet() {
+            const wrap = document.getElementById("ttsPanelWrap");
+            if (wrap.classList.contains("sheet-open")) closeTtsSheet();
+            else openTtsSheet();
+        }
+
+        function updateBottomBarVisibility() {
+            const isMobile = window.innerWidth < 900;
+            const setupVisible = currentScreen === "setup";
+
+            const scenesBtn = document.getElementById("scenesBarBtn");
+            if (scenesBtn) scenesBtn.style.display = (isMobile && setupVisible) ? "inline-block" : "none";
+            if (!isMobile || !setupVisible) closeScenesSheet();
+
+            const homeBtn = document.getElementById("homeBtn");
+            if (homeBtn) homeBtn.style.display = (currentScreen === "practice" || currentScreen === "done") ? "flex" : "none";
+        }
+
+        document.addEventListener("keydown", (e) => {
+            if (document.getElementById("practice").style.display !== "flex") return;
+            if (e.code === "Space" || e.code === "Enter") {
+                e.preventDefault();
+                handlePress();
+            } else if (e.key.toLowerCase() === "g" && cueMode) {
+                markScore(true);
+            } else if (e.key.toLowerCase() === "m" && cueMode) {
+                markScore(false);
+            } else if (e.key.toLowerCase() === "h") {
+                hideAgain();
+            }
+        });
+
+        if ("serviceWorker" in navigator) {
+            window.addEventListener("load", () => {
+                navigator.serviceWorker.register("sw.js").catch(() => {});
+            });
+        }
+
+        let deferredInstallPrompt = null;
+        const INSTALLED_FLAG = "lineRunnerInstalled";
+
+        function markInstalled() {
+            try { localStorage.setItem(INSTALLED_FLAG, "1"); } catch (e) {}
+        }
+
+        function wasMarkedInstalled() {
+            try { return localStorage.getItem(INSTALLED_FLAG) === "1"; } catch (e) { return false; }
+        }
+
+        function isRunningStandalone() {
+            return window.matchMedia("(display-mode: standalone)").matches ||
+                window.navigator.standalone === true;
+        }
+
+        async function isAlreadyInstalled() {
+            if (isRunningStandalone()) return true;
+            if (wasMarkedInstalled()) return true;
+            if ("getInstalledRelatedApps" in navigator) {
+                try {
+                    const related = await navigator.getInstalledRelatedApps();
+                    if (related.length > 0) {
+                        markInstalled();
+                        return true;
+                    }
+                } catch (e) {}
+            }
+            return false;
+        }
+
+        async function updateInstallButton() {
+            const btn = document.getElementById("installBtn");
+            if (!btn) return;
+            if (await isAlreadyInstalled()) {
+                btn.style.display = "none";
+            } else if (deferredInstallPrompt) {
+                btn.style.display = "flex";
+            } else {
+                btn.style.display = "none";
+            }
+        }
+
+        window.addEventListener("beforeinstallprompt", (e) => {
+            e.preventDefault();
+            deferredInstallPrompt = e;
+            updateInstallButton();
+        });
+
+        window.addEventListener("appinstalled", () => {
+            markInstalled();
+            deferredInstallPrompt = null;
+            updateInstallButton();
+        });
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const btn = document.getElementById("installBtn");
+            if (btn) {
+                btn.addEventListener("click", async () => {
+                    if (!deferredInstallPrompt) return;
+                    deferredInstallPrompt.prompt();
+                    const choice = await deferredInstallPrompt.userChoice;
+                    deferredInstallPrompt = null;
+                    if (choice.outcome === "accepted") {
+                        markInstalled();
+                        btn.style.display = "none";
+                    } else {
+                        btn.style.display = "none";
+                    }
+                });
+            }
+            updateInstallButton();
+        });
+    </script>
+
+    <div class="bottom-bar">
+        <button id="scenesBarBtn" onclick="toggleScenesSheet()">Saved Scenes</button>
+        <div class="bar-right">
+            <button id="homeBtn" class="theme-toggle-btn" onclick="backToSetup()" title="Home" aria-label="Home" style="display:none;">⌂</button>
+            <button id="ttsBtn" class="theme-toggle-btn" onclick="toggleTtsSheet()" title="Text-to-speech settings" aria-label="Text-to-speech settings"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8.5a6.5 6.5 0 1 1 13 0c0 6-6 6-6 10a3.5 3.5 0 1 1-7 0"/><path d="M15 8.5a2.5 2.5 0 0 0-5 0v1a2 2 0 1 1 0 4"/></svg></button>
+            <button id="installBtn" title="Install App" aria-label="Install App"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg></button>
+            <button id="themeToggleBtn" class="theme-toggle-btn" onclick="toggleTheme()" title="Switch theme" aria-label="Switch theme">☀</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-app.js";
+        import {
+            getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
+        } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-auth.js";
+        import {
+            getFirestore, doc, getDoc, setDoc
+        } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDNoj3EbPvTZi8fIPhSj6id7HkVYYVb1z4",
+            authDomain: "nullvault-stagewhisper.firebaseapp.com",
+            projectId: "nullvault-stagewhisper",
+            storageBucket: "nullvault-stagewhisper.firebasestorage.app",
+            messagingSenderId: "878820162278",
+            appId: "1:878820162278:web:ccf492e98bfaaf5d955927"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const provider = new GoogleAuthProvider();
+
+        window.swSignIn = async function() {
+            try {
+                await signInWithPopup(auth, provider);
+            } catch (e) {
+                console.error(e);
+                alert("Sign-in didn't go through: " + (e && e.message ? e.message : "unknown error"));
+            }
+        };
+
+        window.swSignOut = function() {
+            signOut(auth);
+        };
+
+        window.swPullCloud = async function(uid) {
+            const snap = await getDoc(doc(db, "users", uid));
+            return snap.exists() ? (snap.data().screenplays || {}) : null;
+        };
+
+        window.swPushCloud = async function(uid, screenplays) {
+            await setDoc(doc(db, "users", uid), { screenplays, updatedAt: Date.now() });
+        };
+
+        onAuthStateChanged(auth, (user) => {
+            window.swCurrentUser = user || null;
+            if (user && window.onSwSignedIn) window.onSwSignedIn(user);
+            if (!user && window.onSwSignedOut) window.onSwSignedOut();
+        });
+    </script>
+
+</body>
+</html>
