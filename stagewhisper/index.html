@@ -81,6 +81,9 @@
         .side-col {
             width: 300px;
             flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
         }
         .side-col-inner {
             background: var(--panel);
@@ -184,6 +187,7 @@
                 opacity: 0;
                 transition: transform 0.25s ease, opacity 0.25s ease;
                 pointer-events: none;
+                gap: 0;
             }
             .side-col.sheet-open {
                 transform: translateY(0);
@@ -197,6 +201,20 @@
             }
             .side-col .panel-header .close-sheet {
                 display: block;
+            }
+            .side-col .desktop-start-btn-wrapper {
+                display: none !important;
+            }
+        }
+        @media (min-width:900px) {
+            .side-col .desktop-start-btn-wrapper {
+                display: block !important;
+            }
+            .mobile-start-btn-wrapper {
+                display: none !important;
+            }
+            #setup {
+                padding-bottom: 8px !important;
             }
         }
         h1 {
@@ -268,7 +286,7 @@
             background: var(--panel);
             border: 1px solid var(--border);
             border-radius: 10px;
-            padding: 20px;
+            padding: 20px 20px 8px 20px;
             width: 100%;
             max-width: 640px;
             box-shadow: 0 0 24px rgba(57, 255, 154, 0.05);
@@ -368,7 +386,14 @@
         .primary:hover {
             box-shadow: 0 0 16px rgba(57, 255, 154, 0.6);
         }
-        .start-practice-btn {
+        /* mobile start button — fixed at bottom */
+        .mobile-start-btn-wrapper {
+            display: block;
+            width: 100%;
+            max-width: 640px;
+            margin: 0 auto;
+        }
+        .mobile-start-btn-wrapper .start-practice-btn {
             position: fixed;
             left: 16px;
             right: 16px;
@@ -378,6 +403,25 @@
             margin: 0 auto;
             z-index: 70;
             box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+        }
+        /* desktop start button — in side column */
+        .desktop-start-btn-wrapper {
+            display: none;
+        }
+        .desktop-start-btn-wrapper .start-practice-btn {
+            width: 100%;
+            margin: 0;
+            box-shadow: 0 2px 12px rgba(57, 255, 154, 0.2);
+        }
+        .desktop-start-btn-wrapper .start-practice-btn:disabled {
+            background: var(--border);
+            color: var(--muted);
+            cursor: not-allowed;
+            box-shadow: none;
+            opacity: 0.7;
+        }
+        .desktop-start-btn-wrapper .start-practice-btn:disabled:hover {
+            box-shadow: none;
         }
 
         .start-practice-btn:disabled {
@@ -391,7 +435,7 @@
             box-shadow: none;
         }
         #setup {
-            padding-bottom: calc(var(--bottom-bar-h) + 76px);
+            padding-bottom: 8px;
         }
 
         /* Practice view */
@@ -658,7 +702,6 @@
         .screenplay-header .header-actions .del:hover {
             background: rgba(255, 95, 109, 0.1);
         }
-        /* play-all button uses default button styles (green) */
         footer {
             color: var(--muted);
             font-size: 0.7rem;
@@ -700,7 +743,10 @@
                 </div>
                 <div class="hint">Group scenes under a screenplay so you can keep separate roles — e.g. two characters from the same play — organized and easy to tell apart.</div>
 
-                <button class="primary start-practice-btn" id="startPracticeBtn" onclick="startPractice()" disabled>START PRACTICE</button>
+                <!-- mobile button wrapper (fixed at bottom) -->
+                <div class="mobile-start-btn-wrapper">
+                    <button class="primary start-practice-btn" id="startPracticeBtn" onclick="startPractice()" disabled>START PRACTICE</button>
+                </div>
             </div>
 
             <div id="practice">
@@ -752,6 +798,11 @@
         </div><!-- /main-col -->
 
         <aside class="side-col" id="scenesPanelWrap">
+            <!-- desktop button — above Saved scenes -->
+            <div class="desktop-start-btn-wrapper">
+                <button class="primary start-practice-btn" id="startPracticeBtnDesktop" onclick="startPractice()" disabled>START PRACTICE</button>
+            </div>
+
             <div class="side-col-inner">
                 <div class="panel-header">
                     <span>Saved Scenes</span>
@@ -1030,10 +1081,9 @@
         }
 
         function updateStartButtonState() {
-            const btn = document.getElementById("startPracticeBtn");
-            if (!btn) return;
             const hasScript = document.getElementById("scriptInput").value.trim().length > 0;
-            btn.disabled = !hasScript;
+            const btns = document.querySelectorAll(".start-practice-btn");
+            btns.forEach(btn => btn.disabled = !hasScript);
         }
 
         function loadScene(play, name) {
@@ -1736,7 +1786,7 @@
             document.getElementById("practice").style.display = "none";
             document.getElementById("done").style.display = "none";
             document.getElementById("setup").style.display = "block";
-            document.querySelector(".side-col").style.display = "block";
+            document.querySelector(".side-col").style.display = "flex";
             currentScreen = "setup";
             closeScenesSheet();
             renderSceneList();
