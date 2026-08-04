@@ -373,6 +373,32 @@
     padding:10px 12px;
     margin-bottom:8px;
   }
+  .scene-row.dragging{
+    opacity:0.6;
+    border-color:var(--neon-dim);
+    box-shadow:0 4px 14px rgba(0,0,0,0.35);
+  }
+  .scene-rows{display:flex;flex-direction:column;}
+  .drag-handle{
+    flex-shrink:0;
+    width:22px;
+    height:32px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:var(--muted);
+    font-size:1rem;
+    letter-spacing:-1px;
+    cursor:grab;
+    touch-action:none;
+    user-select:none;
+    -webkit-user-select:none;
+  }
+  .drag-handle:active{cursor:grabbing;color:var(--neon);}
+  body.dragging-active{
+    -webkit-user-select:none;
+    user-select:none;
+  }
   .scene-info{overflow:hidden;}
   .scene-info .name{color:var(--text);font-size:0.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .scene-info .meta{color:var(--muted);font-size:0.7rem;margin-top:2px;}
@@ -596,6 +622,17 @@ function isFlatSceneFormat(obj){
   return vals.every(looksLikeSceneObject);
 }
 
+// Scene names in a screenplay, in the order the person dragged them into —
+// falls back to whatever order the keys happen to be in for any scenes that
+// existed before ordering was tracked, or that arrived from a merge/import
+// without one.
+function getSceneNames(scenes){
+  const keys = Object.keys(scenes).filter(k=>k!=="__order");
+  const saved = Array.isArray(scenes.__order) ? scenes.__order.filter(n=>keys.includes(n)) : [];
+  keys.forEach(k=>{ if(!saved.includes(k)) saved.push(k); });
+  return saved;
+}
+
 function migrateOldScenesIfNeeded(){
   if(!storageWorks) return;
   try{
@@ -693,12 +730,19 @@ window.onSwSignedIn = async function(user){
     let addedFromLocal = 0;
     Object.keys(local).forEach(play=>{
       if(!merged[play]) merged[play] = {};
-      Object.keys(local[play]).forEach(name=>{
+      const cloudOrder = getSceneNames(merged[play]);
+      const localOrder = getSceneNames(local[play]);
+      Object.keys(local[play]).filter(n=>n!=="__order").forEach(name=>{
         if(!merged[play][name]){
           merged[play][name] = local[play][name];
           addedFromLocal++;
         }
       });
+      // Preserve cloud's ordering as the base (it's the more "current" copy),
+      // then append anything local-only that isn't in it yet.
+      const combinedOrder = cloudOrder.slice();
+      localOrder.forEach(n=>{ if(!combinedOrder.includes(n)) combinedOrder.push(n); });
+      merged[play].__order = combinedOrder;
     });
 
     saveScreenplays(merged); // writes locally and pushes back to cloud
@@ -736,8 +780,13 @@ function saveScene(){
     alert("Give this scene a name first.");
     return;
   }
+  if(name === "__order"){
+    alert("That name is reserved internally — please pick a different scene name.");
+    return;
+  }
   const data = loadScreenplays();
   if(!data[play]) data[play] = {};
+  const isNew = !(name in data[play]);
   data[play][name] = {
     script: raw,
     myChar: document.getElementById("myChar").value.trim(),
@@ -746,6 +795,10 @@ function saveScene(){
     hint: document.getElementById("hintMode").checked,
     ttsLang: document.getElementById("ttsLang").value
   };
+  if(isNew){
+    if(!Array.isArray(data[play].__order)) data[play].__order = getSceneNames(data[play]).filter(n=>n!==name);
+    data[play].__order.push(name);
+  }
   const saved = saveScreenplays(data);
   document.getElementById("sceneName").value = "";
   renderSceneList();
@@ -780,7 +833,10 @@ function deleteScene(play, name){
   const data = loadScreenplays();
   if(data[play]){
     delete data[play][name];
-    if(Object.keys(data[play]).length===0) delete data[play];
+    if(Array.isArray(data[play].__order)){
+      data[play].__order = data[play].__order.filter(n=>n!==name);
+    }
+    if(getSceneNames(data[play]).length===0) delete data[play];
   }
   saveScreenplays(data);
   renderSceneList();
@@ -819,10 +875,12 @@ function renderSceneList(){
   empty.style.display = "none";
 
   // Only bother showing search once there's enough to actually need it.
-  const totalScenes = plays.reduce((sum,p)=>sum + Object.keys(data[p]).length, 0);
+  const totalScenes = plays.reduce((sum,p)=>sum + getSceneNames(data[p]).length, 0);
   if(searchBox) searchBox.style.display = (plays.length + totalScenes > 8) ? "block" : "none";
 
   const term = (searchBox && searchBox.value.trim().toLowerCase()) || "";
+  // Reordering only makes sense against the full, unfiltered list.
+  const draggable = !term;
 
   let html = "";
   if(!storageWorks){
@@ -832,7 +890,7 @@ function renderSceneList(){
   let anyRendered = false;
   plays.sort().forEach(play=>{
     const scenes = data[play];
-    let names = Object.keys(scenes).sort();
+    let names = getSceneNames(scenes);
 
     if(term){
       const playMatches = play.toLowerCase().includes(term);
@@ -847,11 +905,13 @@ function renderSceneList(){
       <div class="screenplay-header">
         <span class="title">${escapeHtml(play)}</span>
         <button class="del" onclick="deleteScreenplay('${escapeAttr(play)}')">&times;</button>
-      </div>`;
+      </div>
+      <div class="scene-rows" data-play="${escapeAttr(play)}">`;
     names.forEach(name=>{
       const lineCount = scenes[name].script.split("\n").map(r=>r.trim()).filter(r=>r).length;
       const charLabel = scenes[name].myChar ? ` · as ${scenes[name].myChar}` : "";
-      html += `<div class="scene-row">
+      html += `<div class="scene-row" data-scene="${escapeAttr(name)}">
+        ${draggable ? `<span class="drag-handle" title="Drag to reorder" aria-label="Drag to reorder">⠿</span>` : ""}
         <div class="scene-info">
           <div class="name">${escapeHtml(name)}</div>
           <div class="meta">${lineCount} lines${charLabel}</div>
@@ -862,11 +922,102 @@ function renderSceneList(){
         </div>
       </div>`;
     });
-    html += `</div>`;
+    html += `</div></div>`;
   });
 
   list.innerHTML = html;
   noMatches.style.display = (term && !anyRendered) ? "block" : "none";
+  attachDragHandlers();
+}
+
+// ---- Drag-to-reorder scenes within a screenplay (mouse + touch via Pointer Events) ----
+let dragCtx = null;
+
+function attachDragHandlers(){
+  document.querySelectorAll(".drag-handle").forEach(handle=>{
+    handle.addEventListener("pointerdown", onDragHandleDown);
+  });
+}
+
+function onDragHandleDown(e){
+  const handle = e.currentTarget;
+  const row = handle.closest(".scene-row");
+  const container = row && row.closest(".scene-rows");
+  if(!row || !container) return;
+  e.preventDefault();
+  dragCtx = {
+    row,
+    container,
+    play: container.dataset.play,
+    pointerId: e.pointerId
+  };
+  row.classList.add("dragging");
+  document.body.classList.add("dragging-active");
+  try{ handle.setPointerCapture(e.pointerId); }catch(err){}
+  document.addEventListener("pointermove", onDragMove);
+  document.addEventListener("pointerup", endDrag);
+  document.addEventListener("pointercancel", endDrag);
+}
+
+function onDragMove(e){
+  if(!dragCtx) return;
+  const { row, container } = dragCtx;
+  const y = e.clientY;
+
+  // Auto-scroll the panel if dragging near its top/bottom edge, so scenes
+  // further up or down than what's currently visible are still reachable.
+  const scrollParent = container.closest(".side-col-inner, .tts-panel-inner");
+  if(scrollParent){
+    const prect = scrollParent.getBoundingClientRect();
+    const edge = 32;
+    if(y < prect.top + edge){
+      scrollParent.scrollTop -= 12;
+    } else if(y > prect.bottom - edge){
+      scrollParent.scrollTop += 12;
+    }
+  }
+
+  // Find the first sibling whose vertical midpoint sits below the pointer —
+  // that's where the dragged row belongs. Computed fresh and placed directly
+  // (rather than nudging one neighbor at a time) so a fast swipe lands
+  // exactly where the finger is, even if touch only sent a couple of
+  // pointermove events for the whole gesture.
+  const siblings = Array.from(container.querySelectorAll(".scene-row")).filter(el=>el!==row);
+  let target = null;
+  for(const sib of siblings){
+    const rect = sib.getBoundingClientRect();
+    const mid = rect.top + rect.height/2;
+    if(y < mid){
+      target = sib;
+      break;
+    }
+  }
+
+  if(target){
+    if(row.nextElementSibling !== target){
+      container.insertBefore(row, target);
+    }
+  } else if(container.lastElementChild !== row){
+    container.appendChild(row);
+  }
+}
+
+function endDrag(){
+  if(!dragCtx) return;
+  const { row, container, play } = dragCtx;
+  row.classList.remove("dragging");
+  document.body.classList.remove("dragging-active");
+  document.removeEventListener("pointermove", onDragMove);
+  document.removeEventListener("pointerup", endDrag);
+  document.removeEventListener("pointercancel", endDrag);
+
+  const newOrder = Array.from(container.querySelectorAll(".scene-row")).map(r=>r.dataset.scene);
+  const data = loadScreenplays();
+  if(data[play]){
+    data[play].__order = newOrder;
+    saveScreenplays(data); // also pushes the new order to the cloud if signed in
+  }
+  dragCtx = null;
 }
 
 function exportScenes(){
@@ -921,7 +1072,7 @@ function importScenesFile(event){
     const existing = loadScreenplays();
     const collisions = [];
     Object.keys(incoming).forEach(play=>{
-      Object.keys(incoming[play]).forEach(name=>{
+      Object.keys(incoming[play]).filter(n=>n!=="__order").forEach(name=>{
         if(existing[play] && existing[play][name]) collisions.push(`${play} / ${name}`);
       });
     });
@@ -933,8 +1084,15 @@ function importScenesFile(event){
     let sceneCount = 0;
     Object.keys(incoming).forEach(play=>{
       if(!existing[play]) existing[play] = {};
+      const existingOrder = getSceneNames(existing[play]);
+      const incomingOrder = getSceneNames(incoming[play]);
       Object.assign(existing[play], incoming[play]);
-      sceneCount += Object.keys(incoming[play]).length;
+      // Keep existing scenes' positions, then append any newly-arrived ones
+      // in the order the imported file had them.
+      const combinedOrder = existingOrder.slice();
+      incomingOrder.forEach(n=>{ if(!combinedOrder.includes(n)) combinedOrder.push(n); });
+      existing[play].__order = combinedOrder;
+      sceneCount += incomingOrder.filter(n=>n!=="__order").length;
     });
     const saved = saveScreenplays(existing);
     renderSceneList();
