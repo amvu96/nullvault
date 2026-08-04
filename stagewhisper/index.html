@@ -1323,12 +1323,14 @@
             try {
                 return await window.swGetHintsDoc(window.swCurrentUser.uid, hintsDocId(play, scene, character));
             } catch (e) {
+                console.error("Failed to read AI hints (check Firestore rules for users/{uid}/hints/*)", e);
+                showAiToast("Couldn't read saved AI hints from your account (permissions?) — regenerating.", true);
                 return null;
             }
         }
 
         async function saveHintsDoc(play, scene, character, hints, scriptHash) {
-            if (!window.swCurrentUser || !window.swSaveHintsDoc) return;
+            if (!window.swCurrentUser || !window.swSaveHintsDoc) return false;
             try {
                 await window.swSaveHintsDoc(window.swCurrentUser.uid, hintsDocId(play, scene, character), {
                     play, scene,
@@ -1336,8 +1338,11 @@
                     hints, scriptHash
                 });
                 await refreshHintsIndex();
+                return true;
             } catch (e) {
-                console.error("Failed to save AI hints", e);
+                console.error("Failed to save AI hints (check Firestore rules for users/{uid}/hints/*)", e);
+                showAiToast("Hints generated, but couldn't be saved to your account (permissions?) — they'll regenerate next time.", true);
+                return false;
             }
         }
 
@@ -1353,6 +1358,7 @@
                 docs.forEach(d => { if (d && d.play && d.scene) set.add(d.play + "::" + d.scene); });
                 window.swHintsIndex = set;
             } catch (e) {
+                console.error("Failed to list AI hints (check Firestore rules for users/{uid}/hints/*)", e);
                 window.swHintsIndex = new Set();
             }
             renderSceneList();
@@ -1427,20 +1433,29 @@
                 hash = await sha256Hex(raw);
             } catch (e) {}
 
-            if (play && scene) {
+            if (play && scene && window.swCurrentUser) {
                 const existing = await fetchHintsDoc(play, scene, myChar);
                 if (existing && hash && existing.scriptHash === hash && Array.isArray(existing.hints)) {
+                    showAiToast("AI hints loaded from your saved cache — no API call made.");
                     return existing.hints;
                 }
             } else if (!window.swCurrentUser) {
-                showAiToast("Sign in and save this scene (with a screenplay + scene name) to reuse AI hints next time. Generating for this run only…");
+                showAiToast("Sign in to save and reuse AI hints across sessions. Generating for this run only…");
             }
 
             showAiLoading(true);
             try {
                 const hints = await callMistralForHints(myChar, allLines);
+                let saved = false;
                 if (play && scene && window.swCurrentUser) {
-                    await saveHintsDoc(play, scene, myChar, hints, hash);
+                    saved = await saveHintsDoc(play, scene, myChar, hints, hash);
+                }
+                if (saved) {
+                    showAiToast("New AI hints generated and saved for next time.");
+                } else if (play && scene && window.swCurrentUser) {
+                    // saveHintsDoc already showed its own warning toast
+                } else {
+                    showAiToast("New AI hints generated for this session only.");
                 }
                 return hints;
             } finally {
