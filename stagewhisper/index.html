@@ -77,7 +77,7 @@
             align-items: flex-start;
             gap: 24px;
             width: 100%;
-            max-width: 980px;
+            max-width: 1040px;
         }
         .main-col {
             flex: 1;
@@ -87,7 +87,7 @@
             align-items: center;
         }
         .side-col {
-            width: 300px;
+            width: 340px;
             flex-shrink: 0;
             display: flex;
             flex-direction: column;
@@ -565,7 +565,9 @@
             animation: ai-spin 0.8s linear infinite;
         }
         @keyframes ai-spin {
-            to { transform: rotate(360deg); }
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         /* Practice view */
@@ -724,6 +726,18 @@
         .scene-rows {
             display: flex;
             flex-direction: column;
+            padding-left: 8px;
+            overflow: hidden;
+            transition: max-height 0.3s ease, opacity 0.2s ease;
+            max-height: 2000px;
+            opacity: 1;
+        }
+        .scene-rows.collapsed {
+            max-height: 0 !important;
+            opacity: 0;
+            padding-left: 8px;
+            pointer-events: none;
+            margin: 0;
         }
         .drag-handle {
             flex-shrink: 0;
@@ -789,14 +803,20 @@
             line-height: 1.4;
         }
         .screenplay-group {
-            margin-bottom: 16px;
+            margin-bottom: 12px;
         }
         .screenplay-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 8px;
-            margin-bottom: 8px;
+            padding: 6px 4px 6px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .screenplay-header:hover {
+            background: var(--input-bg);
         }
         .screenplay-header .title {
             color: var(--neon);
@@ -806,6 +826,21 @@
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex: 1;
+            min-width: 0;
+        }
+        .screenplay-header .title .toggle-icon {
+            display: inline-block;
+            font-size: 0.7rem;
+            transition: transform 0.2s ease;
+            color: var(--muted);
+            flex-shrink: 0;
+        }
+        .screenplay-header .title .toggle-icon.open {
+            transform: rotate(90deg);
         }
         .screenplay-header .header-actions {
             display: flex;
@@ -831,6 +866,13 @@
         }
         .screenplay-header .header-actions .del:hover {
             background: rgba(255, 95, 109, 0.1);
+        }
+        .screenplay-header .header-actions .play-all-btn {
+            border-color: var(--cyan);
+            color: var(--cyan);
+        }
+        .screenplay-header .header-actions .play-all-btn:hover {
+            background: rgba(58, 214, 255, 0.08);
         }
         footer {
             color: var(--muted);
@@ -1002,8 +1044,8 @@
 
             <label style="display:block;font-size:0.8rem;color:var(--cyan);margin:0 0 6px;text-transform:uppercase;">Provider</label>
             <select id="aiProviderSelect" onchange="onAiProviderChange()">
-                <option value="mistral">Mistral (mistral-small-latest)</option>
-                <option value="openrouter">OpenRouter — Gemma 4 26B A4B (free)</option>
+                <option value="mistral">Mistral</option>
+                <option value="openrouter">OpenRouter</option>
             </select>
 
             <div id="mistralKeySection" style="margin-top:16px;">
@@ -1081,6 +1123,7 @@
 
         const STORAGE_KEY = "lineRunnerScreenplays";
         const OLD_STORAGE_KEY = "lineRunnerScenes";
+        const COLLAPSED_STORAGE_KEY = "stageWhisperCollapsed";
         let storageWorks = true;
         let memoryScreenplays = {};
 
@@ -1230,6 +1273,44 @@
             renderSceneList();
         };
 
+        function getCollapsedState(play) {
+            try {
+                const raw = localStorage.getItem(COLLAPSED_STORAGE_KEY);
+                const data = raw ? JSON.parse(raw) : {};
+                return !!data[play];
+            } catch (e) { return false; }
+        }
+
+        function setCollapsedState(play, collapsed) {
+            try {
+                const raw = localStorage.getItem(COLLAPSED_STORAGE_KEY);
+                const data = raw ? JSON.parse(raw) : {};
+                if (collapsed) data[play] = true;
+                else delete data[play];
+                localStorage.setItem(COLLAPSED_STORAGE_KEY, JSON.stringify(data));
+            } catch (e) { /* ignore */ }
+        }
+
+        function toggleScreenplay(play, event) {
+            // ignore if the click was on a button inside the header
+            if (event && event.target && event.target.closest && event.target.closest('button')) return;
+            const container = document.querySelector(`.scene-rows[data-play="${escapeAttr(play)}"]`);
+            if (!container) return;
+            const isCollapsed = container.classList.contains("collapsed");
+            if (isCollapsed) {
+                container.classList.remove("collapsed");
+                setCollapsedState(play, false);
+                // Update toggle icon
+                const header = container.closest('.screenplay-group')?.querySelector('.screenplay-header .title .toggle-icon');
+                if (header) header.classList.add('open');
+            } else {
+                container.classList.add("collapsed");
+                setCollapsedState(play, true);
+                const header = container.closest('.screenplay-group')?.querySelector('.screenplay-header .title .toggle-icon');
+                if (header) header.classList.remove('open');
+            }
+        }
+
         function saveScene() {
             const raw = document.getElementById("scriptInput").value;
             if (raw.trim().length === 0) {
@@ -1296,8 +1377,6 @@
         const OPENROUTER_KEY_STORAGE = "openrouterApiKey";
         const OPENROUTER_MODEL_STORAGE = "openrouterModel";
         const DEFAULT_OPENROUTER_MODEL = "google/gemma-4-26b-a4b-it:free";
-        // Mistral free tier: 1 req/sec, 2 requests/minute — space calls well over 30s apart.
-        // OpenRouter's free models are looser but still rate-limited, so a light gap is still applied.
         const AI_MIN_INTERVAL_MS = { mistral: 31000, openrouter: 4000 };
 
         function getAiProvider() {
@@ -1435,6 +1514,7 @@
         }
 
         let aiToastTimer = null;
+
         function showAiToast(msg, warn) {
             const el = document.getElementById("aiToast");
             if (!el) return;
@@ -1458,7 +1538,6 @@
                 const buf = await crypto.subtle.digest("SHA-256", enc);
                 return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
             } catch (e) {
-                // Fallback change-detection hash if SubtleCrypto isn't available (e.g. non-HTTPS context)
                 let h = 0;
                 for (let i = 0; i < str.length; i++) {
                     h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
@@ -1519,8 +1598,6 @@
             renderSceneList();
         }
 
-        /* ---- Rate limiting: every call goes through a single-flight queue that enforces
-           spacing between requests app-wide, sized to the active provider's free-tier limits. ---- */
         let aiCallQueue = Promise.resolve();
         let aiNextAllowedAt = 0;
 
@@ -1539,7 +1616,6 @@
                     aiNextAllowedAt = Date.now() + (AI_MIN_INTERVAL_MS[provider] || 4000);
                 }
             });
-            // Keep the queue chain alive even if this call throws, so later calls still run.
             aiCallQueue = run.catch(() => {});
             return run;
         }
@@ -1553,7 +1629,7 @@
             if (typeof v === "object") {
                 const cand = v.hint || v.text || v.value;
                 if (typeof cand === "string" && cand.trim()) return cand.trim();
-                return null; // never stringify a raw object into the UI
+                return null;
             }
             return String(v).trim() || null;
         }
@@ -1567,7 +1643,6 @@
             const end = jsonText.lastIndexOf("}");
             const bStart = jsonText.indexOf("[");
             const bEnd = jsonText.lastIndexOf("]");
-            // Prefer an object span {...}; fall back to an array span [...] if that's all there is.
             if (start !== -1 && end !== -1 && end > start) {
                 jsonText = jsonText.slice(start, end + 1);
             } else if (bStart !== -1 && bEnd !== -1 && bEnd > bStart) {
@@ -1583,7 +1658,6 @@
 
             const result = new Array(lines.length).fill(null);
             if (Array.isArray(obj)) {
-                // Backward compatibility if the model (or a custom prompt) returns a plain array.
                 obj.forEach((v, i) => { if (i < result.length) result[i] = sanitizeHintValue(v); });
                 return result;
             }
@@ -1657,7 +1731,6 @@
                 }
 
                 if (res.status === 400 && useJsonMode) {
-                    // Some models/setups reject response_format — retry once in plain mode.
                     return attempt(false, isRetry);
                 }
 
@@ -1715,12 +1788,18 @@
             const msg = (e && e.message) || "";
             const label = getAiProvider() === "mistral" ? "Mistral" : "OpenRouter";
             switch (msg) {
-                case "no-api-key": return `No ${label} API key set — continuing without AI hints.`;
-                case "unauthorized": return `${label} API key looks invalid — continuing without AI hints.`;
-                case "rate-limited": return `${label} rate limit reached — continuing without AI hints.`;
-                case "network-error": return `Couldn't reach the ${label} API — continuing without AI hints.`;
-                case "bad-response": return "Couldn't read the AI response — continuing without AI hints.";
-                default: return "AI hints unavailable right now — continuing without them.";
+                case "no-api-key":
+                    return `No ${label} API key set — continuing without AI hints.`;
+                case "unauthorized":
+                    return `${label} API key looks invalid — continuing without AI hints.`;
+                case "rate-limited":
+                    return `${label} rate limit reached — continuing without AI hints.`;
+                case "network-error":
+                    return `Couldn't reach the ${label} API — continuing without AI hints.`;
+                case "bad-response":
+                    return "Couldn't read the AI response — continuing without AI hints.";
+                default:
+                    return "AI hints unavailable right now — continuing without them.";
             }
         }
 
@@ -1883,15 +1962,21 @@
                 }
 
                 anyRendered = true;
+                const isCollapsed = getCollapsedState(play);
+                const toggleClass = isCollapsed ? "" : "open";
+
                 html += `<div class="screenplay-group">
-              <div class="screenplay-header">
-                <span class="title">${escapeHtml(play)}</span>
+              <div class="screenplay-header" onclick="toggleScreenplay('${escapeAttr(play)}', event)">
+                <span class="title">
+                  <span class="toggle-icon ${toggleClass}">▶</span>
+                  ${escapeHtml(play)}
+                </span>
                 <div class="header-actions">
-                  <button onclick="playAllScenes('${escapeAttr(play)}')" title="Play all scenes from this screenplay" aria-label="Play all scenes">Play All</button>
-                  <button class="del" onclick="deleteScreenplay('${escapeAttr(play)}')">&times;</button>
+                  <button class="play-all-btn" onclick="event.stopPropagation();playAllScenes('${escapeAttr(play)}')" title="Play all scenes from this screenplay" aria-label="Play all scenes">Play All</button>
+                  <button class="del" onclick="event.stopPropagation();deleteScreenplay('${escapeAttr(play)}')">&times;</button>
                 </div>
               </div>
-              <div class="scene-rows" data-play="${escapeAttr(play)}">`;
+              <div class="scene-rows ${isCollapsed ? 'collapsed' : ''}" data-play="${escapeAttr(play)}">`;
                 names.forEach(name => {
                     const lineCount = scenes[name].script.split("\n").map(r => r.trim()).filter(r => r).length;
                     const charLabel = scenes[name].myChar ? ` · as ${scenes[name].myChar}` : "";
@@ -2582,7 +2667,6 @@
         }
         window.addEventListener("appinstalled", lockPortraitIfPossible);
 
-        // ----- disable pull-to-refresh on Android PWA (touch handler) -----
         function disablePullToRefresh() {
             let startY = 0;
             let startX = 0;
@@ -2601,7 +2685,6 @@
                 const t = e.touches[0];
                 const dy = t.clientY - startY;
                 const dx = t.clientX - startX;
-                // only prevent if dragging mostly downward and at the top of the page
                 if (dy > threshold && Math.abs(dx) < threshold * 2) {
                     const scrollTop = document.documentElement.scrollTop || document.body.scrollTop || 0;
                     if (scrollTop <= 0) {
@@ -2812,7 +2895,6 @@
             await setDoc(doc(db, "users", uid), { screenplays, updatedAt: Date.now() });
         };
 
-        // AI hints: users/{uid}/hints/{play--scene--character}
         window.swGetHintsDoc = async function(uid, docId) {
             const snap = await getDoc(doc(db, "users", uid, "hints", docId));
             return snap.exists() ? snap.data() : null;
