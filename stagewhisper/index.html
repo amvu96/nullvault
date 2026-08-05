@@ -485,6 +485,9 @@
         .ai-modal-inner input {
             width: 100%;
         }
+        .ai-modal-inner select {
+            width: 100%;
+        }
         .ai-modal-actions {
             display: flex;
             gap: 8px;
@@ -856,7 +859,7 @@
 
                 <div class="checkbox-row" style="margin-bottom:10px;">
                     <input type="checkbox" id="aiMode" onchange="handleAiModeToggle()"> AI Mode (contextual hints for your lines)
-                    <button type="button" class="ai-key-btn" onclick="openAiKeyModal()" title="Manage Mistral API key" aria-label="Manage Mistral API key">Key</button>
+                    <button type="button" class="ai-key-btn" onclick="openAiSettingsModal()" title="AI Mode settings" aria-label="AI Mode settings">Settings</button>
                 </div>
 
                 <div class="row">
@@ -993,16 +996,57 @@
     </div>
     <div class="scenes-backdrop" id="ttsBackdrop" onclick="closeTtsSheet()"></div>
 
-    <div class="ai-modal" id="aiKeyModal">
+    <div class="ai-modal" id="aiSettingsModal">
         <div class="ai-modal-inner">
-            <h3>Mistral API Key</h3>
-            <div class="hint" style="margin-bottom:10px;">AI Mode uses your own Mistral API key to generate contextual hints for your lines. It's stored only in this browser's local storage and sent only to Mistral's API — never anywhere else.</div>
-            <input type="password" id="mistralKeyInput" placeholder="Paste your Mistral API key" autocomplete="off">
-            <div class="ai-modal-actions">
-                <button onclick="saveAiKey()">Save</button>
-                <button onclick="clearAiKey()">Clear</button>
-                <button onclick="closeAiKeyModal()">Cancel</button>
+            <h3>AI Mode Settings</h3>
+
+            <label style="display:block;font-size:0.8rem;color:var(--cyan);margin:0 0 6px;text-transform:uppercase;">Provider</label>
+            <select id="aiProviderSelect" onchange="onAiProviderChange()">
+                <option value="mistral">Mistral (mistral-small-latest)</option>
+                <option value="openrouter">OpenRouter — Gemma 4 26B A4B (free)</option>
+            </select>
+
+            <div id="mistralKeySection" style="margin-top:16px;">
+                <label style="display:block;font-size:0.8rem;color:var(--cyan);margin:0 0 6px;text-transform:uppercase;">Mistral API Key</label>
+                <div class="hint" style="margin-bottom:8px;">Stored only in this browser's local storage, sent only to Mistral's API. Free tier: 1 req/sec, 2 requests/minute.</div>
+                <input type="password" id="mistralKeyInput" placeholder="Paste your Mistral API key" autocomplete="off">
+                <div class="ai-modal-actions">
+                    <button onclick="saveMistralKey()">Save Key</button>
+                    <button onclick="clearMistralKey()">Clear Key</button>
+                </div>
             </div>
+
+            <div id="openrouterKeySection" style="margin-top:16px;">
+                <label style="display:block;font-size:0.8rem;color:var(--cyan);margin:0 0 6px;text-transform:uppercase;">OpenRouter API Key</label>
+                <div class="hint" style="margin-bottom:8px;">Stored only in this browser's local storage, sent only to OpenRouter's API. Get a free key at openrouter.ai.</div>
+                <input type="password" id="openrouterKeyInput" placeholder="Paste your OpenRouter API key" autocomplete="off">
+                <div class="ai-modal-actions">
+                    <button onclick="saveOpenRouterKey()">Save Key</button>
+                    <button onclick="clearOpenRouterKey()">Clear Key</button>
+                </div>
+                <label style="display:block;font-size:0.8rem;color:var(--cyan);margin:14px 0 6px;text-transform:uppercase;">OpenRouter Model</label>
+                <input type="text" id="openrouterModelInput" placeholder="google/gemma-4-26b-a4b-it:free">
+            </div>
+
+            <label style="display:block;font-size:0.8rem;color:var(--cyan);margin:18px 0 6px;text-transform:uppercase;">Hint Language</label>
+            <div class="hint" style="margin-bottom:8px;">Leave blank to match the script's own language.</div>
+            <input type="text" id="aiLanguageInput" placeholder="e.g. English, Romanian…">
+
+            <label style="display:block;font-size:0.8rem;color:var(--cyan);margin:18px 0 6px;text-transform:uppercase;">System Prompt</label>
+            <div class="hint" style="margin-bottom:8px;">Controls how hints are generated. Edit with care — the app expects a JSON reply, so keep that part intact.</div>
+            <textarea id="aiPromptInput" style="min-height:140px;font-size:0.78rem;"></textarea>
+            <div class="ai-modal-actions">
+                <button onclick="resetAiPromptToDefault()">Reset Prompt</button>
+            </div>
+
+            <div class="ai-modal-actions" style="margin-top:18px;">
+                <button onclick="saveAiSettings()">Save Settings</button>
+                <button onclick="closeAiSettingsModal()">Close</button>
+            </div>
+
+            <label style="display:block;font-size:0.8rem;color:var(--cyan);margin:18px 0 6px;text-transform:uppercase;">Current Scene</label>
+            <div class="hint" style="margin-bottom:8px;">Force-regenerate hints for whatever script is currently loaded (setup or practice), overwriting any saved cache.</div>
+            <button style="width:100%;" onclick="regenerateCurrentSceneHints()">Regenerate Hints For Current Scene</button>
         </div>
     </div>
 
@@ -1010,7 +1054,7 @@
 
     <div class="ai-loading-overlay" id="aiLoadingOverlay">
         <div class="ai-spinner"></div>
-        <div>Generating AI hints…</div>
+        <div id="aiLoadingText">Generating AI hints…</div>
     </div>
 
     <script>
@@ -1245,39 +1289,148 @@
 
         /* ---------------- AI Mode ---------------- */
 
-        function openAiKeyModal() {
-            const input = document.getElementById("mistralKeyInput");
-            if (input) input.value = localStorage.getItem(MISTRAL_KEY_STORAGE) || "";
-            document.getElementById("aiKeyModal").classList.add("open");
+        const DEFAULT_AI_SYSTEM_PROMPT = "You are a theatre rehearsal assistant. You will be given a numbered list of every line in a script and the name of one character. For each line spoken by that character, write a very short (one sentence) hint about the subtext, emotional state, or objective behind that line — it must NOT repeat the line itself, it should help the actor remember the intention. Respond ONLY with a JSON object of the exact form {\"hints\": {\"3\": \"hint for line 3\", \"7\": \"hint for line 7\"}} — an entry only for the line numbers spoken by the target character, using the line numbers given. Do not include any other text, explanation, or markdown formatting.";
+        const AI_PROMPT_STORAGE = "aiSystemPrompt";
+        const AI_LANGUAGE_STORAGE = "aiHintLanguage";
+        const AI_PROVIDER_STORAGE = "aiProvider";
+        const OPENROUTER_KEY_STORAGE = "openrouterApiKey";
+        const OPENROUTER_MODEL_STORAGE = "openrouterModel";
+        const DEFAULT_OPENROUTER_MODEL = "google/gemma-4-26b-a4b-it:free";
+        // Mistral free tier: 1 req/sec, 2 requests/minute — space calls well over 30s apart.
+        // OpenRouter's free models are looser but still rate-limited, so a light gap is still applied.
+        const AI_MIN_INTERVAL_MS = { mistral: 31000, openrouter: 4000 };
+
+        function getAiProvider() {
+            return localStorage.getItem(AI_PROVIDER_STORAGE) === "openrouter" ? "openrouter" : "mistral";
         }
 
-        function closeAiKeyModal() {
-            document.getElementById("aiKeyModal").classList.remove("open");
+        function getAiApiKey(provider) {
+            return localStorage.getItem(provider === "openrouter" ? OPENROUTER_KEY_STORAGE : MISTRAL_KEY_STORAGE);
         }
 
-        function saveAiKey() {
+        function getOpenRouterModel() {
+            return (localStorage.getItem(OPENROUTER_MODEL_STORAGE) || "").trim() || DEFAULT_OPENROUTER_MODEL;
+        }
+
+        function getAiSystemPrompt() {
+            return localStorage.getItem(AI_PROMPT_STORAGE) || DEFAULT_AI_SYSTEM_PROMPT;
+        }
+
+        function getAiHintLanguage() {
+            return (localStorage.getItem(AI_LANGUAGE_STORAGE) || "").trim();
+        }
+
+        function updateAiProviderSectionVisibility() {
+            const provider = document.getElementById("aiProviderSelect").value;
+            document.getElementById("mistralKeySection").style.display = provider === "mistral" ? "block" : "none";
+            document.getElementById("openrouterKeySection").style.display = provider === "openrouter" ? "block" : "none";
+        }
+
+        function onAiProviderChange() {
+            const provider = document.getElementById("aiProviderSelect").value;
+            localStorage.setItem(AI_PROVIDER_STORAGE, provider);
+            updateAiProviderSectionVisibility();
+        }
+
+        function openAiSettingsModal() {
+            const provider = getAiProvider();
+            document.getElementById("aiProviderSelect").value = provider;
+            updateAiProviderSectionVisibility();
+
+            const mKeyInput = document.getElementById("mistralKeyInput");
+            if (mKeyInput) mKeyInput.value = localStorage.getItem(MISTRAL_KEY_STORAGE) || "";
+            const oKeyInput = document.getElementById("openrouterKeyInput");
+            if (oKeyInput) oKeyInput.value = localStorage.getItem(OPENROUTER_KEY_STORAGE) || "";
+            const oModelInput = document.getElementById("openrouterModelInput");
+            if (oModelInput) oModelInput.value = getOpenRouterModel();
+
+            const langInput = document.getElementById("aiLanguageInput");
+            if (langInput) langInput.value = getAiHintLanguage();
+            const promptInput = document.getElementById("aiPromptInput");
+            if (promptInput) promptInput.value = getAiSystemPrompt();
+            document.getElementById("aiSettingsModal").classList.add("open");
+        }
+
+        function closeAiSettingsModal() {
+            document.getElementById("aiSettingsModal").classList.remove("open");
+        }
+
+        function saveMistralKey() {
             const input = document.getElementById("mistralKeyInput");
             const val = input ? input.value.trim() : "";
             if (!val) {
-                alert("Paste a Mistral API key first, or use Clear to remove the saved key.");
+                alert("Paste a Mistral API key first, or use Clear Key to remove the saved key.");
                 return;
             }
             localStorage.setItem(MISTRAL_KEY_STORAGE, val);
-            closeAiKeyModal();
             showAiToast("Mistral API key saved.");
         }
 
-        function clearAiKey() {
+        function clearMistralKey() {
             localStorage.removeItem(MISTRAL_KEY_STORAGE);
             const input = document.getElementById("mistralKeyInput");
             if (input) input.value = "";
             showAiToast("Mistral API key cleared.");
         }
 
+        function saveOpenRouterKey() {
+            const input = document.getElementById("openrouterKeyInput");
+            const val = input ? input.value.trim() : "";
+            if (!val) {
+                alert("Paste an OpenRouter API key first, or use Clear Key to remove the saved key.");
+                return;
+            }
+            localStorage.setItem(OPENROUTER_KEY_STORAGE, val);
+            const modelInput = document.getElementById("openrouterModelInput");
+            const model = modelInput ? modelInput.value.trim() : "";
+            if (model) localStorage.setItem(OPENROUTER_MODEL_STORAGE, model);
+            showAiToast("OpenRouter API key saved.");
+        }
+
+        function clearOpenRouterKey() {
+            localStorage.removeItem(OPENROUTER_KEY_STORAGE);
+            const input = document.getElementById("openrouterKeyInput");
+            if (input) input.value = "";
+            showAiToast("OpenRouter API key cleared.");
+        }
+
+        function resetAiPromptToDefault() {
+            const promptInput = document.getElementById("aiPromptInput");
+            if (promptInput) promptInput.value = DEFAULT_AI_SYSTEM_PROMPT;
+        }
+
+        function saveAiSettings() {
+            const langInput = document.getElementById("aiLanguageInput");
+            const promptInput = document.getElementById("aiPromptInput");
+            const lang = langInput ? langInput.value.trim() : "";
+            const prompt = promptInput ? promptInput.value.trim() : "";
+
+            const provider = document.getElementById("aiProviderSelect").value;
+            localStorage.setItem(AI_PROVIDER_STORAGE, provider);
+
+            const oModelInput = document.getElementById("openrouterModelInput");
+            const model = oModelInput ? oModelInput.value.trim() : "";
+            if (model) localStorage.setItem(OPENROUTER_MODEL_STORAGE, model);
+            else localStorage.removeItem(OPENROUTER_MODEL_STORAGE);
+
+            if (lang) localStorage.setItem(AI_LANGUAGE_STORAGE, lang);
+            else localStorage.removeItem(AI_LANGUAGE_STORAGE);
+
+            if (prompt && prompt !== DEFAULT_AI_SYSTEM_PROMPT) localStorage.setItem(AI_PROMPT_STORAGE, prompt);
+            else localStorage.removeItem(AI_PROMPT_STORAGE);
+
+            if (!/\{"?hints"?\s*:/i.test(prompt)) {
+                showAiToast("Prompt saved, but it no longer mentions the {\"hints\": ...} JSON format the app expects — hints may fail to parse.", true);
+            } else {
+                showAiToast("AI settings saved.");
+            }
+            closeAiSettingsModal();
+        }
+
         function handleAiModeToggle() {
             const checked = document.getElementById("aiMode").checked;
-            if (checked && !localStorage.getItem(MISTRAL_KEY_STORAGE)) {
-                openAiKeyModal();
+            if (checked && !getAiApiKey(getAiProvider())) {
+                openAiSettingsModal();
             }
         }
 
@@ -1292,8 +1445,10 @@
             aiToastTimer = setTimeout(() => { el.style.display = "none"; }, 6000);
         }
 
-        function showAiLoading(on) {
+        function showAiLoading(on, text) {
             const el = document.getElementById("aiLoadingOverlay");
+            const textEl = document.getElementById("aiLoadingText");
+            if (textEl) textEl.textContent = text || "Generating AI hints…";
             if (el) el.style.display = on ? "flex" : "none";
         }
 
@@ -1364,65 +1519,158 @@
             renderSceneList();
         }
 
-        async function callMistralForHints(character, lines) {
-            const key = localStorage.getItem(MISTRAL_KEY_STORAGE);
-            if (!key) throw new Error("no-api-key");
+        /* ---- Rate limiting: every call goes through a single-flight queue that enforces
+           spacing between requests app-wide, sized to the active provider's free-tier limits. ---- */
+        let aiCallQueue = Promise.resolve();
+        let aiNextAllowedAt = 0;
 
-            const scriptText = lines.map(l => l.character ? `${l.character}: ${l.text}` : l.text).join("\n");
-            const systemPrompt = "You are a theatre rehearsal assistant. I will give you a complete script and the name of one character. For every line spoken by that character, provide a very short (1-sentence) hint about the subtext, emotional state, or character objective behind that line. The hint must NOT repeat the line itself – it should help the actor remember the intention. Return your response as a JSON array where each element corresponds to a line of the script, but only fill in entries for lines spoken by the target character. For lines not spoken by the character, return null. The array must have exactly the same number of elements as the number of lines in the script.";
-            const userMsg = "Character: " + character + "\nScript:\n" + scriptText;
+        function queueAiCall(provider, fn) {
+            const run = aiCallQueue.then(async () => {
+                const waitMs = aiNextAllowedAt - Date.now();
+                const label = provider === "mistral" ? "Mistral" : "OpenRouter";
+                if (waitMs > 1000) {
+                    showAiLoading(true, `Waiting ${Math.ceil(waitMs / 1000)}s (${label} free-tier rate limit)…`);
+                    await new Promise(r => setTimeout(r, waitMs));
+                    showAiLoading(true);
+                }
+                try {
+                    return await fn();
+                } finally {
+                    aiNextAllowedAt = Date.now() + (AI_MIN_INTERVAL_MS[provider] || 4000);
+                }
+            });
+            // Keep the queue chain alive even if this call throws, so later calls still run.
+            aiCallQueue = run.catch(() => {});
+            return run;
+        }
 
-            let res;
-            try {
-                res = await fetch("https://api.mistral.ai/v1/chat/completions", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": "Bearer " + key
-                    },
-                    body: JSON.stringify({
-                        model: "mistral-small-latest",
-                        messages: [
-                            { role: "system", content: systemPrompt },
-                            { role: "user", content: userMsg }
-                        ]
-                    })
-                });
-            } catch (netErr) {
-                throw new Error("network-error");
+        function sanitizeHintValue(v) {
+            if (typeof v === "string") {
+                const t = v.trim();
+                return t.length ? t : null;
             }
+            if (v == null) return null;
+            if (typeof v === "object") {
+                const cand = v.hint || v.text || v.value;
+                if (typeof cand === "string" && cand.trim()) return cand.trim();
+                return null; // never stringify a raw object into the UI
+            }
+            return String(v).trim() || null;
+        }
 
-            if (res.status === 401 || res.status === 403) throw new Error("unauthorized");
-            if (res.status === 429) throw new Error("rate-limited");
-            if (!res.ok) throw new Error("bad-response");
-
-            const data = await res.json();
-            const content = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+        function parseHintsContent(content, lines) {
             if (!content) throw new Error("bad-response");
-
             let jsonText = content.trim();
             const fenced = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/i);
             if (fenced) jsonText = fenced[1].trim();
-            const start = jsonText.indexOf("[");
-            const end = jsonText.lastIndexOf("]");
+            const start = jsonText.indexOf("{");
+            const end = jsonText.lastIndexOf("}");
+            const bStart = jsonText.indexOf("[");
+            const bEnd = jsonText.lastIndexOf("]");
+            // Prefer an object span {...}; fall back to an array span [...] if that's all there is.
             if (start !== -1 && end !== -1 && end > start) {
                 jsonText = jsonText.slice(start, end + 1);
+            } else if (bStart !== -1 && bEnd !== -1 && bEnd > bStart) {
+                jsonText = jsonText.slice(bStart, bEnd + 1);
             }
 
-            let parsed;
+            let obj;
             try {
-                parsed = JSON.parse(jsonText);
+                obj = JSON.parse(jsonText);
             } catch (parseErr) {
                 throw new Error("bad-response");
             }
-            if (!Array.isArray(parsed)) throw new Error("bad-response");
 
-            if (parsed.length < lines.length) {
-                parsed = parsed.concat(new Array(lines.length - parsed.length).fill(null));
-            } else if (parsed.length > lines.length) {
-                parsed = parsed.slice(0, lines.length);
+            const result = new Array(lines.length).fill(null);
+            if (Array.isArray(obj)) {
+                // Backward compatibility if the model (or a custom prompt) returns a plain array.
+                obj.forEach((v, i) => { if (i < result.length) result[i] = sanitizeHintValue(v); });
+                return result;
             }
-            return parsed;
+
+            const hintsMap = (obj && typeof obj === "object" && obj.hints && typeof obj.hints === "object") ? obj.hints : obj;
+            if (!hintsMap || typeof hintsMap !== "object") throw new Error("bad-response");
+
+            Object.keys(hintsMap).forEach(k => {
+                const idx = parseInt(k, 10) - 1;
+                if (Number.isInteger(idx) && idx >= 0 && idx < result.length) {
+                    result[idx] = sanitizeHintValue(hintsMap[k]);
+                }
+            });
+            return result;
+        }
+
+        async function callAiForHints(character, lines) {
+            const provider = getAiProvider();
+            const key = getAiApiKey(provider);
+            if (!key) throw new Error("no-api-key");
+
+            const scriptText = lines.map((l, i) => `${i + 1}. ${l.character ? l.character + ": " : ""}${l.text}`).join("\n");
+            const lang = getAiHintLanguage();
+            const systemPrompt = getAiSystemPrompt() + (lang ? ` Write every hint in ${lang}.` : "");
+            const userMsg = "Character: " + character + "\nScript (numbered):\n" + scriptText;
+
+            const endpoint = provider === "mistral"
+                ? "https://api.mistral.ai/v1/chat/completions"
+                : "https://openrouter.ai/api/v1/chat/completions";
+            const model = provider === "mistral" ? "mistral-small-latest" : getOpenRouterModel();
+
+            const headers = {
+                "Content-Type": "application/json",
+                "Authorization": "Bearer " + key
+            };
+            if (provider === "openrouter") {
+                headers["HTTP-Referer"] = window.location.origin || "https://nullvault.eu";
+                headers["X-Title"] = "Stage Whisper";
+            }
+
+            const attempt = async (useJsonMode, isRetry) => {
+                const body = {
+                    model,
+                    messages: [
+                        { role: "system", content: systemPrompt },
+                        { role: "user", content: userMsg }
+                    ]
+                };
+                if (useJsonMode) body.response_format = { type: "json_object" };
+
+                let res;
+                try {
+                    res = await fetch(endpoint, {
+                        method: "POST",
+                        headers,
+                        body: JSON.stringify(body)
+                    });
+                } catch (netErr) {
+                    throw new Error("network-error");
+                }
+
+                if (res.status === 401 || res.status === 403) throw new Error("unauthorized");
+
+                if (res.status === 429) {
+                    if (isRetry) throw new Error("rate-limited");
+                    const retryAfter = parseInt(res.headers.get("Retry-After") || "20", 10);
+                    const label = provider === "mistral" ? "Mistral" : "OpenRouter";
+                    showAiLoading(true, `${label} rate limit hit — retrying in ${retryAfter}s…`);
+                    await new Promise(r => setTimeout(r, retryAfter * 1000));
+                    return attempt(useJsonMode, true);
+                }
+
+                if (res.status === 400 && useJsonMode) {
+                    // Some models/setups reject response_format — retry once in plain mode.
+                    return attempt(false, isRetry);
+                }
+
+                if (!res.ok) throw new Error("bad-response");
+                return res;
+            };
+
+            return queueAiCall(provider, async () => {
+                const res = await attempt(true, false);
+                const data = await res.json();
+                const content = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+                return parseHintsContent(content, lines);
+            });
         }
 
         async function loadOrGenerateHints(raw) {
@@ -1445,7 +1693,7 @@
 
             showAiLoading(true);
             try {
-                const hints = await callMistralForHints(myChar, allLines);
+                const hints = await callAiForHints(myChar, allLines);
                 let saved = false;
                 if (play && scene && window.swCurrentUser) {
                     saved = await saveHintsDoc(play, scene, myChar, hints, hash);
@@ -1465,18 +1713,19 @@
 
         function aiErrorMessage(e) {
             const msg = (e && e.message) || "";
+            const label = getAiProvider() === "mistral" ? "Mistral" : "OpenRouter";
             switch (msg) {
-                case "no-api-key": return "No Mistral API key set — continuing without AI hints.";
-                case "unauthorized": return "Mistral API key looks invalid — continuing without AI hints.";
-                case "rate-limited": return "Mistral API rate limit reached — continuing without AI hints.";
-                case "network-error": return "Couldn't reach the Mistral API — continuing without AI hints.";
+                case "no-api-key": return `No ${label} API key set — continuing without AI hints.`;
+                case "unauthorized": return `${label} API key looks invalid — continuing without AI hints.`;
+                case "rate-limited": return `${label} rate limit reached — continuing without AI hints.`;
+                case "network-error": return `Couldn't reach the ${label} API — continuing without AI hints.`;
                 case "bad-response": return "Couldn't read the AI response — continuing without AI hints.";
                 default: return "AI hints unavailable right now — continuing without them.";
             }
         }
 
         async function confirmRegenerateHints(play, name) {
-            if (!confirm(`Regenerate AI hints for "${name}"? This calls the Mistral API again and overwrites the saved hints.`)) return;
+            if (!confirm(`Regenerate AI hints for "${name}"? This calls the AI API again and overwrites the saved hints.`)) return;
             const data = loadScreenplays();
             const s = data[play] && data[play][name];
             if (!s) return;
@@ -1485,17 +1734,58 @@
                 alert("This scene has no character name set, so AI hints can't be generated for it. Load it, set your character, and save it first.");
                 return;
             }
-            if (!localStorage.getItem(MISTRAL_KEY_STORAGE)) {
-                openAiKeyModal();
+            if (!getAiApiKey(getAiProvider())) {
+                openAiSettingsModal();
                 return;
             }
             showAiLoading(true);
             try {
                 const lines = parseScript(s.script);
-                const hints = await callMistralForHints(character, lines);
+                const hints = await callAiForHints(character, lines);
                 const hash = await sha256Hex(s.script);
                 await saveHintsDoc(play, name, character, hints, hash);
                 showAiToast(`AI hints regenerated for "${name}".`);
+            } catch (e) {
+                showAiToast(aiErrorMessage(e), true);
+            } finally {
+                showAiLoading(false);
+            }
+        }
+
+        async function regenerateCurrentSceneHints() {
+            const raw = document.getElementById("scriptInput").value;
+            if (!raw.trim()) {
+                showAiToast("No script loaded to generate hints for.", true);
+                return;
+            }
+            const character = document.getElementById("myChar").value.trim().toUpperCase();
+            if (!character) {
+                showAiToast("Set your character name first — AI hints need to know whose lines to hint.", true);
+                return;
+            }
+            if (!getAiApiKey(getAiProvider())) {
+                showAiToast("Add your API key first (AI settings).", true);
+                return;
+            }
+            if (!confirm("Regenerate AI hints for the currently loaded script? This calls the AI API again.")) return;
+
+            closeAiSettingsModal();
+            showAiLoading(true);
+            try {
+                const lines = parseScript(raw);
+                const hints = await callAiForHints(character, lines);
+                const play = document.getElementById("screenplayName").value.trim();
+                const scene = document.getElementById("sceneName").value.trim();
+                let saved = false;
+                if (play && scene && window.swCurrentUser) {
+                    const hash = await sha256Hex(raw);
+                    saved = await saveHintsDoc(play, scene, character, hints, hash);
+                }
+                if (currentScreen === "practice" && aiMode && character === myChar) {
+                    currentHints = hints;
+                    renderCurrent();
+                }
+                showAiToast(saved ? "Hints regenerated and saved." : "Hints regenerated for this session.");
             } catch (e) {
                 showAiToast(aiErrorMessage(e), true);
             } finally {
@@ -1964,9 +2254,9 @@
                 alert("AI Mode needs your character name (above) so it knows whose lines to generate hints for.");
                 return;
             }
-            if (aiMode && !localStorage.getItem(MISTRAL_KEY_STORAGE)) {
-                openAiKeyModal();
-                showAiToast("Add your Mistral API key, then press Start Practice again.", true);
+            if (aiMode && !getAiApiKey(getAiProvider())) {
+                openAiSettingsModal();
+                showAiToast("Add your API key, then press Start Practice again.", true);
                 return;
             }
             speakOn = document.getElementById("speakOthers").checked;
@@ -2470,6 +2760,7 @@
         <button id="scenesBarBtn" onclick="toggleScenesSheet()">Saved Scenes</button>
         <div class="bar-right">
             <button id="homeBtn" class="theme-toggle-btn" onclick="backToSetup()" title="Home" aria-label="Home" style="display:none;">⌂</button>
+            <button id="aiSettingsBtn" class="theme-toggle-btn" onclick="openAiSettingsModal()" title="AI Mode settings" aria-label="AI Mode settings"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 0-7 7c0 2.4 1.2 3.8 2 4.7.6.7 1 1.1 1 2.3v1a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-1c0-1.2.4-1.6 1-2.3.8-.9 2-2.3 2-4.7a7 7 0 0 0-7-7Z"/><path d="M9.5 21h5"/><path d="M10 17h4"/></svg></button>
             <button id="ttsBtn" class="theme-toggle-btn" onclick="toggleTtsSheet()" title="Text-to-speech settings" aria-label="Text-to-speech settings"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8.5a6.5 6.5 0 1 1 13 0c0 6-6 6-6 10a3.5 3.5 0 1 1-7 0"/><path d="M15 8.5a2.5 2.5 0 0 0-5 0v1a2 2 0 1 1 0 4"/></svg></button>
             <button id="installBtn" title="Install App" aria-label="Install App"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg></button>
             <button id="themeToggleBtn" class="theme-toggle-btn" onclick="toggleTheme()" title="Switch theme" aria-label="Switch theme">☀</button>
