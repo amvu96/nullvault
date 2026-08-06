@@ -1770,6 +1770,9 @@
                     ]
                 };
                 if (useJsonMode) body.response_format = { type: "json_object" };
+                if (provider === "google") {
+                    body.extra_body = { google: { thinking_config: { thinking_level: "minimal" } } };
+                }
 
                 let res;
                 try {
