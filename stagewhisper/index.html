@@ -637,6 +637,34 @@
             margin-bottom: 14px;
             min-height: 1.2em;
         }
+        .context-line.clickable {
+            cursor: pointer;
+            text-decoration: underline dotted;
+            text-underline-offset: 3px;
+        }
+        .context-modal-line {
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .context-modal-line:last-child {
+            border-bottom: none;
+        }
+        .context-modal-char {
+            color: var(--cyan);
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            font-size: 0.75rem;
+            margin-bottom: 3px;
+        }
+        .context-modal-text {
+            color: var(--muted);
+            font-size: 0.88rem;
+            line-height: 1.4;
+        }
+        .context-modal-line-last .context-modal-text {
+            color: var(--text);
+            font-weight: 500;
+        }
         .char-name {
             color: var(--cyan);
             font-weight: bold;
@@ -951,7 +979,7 @@
                 <div class="stage">
                     <div class="progress" id="progressText">LINE 1 / 1</div>
                     <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
-                    <div class="context-line" id="contextLine"></div>
+                    <div class="context-line" id="contextLine" onclick="openContextModal()"></div>
                     <div class="char-name" id="charName"></div>
                     <div class="line-text" id="lineText">Press start below</div>
                     <div class="ai-hint" id="aiHintText"></div>
@@ -1059,6 +1087,16 @@
         </div>
     </div>
     <div class="scenes-backdrop" id="ttsBackdrop" onclick="closeTtsSheet()"></div>
+
+    <div class="ai-modal" id="contextModal" onclick="if(event.target===this) closeContextModal()">
+        <div class="ai-modal-inner" style="max-width:480px;">
+            <h3>Previous Lines</h3>
+            <div id="contextModalBody"></div>
+            <div class="ai-modal-actions" style="margin-top:18px;">
+                <button onclick="closeContextModal()">Close</button>
+            </div>
+        </div>
+    </div>
 
     <div class="ai-modal" id="aiSettingsModal">
         <div class="ai-modal-inner">
@@ -2274,6 +2312,31 @@
             return s.replace(/'/g, "\\'");
         }
 
+        const CONTEXT_MODAL_MAX_LINES = 6;
+
+        function openContextModal() {
+            if (currentScreen !== "practice" || pos <= 0 || !order.length) return;
+            const body = document.getElementById("contextModalBody");
+            const startIdx = Math.max(0, pos - CONTEXT_MODAL_MAX_LINES);
+            let html = "";
+            for (let i = startIdx; i < pos; i++) {
+                const l = allLines[order[i]];
+                if (!l) continue;
+                const isLast = i === pos - 1;
+                const charLabel = l.character ? l.character.toUpperCase() : "";
+                html += `<div class="context-modal-line${isLast ? " context-modal-line-last" : ""}">`
+                    + (charLabel ? `<div class="context-modal-char">${escapeHtml(charLabel)}</div>` : "")
+                    + `<div class="context-modal-text">${escapeHtml(l.text)}</div>`
+                    + `</div>`;
+            }
+            body.innerHTML = html || "<div class=\"context-modal-text\">No earlier lines yet.</div>";
+            document.getElementById("contextModal").classList.add("open");
+        }
+
+        function closeContextModal() {
+            document.getElementById("contextModal").classList.remove("open");
+        }
+
         function loadVoices() {
             voices = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
             updateVoiceHint();
@@ -2528,8 +2591,10 @@
                 const prev = allLines[order[pos - 1]];
                 const prevLabel = prev.character ? prev.character + ": " : "";
                 document.getElementById("contextLine").textContent = "Previous: " + prevLabel + prev.text;
+                document.getElementById("contextLine").classList.add("clickable");
             } else {
                 document.getElementById("contextLine").textContent = "";
+                document.getElementById("contextLine").classList.remove("clickable");
             }
 
             const mine = isMyLine(line);
