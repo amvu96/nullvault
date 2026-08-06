@@ -1046,6 +1046,7 @@
             <select id="aiProviderSelect" onchange="onAiProviderChange()">
                 <option value="mistral">Mistral</option>
                 <option value="openrouter">OpenRouter</option>
+                <option value="google">Google AI Studio</option>
             </select>
 
             <div id="mistralKeySection" style="margin-top:16px;">
@@ -1068,6 +1069,18 @@
                 </div>
                 <label style="display:block;font-size:0.8rem;color:var(--cyan);margin:14px 0 6px;text-transform:uppercase;">OpenRouter Model</label>
                 <input type="text" id="openrouterModelInput" placeholder="google/gemma-4-26b-a4b-it:free">
+            </div>
+
+            <div id="googleKeySection" style="margin-top:16px;">
+                <label style="display:block;font-size:0.8rem;color:var(--cyan);margin:0 0 6px;text-transform:uppercase;">Google AI Studio API Key</label>
+                <div class="hint" style="margin-bottom:8px;">Stored only in this browser's local storage, sent only to Google's Generative Language API. Get a free key at aistudio.google.com.</div>
+                <input type="password" id="googleKeyInput" placeholder="Paste your Google AI Studio API key" autocomplete="off">
+                <div class="ai-modal-actions">
+                    <button onclick="saveGoogleKey()">Save Key</button>
+                    <button onclick="clearGoogleKey()">Clear Key</button>
+                </div>
+                <label style="display:block;font-size:0.8rem;color:var(--cyan);margin:14px 0 6px;text-transform:uppercase;">Google Model</label>
+                <input type="text" id="googleModelInput" placeholder="gemma-4-26b-a4b-it">
             </div>
 
             <label style="display:block;font-size:0.8rem;color:var(--cyan);margin:18px 0 6px;text-transform:uppercase;">Hint Language</label>
@@ -1377,18 +1390,33 @@
         const OPENROUTER_KEY_STORAGE = "openrouterApiKey";
         const OPENROUTER_MODEL_STORAGE = "openrouterModel";
         const DEFAULT_OPENROUTER_MODEL = "google/gemma-4-26b-a4b-it:free";
-        const AI_MIN_INTERVAL_MS = { mistral: 31000, openrouter: 4000 };
+        const GOOGLE_KEY_STORAGE = "googleApiKey";
+        const GOOGLE_MODEL_STORAGE = "googleModel";
+        const DEFAULT_GOOGLE_MODEL = "gemma-4-26b-a4b-it";
+        const AI_MIN_INTERVAL_MS = { mistral: 31000, openrouter: 4000, google: 4000 };
+        const AI_PROVIDER_LABELS = { mistral: "Mistral", openrouter: "OpenRouter", google: "Google AI Studio" };
+
+        function aiProviderLabel(provider) {
+            return AI_PROVIDER_LABELS[provider] || "AI";
+        }
 
         function getAiProvider() {
-            return localStorage.getItem(AI_PROVIDER_STORAGE) === "openrouter" ? "openrouter" : "mistral";
+            const p = localStorage.getItem(AI_PROVIDER_STORAGE);
+            return (p === "openrouter" || p === "google") ? p : "mistral";
         }
 
         function getAiApiKey(provider) {
-            return localStorage.getItem(provider === "openrouter" ? OPENROUTER_KEY_STORAGE : MISTRAL_KEY_STORAGE);
+            if (provider === "openrouter") return localStorage.getItem(OPENROUTER_KEY_STORAGE);
+            if (provider === "google") return localStorage.getItem(GOOGLE_KEY_STORAGE);
+            return localStorage.getItem(MISTRAL_KEY_STORAGE);
         }
 
         function getOpenRouterModel() {
             return (localStorage.getItem(OPENROUTER_MODEL_STORAGE) || "").trim() || DEFAULT_OPENROUTER_MODEL;
+        }
+
+        function getGoogleModel() {
+            return (localStorage.getItem(GOOGLE_MODEL_STORAGE) || "").trim() || DEFAULT_GOOGLE_MODEL;
         }
 
         function getAiSystemPrompt() {
@@ -1403,6 +1431,7 @@
             const provider = document.getElementById("aiProviderSelect").value;
             document.getElementById("mistralKeySection").style.display = provider === "mistral" ? "block" : "none";
             document.getElementById("openrouterKeySection").style.display = provider === "openrouter" ? "block" : "none";
+            document.getElementById("googleKeySection").style.display = provider === "google" ? "block" : "none";
         }
 
         function onAiProviderChange() {
@@ -1422,6 +1451,10 @@
             if (oKeyInput) oKeyInput.value = localStorage.getItem(OPENROUTER_KEY_STORAGE) || "";
             const oModelInput = document.getElementById("openrouterModelInput");
             if (oModelInput) oModelInput.value = getOpenRouterModel();
+            const gKeyInput = document.getElementById("googleKeyInput");
+            if (gKeyInput) gKeyInput.value = localStorage.getItem(GOOGLE_KEY_STORAGE) || "";
+            const gModelInput = document.getElementById("googleModelInput");
+            if (gModelInput) gModelInput.value = getGoogleModel();
 
             const langInput = document.getElementById("aiLanguageInput");
             if (langInput) langInput.value = getAiHintLanguage();
@@ -1473,6 +1506,27 @@
             showAiToast("OpenRouter API key cleared.");
         }
 
+        function saveGoogleKey() {
+            const input = document.getElementById("googleKeyInput");
+            const val = input ? input.value.trim() : "";
+            if (!val) {
+                alert("Paste a Google AI Studio API key first, or use Clear Key to remove the saved key.");
+                return;
+            }
+            localStorage.setItem(GOOGLE_KEY_STORAGE, val);
+            const modelInput = document.getElementById("googleModelInput");
+            const model = modelInput ? modelInput.value.trim() : "";
+            if (model) localStorage.setItem(GOOGLE_MODEL_STORAGE, model);
+            showAiToast("Google AI Studio API key saved.");
+        }
+
+        function clearGoogleKey() {
+            localStorage.removeItem(GOOGLE_KEY_STORAGE);
+            const input = document.getElementById("googleKeyInput");
+            if (input) input.value = "";
+            showAiToast("Google AI Studio API key cleared.");
+        }
+
         function resetAiPromptToDefault() {
             const promptInput = document.getElementById("aiPromptInput");
             if (promptInput) promptInput.value = DEFAULT_AI_SYSTEM_PROMPT;
@@ -1491,6 +1545,11 @@
             const model = oModelInput ? oModelInput.value.trim() : "";
             if (model) localStorage.setItem(OPENROUTER_MODEL_STORAGE, model);
             else localStorage.removeItem(OPENROUTER_MODEL_STORAGE);
+
+            const gModelInput = document.getElementById("googleModelInput");
+            const gModel = gModelInput ? gModelInput.value.trim() : "";
+            if (gModel) localStorage.setItem(GOOGLE_MODEL_STORAGE, gModel);
+            else localStorage.removeItem(GOOGLE_MODEL_STORAGE);
 
             if (lang) localStorage.setItem(AI_LANGUAGE_STORAGE, lang);
             else localStorage.removeItem(AI_LANGUAGE_STORAGE);
@@ -1604,7 +1663,7 @@
         function queueAiCall(provider, fn) {
             const run = aiCallQueue.then(async () => {
                 const waitMs = aiNextAllowedAt - Date.now();
-                const label = provider === "mistral" ? "Mistral" : "OpenRouter";
+                const label = aiProviderLabel(provider);
                 if (waitMs > 1000) {
                     showAiLoading(true, `Waiting ${Math.ceil(waitMs / 1000)}s (${label} free-tier rate limit)…`);
                     await new Promise(r => setTimeout(r, waitMs));
@@ -1686,8 +1745,12 @@
 
             const endpoint = provider === "mistral"
                 ? "https://api.mistral.ai/v1/chat/completions"
+                : provider === "google"
+                ? "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
                 : "https://openrouter.ai/api/v1/chat/completions";
-            const model = provider === "mistral" ? "mistral-small-latest" : getOpenRouterModel();
+            const model = provider === "mistral" ? "mistral-small-latest"
+                : provider === "google" ? getGoogleModel()
+                : getOpenRouterModel();
 
             const headers = {
                 "Content-Type": "application/json",
@@ -1724,7 +1787,7 @@
                 if (res.status === 429) {
                     if (isRetry) throw new Error("rate-limited");
                     const retryAfter = parseInt(res.headers.get("Retry-After") || "20", 10);
-                    const label = provider === "mistral" ? "Mistral" : "OpenRouter";
+                    const label = aiProviderLabel(provider);
                     showAiLoading(true, `${label} rate limit hit — retrying in ${retryAfter}s…`);
                     await new Promise(r => setTimeout(r, retryAfter * 1000));
                     return attempt(useJsonMode, true);
@@ -1786,7 +1849,7 @@
 
         function aiErrorMessage(e) {
             const msg = (e && e.message) || "";
-            const label = getAiProvider() === "mistral" ? "Mistral" : "OpenRouter";
+            const label = aiProviderLabel(getAiProvider());
             switch (msg) {
                 case "no-api-key":
                     return `No ${label} API key set — continuing without AI hints.`;
