@@ -631,6 +631,22 @@
             box-shadow: 0 0 8px var(--neon);
             transition: width 0.2s;
         }
+        .scene-banner {
+            display: none;
+            color: var(--bg);
+            background: var(--cyan);
+            font-size: 0.72rem;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            text-align: center;
+            border-radius: 6px;
+            padding: 6px 10px;
+            margin-bottom: 10px;
+        }
+        .scene-banner.show {
+            display: block;
+        }
         .context-line {
             color: var(--muted);
             font-size: 0.85rem;
@@ -975,6 +991,7 @@
 
             <div id="practice">
                 <div class="stage">
+                    <div class="scene-banner" id="sceneBanner"></div>
                     <div class="progress" id="progressText">LINE 1 / 1</div>
                     <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
                     <div class="context-line" id="contextLine" onclick="openContextModal()"></div>
@@ -2370,14 +2387,23 @@
         function parseScript(raw) {
             const rows = raw.split("\n").map(r => r.trim()).filter(r => r.length > 0);
             const result = [];
+            let pendingScene = null;
             rows.forEach(row => {
                 const m = row.match(/^([A-Za-z][A-Za-z0-9 '.\-]{0,30}):\s*(.+)$/);
+                if (m && m[1].trim() === SCENE_MARKER_CHAR) {
+                    pendingScene = m[2].trim();
+                    return;
+                }
                 if (m) {
-                    result.push({ character: m[1].trim(), text: m[2].trim() });
-                } else if (result.length > 0 && result[result.length - 1].character) {
+                    const entry = { character: m[1].trim(), text: m[2].trim() };
+                    if (pendingScene) { entry.sceneStart = pendingScene; pendingScene = null; }
+                    result.push(entry);
+                } else if (result.length > 0 && result[result.length - 1].character && !pendingScene) {
                     result[result.length - 1].text += " " + row;
                 } else {
-                    result.push({ character: null, text: row });
+                    const entry = { character: null, text: row };
+                    if (pendingScene) { entry.sceneStart = pendingScene; pendingScene = null; }
+                    result.push(entry);
                 }
             });
             return result;
@@ -2425,6 +2451,8 @@
             }).join(" ");
         }
 
+        const SCENE_MARKER_CHAR = "ZZZSCENEDIVIDERZZZ";
+
         function playAllScenes(play) {
             const data = loadScreenplays();
             const screenplay = data[play];
@@ -2448,7 +2476,7 @@
                     firstScene = scene;
                 }
                 if (scene.script) {
-                    combinedScript += scene.script + '\n\n';
+                    combinedScript += SCENE_MARKER_CHAR + ": " + name + "\n" + scene.script + '\n\n';
                 }
             });
 
@@ -2584,6 +2612,15 @@
             document.getElementById("progressFill").style.width = `${(pos/total)*100}%`;
             document.getElementById("charName").textContent = line.character ? line.character : "";
             document.getElementById("lineText").style.fontSize = fontSize + "rem";
+
+            const sceneBanner = document.getElementById("sceneBanner");
+            if (line.sceneStart) {
+                sceneBanner.textContent = "▶ " + line.sceneStart;
+                sceneBanner.classList.add("show");
+            } else {
+                sceneBanner.textContent = "";
+                sceneBanner.classList.remove("show");
+            }
 
             if (pos > 0) {
                 const prev = allLines[order[pos - 1]];
