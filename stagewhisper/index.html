@@ -475,6 +475,28 @@
             padding: 20px;
             box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
         }
+        .ai-modal-columns {
+            display: block;
+        }
+        .ai-modal-col + .ai-modal-col {
+            margin-top: 0;
+        }
+        @media (min-width: 720px) {
+            .ai-modal-inner {
+                max-width: 860px;
+                margin-top: 8vh;
+            }
+            .ai-modal-columns {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 0 32px;
+                align-items: start;
+            }
+            .ai-modal-col-right {
+                border-left: 1px solid var(--border);
+                padding-left: 32px;
+            }
+        }
         .ai-modal-inner h3 {
             margin: 0 0 10px;
             color: var(--cyan);
@@ -1042,66 +1064,72 @@
         <div class="ai-modal-inner">
             <h3>AI Mode Settings</h3>
 
-            <label style="display:block;font-size:0.8rem;color:var(--cyan);margin:0 0 6px;text-transform:uppercase;">Provider</label>
-            <select id="aiProviderSelect" onchange="onAiProviderChange()">
-                <option value="mistral">Mistral</option>
-                <option value="openrouter">OpenRouter</option>
-                <option value="google">Google AI Studio</option>
-            </select>
+            <div class="ai-modal-columns">
+                <div class="ai-modal-col ai-modal-col-left">
+                    <label style="display:block;font-size:0.8rem;color:var(--cyan);margin:0 0 6px;text-transform:uppercase;">Provider</label>
+                    <select id="aiProviderSelect" onchange="onAiProviderChange()">
+                        <option value="mistral">Mistral</option>
+                        <option value="openrouter">OpenRouter</option>
+                        <option value="google">Google AI Studio</option>
+                    </select>
 
-            <div id="mistralKeySection" style="margin-top:16px;">
-                <label style="display:block;font-size:0.8rem;color:var(--cyan);margin:0 0 6px;text-transform:uppercase;">Mistral API Key</label>
-                <div class="hint" style="margin-bottom:8px;">Stored only in this browser's local storage, sent only to Mistral's API. Free tier: 1 req/sec, 2 requests/minute.</div>
-                <input type="password" id="mistralKeyInput" placeholder="Paste your Mistral API key" autocomplete="off">
-                <div class="ai-modal-actions">
-                    <button onclick="saveMistralKey()">Save Key</button>
-                    <button onclick="clearMistralKey()">Clear Key</button>
+                    <div id="mistralKeySection" style="margin-top:16px;">
+                        <label style="display:block;font-size:0.8rem;color:var(--cyan);margin:0 0 6px;text-transform:uppercase;">Mistral API Key</label>
+                        <div class="hint" style="margin-bottom:8px;">Stored only in this browser's local storage, sent only to Mistral's API. Free tier: 1 req/sec, 2 requests/minute.</div>
+                        <input type="password" id="mistralKeyInput" placeholder="Paste your Mistral API key" autocomplete="off">
+                        <div class="ai-modal-actions">
+                            <button onclick="saveMistralKey()">Save Key</button>
+                            <button onclick="clearMistralKey()">Clear Key</button>
+                        </div>
+                    </div>
+
+                    <div id="openrouterKeySection" style="margin-top:16px;">
+                        <label style="display:block;font-size:0.8rem;color:var(--cyan);margin:0 0 6px;text-transform:uppercase;">OpenRouter API Key</label>
+                        <div class="hint" style="margin-bottom:8px;">Stored only in this browser's local storage, sent only to OpenRouter's API. Get a free key at openrouter.ai.</div>
+                        <input type="password" id="openrouterKeyInput" placeholder="Paste your OpenRouter API key" autocomplete="off">
+                        <div class="ai-modal-actions">
+                            <button onclick="saveOpenRouterKey()">Save Key</button>
+                            <button onclick="clearOpenRouterKey()">Clear Key</button>
+                        </div>
+                        <label style="display:block;font-size:0.8rem;color:var(--cyan);margin:14px 0 6px;text-transform:uppercase;">OpenRouter Model</label>
+                        <input type="text" id="openrouterModelInput" placeholder="google/gemma-4-26b-a4b-it:free">
+                    </div>
+
+                    <div id="googleKeySection" style="margin-top:16px;">
+                        <label style="display:block;font-size:0.8rem;color:var(--cyan);margin:0 0 6px;text-transform:uppercase;">Google AI Studio API Key</label>
+                        <div class="hint" style="margin-bottom:8px;">Stored only in this browser's local storage, sent only to Google's Generative Language API. Get a free key at aistudio.google.com.</div>
+                        <input type="password" id="googleKeyInput" placeholder="Paste your Google AI Studio API key" autocomplete="off">
+                        <div class="ai-modal-actions">
+                            <button onclick="saveGoogleKey()">Save Key</button>
+                            <button onclick="clearGoogleKey()">Clear Key</button>
+                        </div>
+                        <label style="display:block;font-size:0.8rem;color:var(--cyan);margin:14px 0 6px;text-transform:uppercase;">Google Model</label>
+                        <input type="text" id="googleModelInput" placeholder="gemma-4-26b-a4b-it">
+                    </div>
+
+                    <label style="display:block;font-size:0.8rem;color:var(--cyan);margin:18px 0 6px;text-transform:uppercase;">Current Scene</label>
+                    <div class="hint" style="margin-bottom:8px;">Force-regenerate hints for whatever script is currently loaded (setup or practice), overwriting any saved cache.</div>
+                    <button style="width:100%;" onclick="regenerateCurrentSceneHints()">Regenerate Hints For Current Scene</button>
                 </div>
-            </div>
 
-            <div id="openrouterKeySection" style="margin-top:16px;">
-                <label style="display:block;font-size:0.8rem;color:var(--cyan);margin:0 0 6px;text-transform:uppercase;">OpenRouter API Key</label>
-                <div class="hint" style="margin-bottom:8px;">Stored only in this browser's local storage, sent only to OpenRouter's API. Get a free key at openrouter.ai.</div>
-                <input type="password" id="openrouterKeyInput" placeholder="Paste your OpenRouter API key" autocomplete="off">
-                <div class="ai-modal-actions">
-                    <button onclick="saveOpenRouterKey()">Save Key</button>
-                    <button onclick="clearOpenRouterKey()">Clear Key</button>
+                <div class="ai-modal-col ai-modal-col-right">
+                    <label style="display:block;font-size:0.8rem;color:var(--cyan);margin:0 0 6px;text-transform:uppercase;">Hint Language</label>
+                    <div class="hint" style="margin-bottom:8px;">Leave blank to match the script's own language.</div>
+                    <input type="text" id="aiLanguageInput" placeholder="e.g. English, Romanian…">
+
+                    <label style="display:block;font-size:0.8rem;color:var(--cyan);margin:18px 0 6px;text-transform:uppercase;">System Prompt</label>
+                    <div class="hint" style="margin-bottom:8px;">Controls how hints are generated. Edit with care — the app expects a JSON reply, so keep that part intact.</div>
+                    <textarea id="aiPromptInput" style="min-height:140px;font-size:0.78rem;"></textarea>
+                    <div class="ai-modal-actions">
+                        <button onclick="resetAiPromptToDefault()">Reset Prompt</button>
+                    </div>
                 </div>
-                <label style="display:block;font-size:0.8rem;color:var(--cyan);margin:14px 0 6px;text-transform:uppercase;">OpenRouter Model</label>
-                <input type="text" id="openrouterModelInput" placeholder="google/gemma-4-26b-a4b-it:free">
-            </div>
-
-            <div id="googleKeySection" style="margin-top:16px;">
-                <label style="display:block;font-size:0.8rem;color:var(--cyan);margin:0 0 6px;text-transform:uppercase;">Google AI Studio API Key</label>
-                <div class="hint" style="margin-bottom:8px;">Stored only in this browser's local storage, sent only to Google's Generative Language API. Get a free key at aistudio.google.com.</div>
-                <input type="password" id="googleKeyInput" placeholder="Paste your Google AI Studio API key" autocomplete="off">
-                <div class="ai-modal-actions">
-                    <button onclick="saveGoogleKey()">Save Key</button>
-                    <button onclick="clearGoogleKey()">Clear Key</button>
-                </div>
-                <label style="display:block;font-size:0.8rem;color:var(--cyan);margin:14px 0 6px;text-transform:uppercase;">Google Model</label>
-                <input type="text" id="googleModelInput" placeholder="gemma-4-26b-a4b-it">
-            </div>
-
-            <label style="display:block;font-size:0.8rem;color:var(--cyan);margin:18px 0 6px;text-transform:uppercase;">Hint Language</label>
-            <div class="hint" style="margin-bottom:8px;">Leave blank to match the script's own language.</div>
-            <input type="text" id="aiLanguageInput" placeholder="e.g. English, Romanian…">
-
-            <label style="display:block;font-size:0.8rem;color:var(--cyan);margin:18px 0 6px;text-transform:uppercase;">System Prompt</label>
-            <div class="hint" style="margin-bottom:8px;">Controls how hints are generated. Edit with care — the app expects a JSON reply, so keep that part intact.</div>
-            <textarea id="aiPromptInput" style="min-height:140px;font-size:0.78rem;"></textarea>
-            <div class="ai-modal-actions">
-                <button onclick="resetAiPromptToDefault()">Reset Prompt</button>
             </div>
 
             <div class="ai-modal-actions" style="margin-top:18px;">
                 <button onclick="saveAiSettings()">Save Settings</button>
                 <button onclick="closeAiSettingsModal()">Close</button>
             </div>
-
-            <label style="display:block;font-size:0.8rem;color:var(--cyan);margin:18px 0 6px;text-transform:uppercase;">Current Scene</label>
-            <div class="hint" style="margin-bottom:8px;">Force-regenerate hints for whatever script is currently loaded (setup or practice), overwriting any saved cache.</div>
-            <button style="width:100%;" onclick="regenerateCurrentSceneHints()">Regenerate Hints For Current Scene</button>
         </div>
     </div>
 
