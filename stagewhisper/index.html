@@ -1402,6 +1402,9 @@
         function setSyncStatus(text, opts) {
             const el = document.getElementById("syncStatus");
             if (!el) return;
+            if (text === "Synced" && window.swPersistenceDegraded) {
+                text = "Synced (this browser won't stay signed in after a reload)";
+            }
             el.textContent = text;
             if (opts && opts.warning) {
                 el.classList.add("sync-status-warning");
@@ -3296,7 +3299,9 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-app.js";
         import {
-            getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
+            getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
+            signOut, onAuthStateChanged, setPersistence,
+            indexedDBLocalPersistence, browserLocalPersistence, inMemoryPersistence
         } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-auth.js";
         import {
             getFirestore, doc, getDoc, setDoc, collection, getDocs, serverTimestamp
@@ -3316,12 +3321,69 @@
         const db = getFirestore(app);
         const provider = new GoogleAuthProvider();
 
+        // Some browsers (private mode, strict tracking protection, certain
+        // tablet/in-app-webview setups) refuse to open IndexedDB, which is what
+        // Firebase Auth uses by default to remember your session. Try the best
+        // option first and step down gracefully instead of hard-failing.
+        async function initAuthPersistence() {
+            const chain = [
+                { mode: indexedDBLocalPersistence, label: "indexeddb" },
+                { mode: browserLocalPersistence, label: "localstorage" },
+                { mode: inMemoryPersistence, label: "memory" }
+            ];
+            for (const { mode, label } of chain) {
+                try {
+                    await setPersistence(auth, mode);
+                    window.swPersistenceDegraded = (label === "memory");
+                    if (label !== "indexeddb") {
+                        console.warn("Stage Whisper: falling back to " + label + " auth persistence.");
+                    }
+                    return;
+                } catch (e) {
+                    console.warn("Stage Whisper: " + label + " auth persistence unavailable, trying next option.", e);
+                }
+            }
+            // Every option failed — sign-in may still work for this page load,
+            // it just won't survive a refresh.
+            window.swPersistenceDegraded = true;
+        }
+
+        const authPersistenceReady = initAuthPersistence();
+
+        // Error codes/messages where a popup is unlikely to ever succeed and a
+        // full-page redirect is the more reliable path.
+        const REDIRECT_FALLBACK_CODES = new Set([
+            "auth/popup-blocked",
+            "auth/operation-not-supported-in-this-environment",
+            "auth/web-storage-unsupported",
+            "auth/internal-error",
+            "auth/network-request-failed"
+        ]);
+
         window.swSignIn = async function() {
+            await authPersistenceReady;
             try {
                 await signInWithPopup(auth, provider);
             } catch (e) {
-                console.error(e);
-                alert("Sign-in didn't go through: " + (e && e.message ? e.message : "unknown error"));
+                console.error("Popup sign-in failed:", e);
+                const code = (e && e.code) || "";
+                if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
+                    // User backed out on purpose — don't force a redirect on them.
+                    return;
+                }
+                const msg = ((e && e.message) || "").toLowerCase();
+                const looksLikeStorageIssue = msg.includes("indexeddb") || msg.includes("database") || msg.includes(" idb");
+                if (REDIRECT_FALLBACK_CODES.has(code) || looksLikeStorageIssue) {
+                    try {
+                        await signInWithRedirect(auth, provider);
+                        return; // page is navigating away
+                    } catch (e2) {
+                        console.error("Redirect sign-in also failed:", e2);
+                        alert("Sign-in didn't go through: " + ((e2 && e2.message) || "unknown error"));
+                        return;
+                    }
+                }
+                alert("Sign-in didn't go through: " + ((e && e.message) || "unknown error"));
             }
         };
 
@@ -3361,6 +3423,14 @@
             window.swCurrentUser = user || null;
             if (user && window.onSwSignedIn) window.onSwSignedIn(user);
             if (!user && window.onSwSignedOut) window.onSwSignedOut();
+        });
+
+        // Completes a signInWithRedirect() flow when the page reloads after
+        // coming back from Google. Resolves to null (no error) when there was
+        // no redirect in progress, which is the common case on a normal load.
+        authPersistenceReady.then(() => getRedirectResult(auth)).catch((e) => {
+            console.error("Redirect sign-in result error:", e);
+            alert("Sign-in didn't complete: " + ((e && e.message) || "unknown error"));
         });
     </script>
 
