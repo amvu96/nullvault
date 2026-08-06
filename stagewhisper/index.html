@@ -1412,6 +1412,17 @@
             }
         }
 
+        function stableStringify(obj) {
+            if (obj === null || typeof obj !== "object") return JSON.stringify(obj);
+            if (Array.isArray(obj)) return "[" + obj.map(stableStringify).join(",") + "]";
+            const keys = Object.keys(obj).sort();
+            return "{" + keys.map(k => JSON.stringify(k) + ":" + stableStringify(obj[k])).join(",") + "}";
+        }
+
+        function scenesEqual(a, b) {
+            return stableStringify(a || null) === stableStringify(b || null);
+        }
+
         window.onSwSignedIn = async function(user) {
             const outView = document.getElementById("signedOutView");
             const inView = document.getElementById("signedInView");
@@ -1444,7 +1455,7 @@
                         if (cloudScene === undefined) {
                             merged[play][name] = localScene;
                             addedFromLocal++;
-                        } else if (JSON.stringify(localScene) !== JSON.stringify(cloudScene)) {
+                        } else if (!scenesEqual(localScene, cloudScene)) {
                             // Present on both sides with different content — leave the cloud
                             // value in `merged` as a placeholder; the user picks the real winner.
                             conflicts.push({ play, scene: name, local: localScene, cloud: cloudScene });
