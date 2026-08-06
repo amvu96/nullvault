@@ -140,6 +140,46 @@
             text-overflow: ellipsis;
             white-space: nowrap;
         }
+        .sync-status-warning {
+            color: var(--danger) !important;
+            cursor: pointer;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+        .sync-conflict-item {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+        .sync-conflict-title {
+            font-size: 0.85rem;
+            font-weight: bold;
+            color: var(--cyan);
+            margin-bottom: 10px;
+        }
+        .sync-conflict-options {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .sync-conflict-choice {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 3px;
+            width: 100%;
+            text-align: left;
+            padding: 10px 12px;
+        }
+        .sync-conflict-label {
+            font-weight: bold;
+        }
+        .sync-conflict-meta {
+            font-size: 0.75rem;
+            color: var(--muted);
+            font-weight: normal;
+        }
         .account-bar button {
             padding: 6px 12px;
             font-size: 0.8rem;
@@ -1149,6 +1189,21 @@
         </div>
     </div>
 
+    <div class="ai-modal" id="syncConflictModal">
+        <div class="ai-modal-inner" style="max-width:520px;">
+            <h3>Scenes Differ Between Devices</h3>
+            <div class="hint" style="margin-bottom:14px;">These scenes were edited both on this device and in your account since they last synced. Pick which version to keep for each.</div>
+            <div id="syncConflictBody" style="max-height:50vh;overflow-y:auto;"></div>
+            <div class="ai-modal-actions" style="margin-top:14px;">
+                <button onclick="resolveAllSyncConflicts('local')">Keep All This Device</button>
+                <button onclick="resolveAllSyncConflicts('cloud')">Keep All Cloud</button>
+            </div>
+            <div class="ai-modal-actions" style="margin-top:8px;">
+                <button onclick="closeConflictModalForLater()">Decide Later</button>
+            </div>
+        </div>
+    </div>
+
     <div class="ai-modal" id="aiSettingsModal">
         <div class="ai-modal-inner">
             <h3>AI Mode Settings</h3>
@@ -1344,9 +1399,17 @@
             return ok;
         }
 
-        function setSyncStatus(text) {
+        function setSyncStatus(text, opts) {
             const el = document.getElementById("syncStatus");
-            if (el) el.textContent = text;
+            if (!el) return;
+            el.textContent = text;
+            if (opts && opts.warning) {
+                el.classList.add("sync-status-warning");
+                el.onclick = opts.onClick || null;
+            } else {
+                el.classList.remove("sync-status-warning");
+                el.onclick = null;
+            }
         }
 
         window.onSwSignedIn = async function(user) {
@@ -1365,24 +1428,43 @@
                         await window.swPushCloud(user.uid, local);
                     }
                     setSyncStatus("Synced");
+                    refreshHintsIndex();
                     return;
                 }
                 const merged = JSON.parse(JSON.stringify(cloud));
+                const conflicts = [];
                 let addedFromLocal = 0;
                 Object.keys(local).forEach(play => {
+                    const localScenes = local[play] || {};
+                    const cloudScenes = cloud[play] || {};
                     if (!merged[play]) merged[play] = {};
-                    const cloudOrder = getSceneNames(merged[play]);
-                    const localOrder = getSceneNames(local[play]);
-                    Object.keys(local[play]).filter(n => n !== "__order").forEach(name => {
-                        if (!merged[play][name]) {
-                            merged[play][name] = local[play][name];
+                    getSceneNames(localScenes).forEach(name => {
+                        const localScene = localScenes[name];
+                        const cloudScene = cloudScenes[name];
+                        if (cloudScene === undefined) {
+                            merged[play][name] = localScene;
                             addedFromLocal++;
+                        } else if (JSON.stringify(localScene) !== JSON.stringify(cloudScene)) {
+                            // Present on both sides with different content — leave the cloud
+                            // value in `merged` as a placeholder; the user picks the real winner.
+                            conflicts.push({ play, scene: name, local: localScene, cloud: cloudScene });
                         }
                     });
+                    const cloudOrder = getSceneNames(merged[play]);
+                    const localOrder = getSceneNames(localScenes);
                     const combinedOrder = cloudOrder.slice();
                     localOrder.forEach(n => { if (!combinedOrder.includes(n)) combinedOrder.push(n); });
                     merged[play].__order = combinedOrder;
                 });
+
+                if (conflicts.length > 0) {
+                    // Don't touch local storage yet — that would silently overwrite this
+                    // device's edits before the user gets a chance to choose.
+                    presentSyncConflicts(merged, conflicts, addedFromLocal);
+                    refreshHintsIndex();
+                    return;
+                }
+
                 saveScreenplays(merged);
                 renderSceneList();
                 setSyncStatus("Synced");
@@ -1395,6 +1477,105 @@
             }
             refreshHintsIndex();
         };
+
+        let pendingConflicts = [];
+        let conflictMergedBase = null;
+        let conflictAddedFromLocal = 0;
+
+        function sceneSummary(scene) {
+            if (!scene) return "";
+            const parts = [];
+            if (scene.myChar) parts.push("as " + scene.myChar);
+            const wordCount = scene.script ? scene.script.trim().split(/\s+/).filter(Boolean).length : 0;
+            parts.push(wordCount + (wordCount === 1 ? " word" : " words"));
+            if (scene.updatedAt) parts.push(new Date(scene.updatedAt).toLocaleString());
+            return parts.join(" · ");
+        }
+
+        function presentSyncConflicts(mergedBase, conflicts, addedFromLocal) {
+            conflictMergedBase = mergedBase;
+            pendingConflicts = conflicts;
+            conflictAddedFromLocal = addedFromLocal || 0;
+            renderConflictModal();
+            document.getElementById("syncConflictModal").classList.add("open");
+            setSyncStatus(`⚠ ${conflicts.length} scene(s) differ — tap to review`, {
+                warning: true,
+                onClick: () => document.getElementById("syncConflictModal").classList.add("open")
+            });
+        }
+
+        function renderConflictModal() {
+            const body = document.getElementById("syncConflictBody");
+            if (!body) return;
+            if (pendingConflicts.length === 0) {
+                body.innerHTML = "";
+                return;
+            }
+            body.innerHTML = pendingConflicts.map((c, i) => `
+                <div class="sync-conflict-item">
+                    <div class="sync-conflict-title">${escapeHtml(c.play)} — ${escapeHtml(c.scene)}</div>
+                    <div class="sync-conflict-options">
+                        <button class="sync-conflict-choice" onclick="resolveSyncConflict(${i}, 'local')">
+                            <span class="sync-conflict-label">Keep This Device</span>
+                            <span class="sync-conflict-meta">${escapeHtml(sceneSummary(c.local))}</span>
+                        </button>
+                        <button class="sync-conflict-choice" onclick="resolveSyncConflict(${i}, 'cloud')">
+                            <span class="sync-conflict-label">Keep Cloud</span>
+                            <span class="sync-conflict-meta">${escapeHtml(sceneSummary(c.cloud))}</span>
+                        </button>
+                    </div>
+                </div>
+            `).join("");
+        }
+
+        function resolveSyncConflict(index, choice) {
+            const c = pendingConflicts[index];
+            if (!c || !conflictMergedBase) return;
+            if (!conflictMergedBase[c.play]) conflictMergedBase[c.play] = {};
+            conflictMergedBase[c.play][c.scene] = choice === "local" ? c.local : c.cloud;
+            pendingConflicts.splice(index, 1);
+            if (pendingConflicts.length === 0) {
+                finishConflictResolution();
+            } else {
+                renderConflictModal();
+            }
+        }
+
+        function resolveAllSyncConflicts(choice) {
+            if (!conflictMergedBase) return;
+            pendingConflicts.forEach(c => {
+                if (!conflictMergedBase[c.play]) conflictMergedBase[c.play] = {};
+                conflictMergedBase[c.play][c.scene] = choice === "local" ? c.local : c.cloud;
+            });
+            pendingConflicts = [];
+            finishConflictResolution();
+        }
+
+        function finishConflictResolution() {
+            document.getElementById("syncConflictModal").classList.remove("open");
+            const finalData = conflictMergedBase;
+            const addedFromLocal = conflictAddedFromLocal;
+            conflictMergedBase = null;
+            conflictAddedFromLocal = 0;
+            if (!finalData) return;
+            const saved = saveScreenplays(finalData);
+            renderSceneList();
+            setSyncStatus("Synced");
+            warnIfNotPersisted(saved);
+            if (addedFromLocal > 0) {
+                alert(`Synced. Added ${addedFromLocal} scene(s) that were only on this device.`);
+            }
+        }
+
+        function closeConflictModalForLater() {
+            document.getElementById("syncConflictModal").classList.remove("open");
+            if (pendingConflicts.length > 0) {
+                setSyncStatus(`⚠ ${pendingConflicts.length} scene(s) need review — tap to resolve`, {
+                    warning: true,
+                    onClick: () => document.getElementById("syncConflictModal").classList.add("open")
+                });
+            }
+        }
 
         window.onSwSignedOut = function() {
             const outView = document.getElementById("signedOutView");
@@ -1473,7 +1654,8 @@
                 speak: document.getElementById("speakOthers").checked,
                 hint: document.getElementById("hintMode").checked,
                 ai: document.getElementById("aiMode").checked,
-                ttsLang: document.getElementById("ttsLang").value
+                ttsLang: document.getElementById("ttsLang").value,
+                updatedAt: Date.now()
             };
             if (isNew) {
                 if (!Array.isArray(data[play].__order)) data[play].__order = getSceneNames(data[play]).filter(n => n !==
