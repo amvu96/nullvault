@@ -536,12 +536,45 @@
             background: var(--muted);
             color: var(--panel);
         }
-        .ai-hint {
+        .ai-hint-row {
+            display: none;
+            align-items: center;
+            gap: 10px;
             margin-top: 10px;
+            text-align: left;
+        }
+        .ai-hint-row.show {
+            display: flex;
+        }
+        .ai-hint-btn {
+            flex-shrink: 0;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: 1px solid var(--cyan);
+            background: transparent;
+            color: var(--cyan);
+            font-weight: bold;
+            font-size: 0.85rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+        }
+        .ai-hint-btn:hover {
+            background: var(--cyan);
+            color: var(--bg);
+        }
+        .ai-hint {
             font-size: 0.8rem;
             font-style: italic;
             color: var(--muted);
             display: none;
+            text-align: left;
+        }
+        .ai-hint.show {
+            display: block;
         }
         .ai-toast {
             position: fixed;
@@ -997,7 +1030,10 @@
                     <div class="context-line" id="contextLine" onclick="openContextModal()"></div>
                     <div class="char-name" id="charName"></div>
                     <div class="line-text" id="lineText">Press start below</div>
-                    <div class="ai-hint" id="aiHintText"></div>
+                    <div class="ai-hint-row" id="aiHintRow">
+                        <button class="ai-hint-btn" id="aiHintBtn" onclick="toggleAiHint()" title="Show AI hint" aria-label="Show AI hint">?</button>
+                        <span class="ai-hint" id="aiHintText"></span>
+                    </div>
                 </div>
 
                 <button class="big-btn" id="mainBtn" onclick="handlePress()">NEXT LINE</button>
@@ -1212,6 +1248,8 @@
         let ttsLang = "ro-RO";
         let aiMode = false;
         let currentHints = null;
+        let currentHintText = null;
+        let aiHintRevealed = false;
         const MISTRAL_KEY_STORAGE = "mistralApiKey";
         window.swHintsIndex = window.swHintsIndex || new Set();
 
@@ -2682,15 +2720,33 @@
                 }
             }
 
+            const aiHintRow = document.getElementById("aiHintRow");
+            const aiHintBtn = document.getElementById("aiHintBtn");
             const aiHintEl = document.getElementById("aiHintText");
-            if (aiHintEl) {
+            if (aiHintRow && aiHintBtn && aiHintEl) {
                 const hintText = aiMode && mine && currentHints ? currentHints[order[pos]] : null;
+                currentHintText = hintText;
+                aiHintRevealed = false;
+                aiHintEl.textContent = "";
+                aiHintEl.classList.remove("show");
                 if (hintText) {
-                    aiHintEl.textContent = "🎭 " + hintText;
-                    aiHintEl.style.display = "block";
+                    aiHintRow.classList.add("show");
                 } else {
-                    aiHintEl.style.display = "none";
+                    aiHintRow.classList.remove("show");
                 }
+            }
+        }
+
+        function toggleAiHint() {
+            if (!currentHintText) return;
+            const aiHintEl = document.getElementById("aiHintText");
+            aiHintRevealed = !aiHintRevealed;
+            if (aiHintRevealed) {
+                aiHintEl.textContent = "🎭 " + currentHintText;
+                aiHintEl.classList.add("show");
+            } else {
+                aiHintEl.textContent = "";
+                aiHintEl.classList.remove("show");
             }
         }
 
