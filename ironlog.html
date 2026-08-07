@@ -387,9 +387,13 @@
   .ex-row input{background:transparent; border:none; color:var(--chalk); font-size:13px; padding:4px;}
   .ex-row input:focus{outline:none;}
   .ex-row .ex-name{flex:2; min-width:0;}
-  .ex-row .ex-sets, .ex-row .ex-reps, .ex-row .ex-weight{flex:1; width:0; text-align:center;}
+  .ex-row .ex-sets, .ex-row .ex-reps, .ex-row .ex-weight, .ex-row .ex-speed{flex:1; width:0; text-align:center;}
   .ex-row .rm{background:none; border:none; color:var(--chalk-faint); font-size:16px; padding:2px 6px; flex:0;}
   .ex-row .rm:hover{color:var(--rust);}
+  .ex-row-walk{flex-wrap:wrap;}
+  .ex-row-walk .ex-name{flex:1 1 100%; order:0;}
+  .ex-row-walk .ex-reps, .ex-row-walk .ex-speed, .ex-row-walk .ex-weight{flex:1 1 0; min-width:64px;}
+  .ex-row-walk .rm{order:5;}
   .ex-row-wrap{display:flex; flex-direction:column; gap:4px; position:relative;}
   .boss-hint{font-size:11px; padding:0 4px; font-family:'JetBrains Mono';}
   .boss-hint .bh-boss{color:var(--brass);}
@@ -1060,8 +1064,33 @@
       }
 
       card.innerHTML = inner;
+
+      // Any past day that isn't completed can be rescheduled directly from
+      // here — no need to wait for the mandatory excuse modal to reappear.
+      if(isPastDay(i) && day.status !== 'done'){
+        const rescheduleBtn = document.createElement('button');
+        rescheduleBtn.className = 'btn btn-ghost btn-block';
+        rescheduleBtn.style.cssText = 'margin-top:10px; font-size:12px; padding:9px;';
+        rescheduleBtn.textContent = day.status === 'missed' ? '↻ Change make-up day' : '↻ Reschedule this day';
+        rescheduleBtn.onclick = ()=> startRescheduleFor(i);
+        card.appendChild(rescheduleBtn);
+      }
+
       list.appendChild(card);
     });
+  }
+
+  // Lets the user reschedule a past pending/missed day directly from the log
+  // list, without needing to go through the mandatory excuse modal again.
+  // If the day hasn't been excused yet, a quick excuse is still required —
+  // consistent with the rest of the app — before the picker opens.
+  function startRescheduleFor(i){
+    if(state.days[i].excuse){
+      pendingMissedIndex = i;
+      openReschedulePicker();
+    } else {
+      triggerMissedModal(i);
+    }
   }
 
   function renderHistory(){
@@ -1251,10 +1280,10 @@
   }
 
   // Formats an exercise's metrics for the small chip badges shown in day
-  // summaries — walking exercises show minutes/incline instead of sets/reps/weight.
+  // summaries — walking exercises show minutes/speed/incline instead of sets/reps/weight.
   function formatExerciseMetrics(ex){
     if(isInclinedWalking(ex.name)){
-      return [ex.minutes && ex.minutes+' min', ex.incline && ex.incline+'% incline'].filter(Boolean).join(' · ');
+      return [ex.minutes && ex.minutes+' min', ex.speed && ex.speed+' km/h', ex.incline && ex.incline+'% incline'].filter(Boolean).join(' · ');
     }
     return [ex.sets && ex.sets+'×', ex.reps, ex.weight && ex.weight+'kg'].filter(Boolean).join(' ');
   }
@@ -1505,9 +1534,11 @@
       row.style.position = 'relative';
 
       if(isInclinedWalking(ex.name)){
+        row.classList.add('ex-row-walk');
         row.innerHTML = `
           <input class="ex-name" placeholder="Exercise name" value="${escapeAttr(ex.name)}" data-idx="${idx}" data-field="name" autocomplete="off">
           <input class="ex-reps" placeholder="Minutes" value="${escapeAttr(ex.minutes)}" data-idx="${idx}" data-field="minutes">
+          <input class="ex-speed" placeholder="km/h" value="${escapeAttr(ex.speed)}" data-idx="${idx}" data-field="speed">
           <input class="ex-weight" placeholder="Incline %" value="${escapeAttr(ex.incline)}" data-idx="${idx}" data-field="incline">
           <button class="rm" data-idx="${idx}" aria-label="Remove exercise">✕</button>
         `;
@@ -1525,7 +1556,7 @@
       if(isInclinedWalking(ex.name)){
         const subLabel = document.createElement('div');
         subLabel.className = 'ex-sublabel';
-        subLabel.textContent = 'Treadmill incline walk — tracked by minutes and incline instead of sets/reps/weight.';
+        subLabel.textContent = 'Treadmill incline walk — tracked by minutes, speed, and incline instead of sets/reps/weight.';
         wrap.appendChild(subLabel);
       }
 
@@ -1630,9 +1661,10 @@
     }
     if(isInclinedWalking(ex.name)){
       const bestMinutes = Math.max(...past.map(p=>toNum(p.minutes)));
+      const bestSpeed = Math.max(...past.map(p=>toNum(p.speed)));
       const bestIncline = Math.max(...past.map(p=>toNum(p.incline)));
       hintEl.style.display = 'block';
-      hintEl.innerHTML = `<span class="bh-boss">⚔ Boss to beat: ${bestMinutes>0?bestMinutes+' min · ':''}${bestIncline>0?bestIncline+'% incline':''}</span>`;
+      hintEl.innerHTML = `<span class="bh-boss">⚔ Boss to beat: ${bestMinutes>0?bestMinutes+' min · ':''}${bestSpeed>0?bestSpeed+' km/h · ':''}${bestIncline>0?bestIncline+'% incline':''}</span>`;
       return;
     }
     const bestWeight = Math.max(...past.map(p=>toNum(p.weight)));
@@ -1732,14 +1764,17 @@
 
     if(isInclinedWalking(ex.name)){
       const bestMinutes = Math.max(...past.map(p=>toNum(p.minutes)));
+      const bestSpeed = Math.max(...past.map(p=>toNum(p.speed)));
       const bestIncline = Math.max(...past.map(p=>toNum(p.incline)));
       const curMinutes = toNum(ex.minutes);
+      const curSpeed = toNum(ex.speed);
       const curIncline = toNum(ex.incline);
       const beatMinutes = curMinutes > 0 && curMinutes > bestMinutes;
+      const beatSpeed = curSpeed > 0 && curSpeed > bestSpeed;
       const beatIncline = curIncline > 0 && curIncline > bestIncline;
-      const won = beatMinutes || beatIncline;
-      const flawless = beatMinutes && beatIncline;
-      return { name: ex.name, won, flawless, beatMinutes, beatIncline, bestMinutes, bestIncline, curMinutes, curIncline, isWalking:true };
+      const won = beatMinutes || beatSpeed || beatIncline;
+      const flawless = beatMinutes && beatSpeed && beatIncline;
+      return { name: ex.name, won, flawless, beatMinutes, beatSpeed, beatIncline, bestMinutes, bestSpeed, bestIncline, curMinutes, curSpeed, curIncline, isWalking:true };
     }
 
     const bestVolume = Math.max(...past.map(exerciseVolume));
