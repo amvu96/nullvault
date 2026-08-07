@@ -762,6 +762,7 @@
     <h2 id="historyDetailTitle">Week</h2>
     <p class="sub" id="historyDetailSub">Tap a day to add or edit exercises you logged.</p>
     <div class="log-list" id="historyDayList"></div>
+    <button class="btn btn-danger btn-block" id="reopenWeekBtn" style="display:none; margin-top:14px;">↩ Reopen this week</button>
     <div class="modal-actions" style="margin-top:18px;">
       <button class="btn btn-primary btn-block" id="closeHistoryDetail">Done</button>
     </div>
@@ -1113,6 +1114,19 @@
     document.getElementById('historyDetailSub').textContent =
       `${rec.completed}/${rec.target} sessions logged. Tap any day to add or edit exercises.`;
     renderHistoryDayList(idx);
+
+    // Only the most recently closed week can be reopened, and only if the
+    // live week is still empty (otherwise reopening would overwrite it).
+    const isMostRecent = idx === state.history.length - 1;
+    const liveHasActivity = Object.values(state.days).some(d => d.status !== 'pending');
+    const reopenBtn = document.getElementById('reopenWeekBtn');
+    if(isMostRecent && !liveHasActivity){
+      reopenBtn.style.display = 'block';
+      reopenBtn.onclick = ()=> reopenWeek(idx);
+    } else {
+      reopenBtn.style.display = 'none';
+    }
+
     document.getElementById('historyDetailScrim').classList.add('show');
   }
 
@@ -1756,16 +1770,54 @@
     const shortfall = Math.max(0, state.target - completed);
     state.brokenPromises = (state.brokenPromises || 0) + shortfall;
 
+    // Snapshot everything needed to fully reverse this archive later, in
+    // case the user closes a week by mistake and wants it back.
+    const streakBefore = state.streak;
+
     const record = {
       label, completed, target: state.target, missed, exercisesLogged, excuses,
       brokenPromises: shortfall,
       weekStartISO: state.weekStartISO,
-      days: JSON.parse(JSON.stringify(state.days)) // full snapshot so past weeks stay editable
+      days: JSON.parse(JSON.stringify(state.days)), // full snapshot so past weeks stay editable
+      streakBefore // streak value prior to this week, so reopening can restore it
     };
     state.history.push(record);
     if(completed >= state.target) state.streak += 1; else state.streak = 0;
     saveState();
     return record;
+  }
+
+  // Undoes archiveWeek(): pulls the most recently archived week back into the
+  // live week, reverses the streak and broken-promise accounting it caused,
+  // and removes it from history. Only ever safe for the LAST archived week —
+  // reopening an older one would silently overwrite whatever became the live
+  // week since then, and every week after it would need re-deriving too.
+  function reopenWeek(historyIdx){
+    if(historyIdx !== state.history.length - 1){
+      showToast("Only the most recently closed week can be reopened.");
+      return;
+    }
+    const rec = state.history[historyIdx];
+
+    // If the live week already has any activity, reopening would clobber it.
+    const liveHasActivity = Object.values(state.days).some(d => d.status !== 'pending');
+    if(liveHasActivity){
+      showToast("Can't reopen — this week already has activity logged. Clear it first if you're sure.");
+      return;
+    }
+
+    state.history.splice(historyIdx, 1);
+    state.weekStartISO = rec.weekStartISO;
+    state.days = JSON.parse(JSON.stringify(rec.days));
+    state.streak = (rec.streakBefore !== undefined) ? rec.streakBefore : Math.max(0, state.streak - 1);
+    state.brokenPromises = Math.max(0, (state.brokenPromises || 0) - (rec.brokenPromises || 0));
+
+    saveState();
+    document.getElementById('historyDetailScrim').classList.remove('show');
+    document.getElementById('weekCloseBanner').classList.remove('show');
+    render();
+    updateBrokenPromisesUI();
+    showToast(`${rec.label} reopened — it's your current week again.`);
   }
 
   function showSummary(){
