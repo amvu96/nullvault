@@ -81,13 +81,6 @@
     50%{ box-shadow:0 0 0 2px var(--ink), 0 0 0 5px rgba(232,72,44,0); }
   }
 
-  .xp-chip{
-    display:flex; align-items:center; gap:5px;
-    padding:6px 11px; border-radius:999px;
-    background:var(--iron); border:1px solid var(--line);
-    font-family:'JetBrains Mono'; font-size:12px; color:var(--brass); font-weight:500;
-  }
-
   .brand{display:flex; align-items:center; gap:10px;}
   .brand-mark{
     width:30px; height:30px; border-radius:50%;
@@ -395,9 +388,6 @@
   .ex-row-walk .ex-reps, .ex-row-walk .ex-speed, .ex-row-walk .ex-weight{flex:1 1 0; min-width:64px;}
   .ex-row-walk .rm{order:5;}
   .ex-row-wrap{display:flex; flex-direction:column; gap:4px; position:relative;}
-  .boss-hint{font-size:11px; padding:0 4px; font-family:'JetBrains Mono';}
-  .boss-hint .bh-boss{color:var(--brass);}
-  .boss-hint .bh-new{color:var(--chalk-faint);}
   .ex-sublabel{font-size:11px; color:var(--chalk-faint); padding:0 4px; line-height:1.4;}
   .ex-autocomplete{
     position:relative; display:flex; flex-direction:column;
@@ -465,9 +455,6 @@
     </div>
   </div>
   <div style="display:flex; align-items:center; gap:10px;">
-    <div class="xp-chip" id="xpChip" title="Lifetime XP">
-      <span>⚡</span><span id="xpVal">0</span>
-    </div>
     <button class="auth-chip" id="authChip">
       <span class="avatar" id="avatarInitial">?</span>
       <span id="authChipText">Sign in</span>
@@ -831,7 +818,6 @@
       streak: 0,
       history: [], // completed weeks
       user: null,  // {name, email, uid}
-      xp: 0,                  // lifetime XP earned by beating past performance
       brokenPromises: 0,      // lifetime count of target sessions a week fell short by
       nextWeekMakeups: []     // [{dayIndex, reason}] committed while rescheduling into next week
     };
@@ -1565,12 +1551,6 @@
       dropdown.dataset.idx = idx;
       wrap.appendChild(dropdown);
 
-      const hint = document.createElement('div');
-      hint.className = 'boss-hint';
-      hint.dataset.idx = idx;
-      updateBossHint(hint, ex);
-      wrap.appendChild(hint);
-
       list.appendChild(wrap);
     });
 
@@ -1594,8 +1574,6 @@
             return;
           }
         }
-        const hint = list.querySelector(`.boss-hint[data-idx="${idx}"]`);
-        if(hint) updateBossHint(hint, exRows[idx]);
       };
       inp.addEventListener('focus', (e)=>{
         if(e.target.dataset.field === 'name'){
@@ -1646,33 +1624,6 @@
   }
 
 
-  // Shows what this exercise's boss fight is chasing, live as the user types.
-  function updateBossHint(hintEl, ex){
-    if(!ex.name || !ex.name.trim()){
-      hintEl.innerHTML = '';
-      hintEl.style.display = 'none';
-      return;
-    }
-    const past = collectPastInstances(ex.name, logTargetHistoryIdx, logDayIndex);
-    if(!past.length){
-      hintEl.style.display = 'block';
-      hintEl.innerHTML = `<span class="bh-new">🆕 First time logging this — no boss to beat yet.</span>`;
-      return;
-    }
-    if(isInclinedWalking(ex.name)){
-      const bestMinutes = Math.max(...past.map(p=>toNum(p.minutes)));
-      const bestSpeed = Math.max(...past.map(p=>toNum(p.speed)));
-      const bestIncline = Math.max(...past.map(p=>toNum(p.incline)));
-      hintEl.style.display = 'block';
-      hintEl.innerHTML = `<span class="bh-boss">⚔ Boss to beat: ${bestMinutes>0?bestMinutes+' min · ':''}${bestSpeed>0?bestSpeed+' km/h · ':''}${bestIncline>0?bestIncline+'% incline':''}</span>`;
-      return;
-    }
-    const bestWeight = Math.max(...past.map(p=>toNum(p.weight)));
-    const bestReps = Math.max(...past.map(p=>toNum(p.reps)));
-    const bestVolume = Math.max(...past.map(exerciseVolume));
-    hintEl.style.display = 'block';
-    hintEl.innerHTML = `<span class="bh-boss">⚔ Boss to beat: ${bestWeight>0?bestWeight+'kg · ':''}${bestReps>0?bestReps+' reps · ':''}${bestVolume>0?bestVolume+' vol':''}</span>`;
-  }
   function escapeAttr(v){ return (v===undefined||v===null) ? '' : String(v).replace(/"/g,'&quot;'); }
 
   function isInclinedWalking(name){
@@ -1708,122 +1659,6 @@
     logTargetHistoryIdx = null;
   };
 
-  // ---------------------------------------------------------------------
-  // Boss Fight — compete with your own past performance
-  // ---------------------------------------------------------------------
-  // Collects every previously-logged instance of a named exercise across
-  // all history weeks and any other already-saved day in the live week
-  // (never including the day currently being edited, so you can't beat
-  // yourself against your own in-progress entry).
-  function collectPastInstances(exerciseName, excludeHistoryIdx, excludeDayIndex){
-    const nameKey = exerciseName.trim().toLowerCase();
-    if(!nameKey) return [];
-    const instances = [];
-
-    // Live current week (only days other than the one being saved right now).
-    Object.entries(state.days).forEach(([idx, day])=>{
-      if(excludeHistoryIdx === null && parseInt(idx,10) === excludeDayIndex) return;
-      (day.exercises||[]).forEach(ex=>{
-        if(ex.name && ex.name.trim().toLowerCase() === nameKey){
-          instances.push(ex);
-        }
-      });
-    });
-
-    // All archived weeks.
-    state.history.forEach((rec, hIdx)=>{
-      Object.entries(rec.days).forEach(([idx, day])=>{
-        if(excludeHistoryIdx === hIdx && parseInt(idx,10) === excludeDayIndex) return;
-        (day.exercises||[]).forEach(ex=>{
-          if(ex.name && ex.name.trim().toLowerCase() === nameKey){
-            instances.push(ex);
-          }
-        });
-      });
-    });
-
-    return instances;
-  }
-
-  function toNum(v){
-    const n = parseFloat(v);
-    return isNaN(n) ? 0 : n;
-  }
-
-  function exerciseVolume(ex){
-    return toNum(ex.sets) * toNum(ex.reps) * toNum(ex.weight);
-  }
-
-  // Compares one freshly-logged exercise against its best prior instance.
-  // Returns null if there's no prior data (first time = nothing to beat yet).
-  // Inclined Walking uses its own metrics (minutes, incline%) since sets/reps/weight
-  // don't apply to it.
-  function evaluateBossFight(ex, excludeHistoryIdx, excludeDayIndex){
-    const past = collectPastInstances(ex.name, excludeHistoryIdx, excludeDayIndex);
-    if(!past.length) return null;
-
-    if(isInclinedWalking(ex.name)){
-      const bestMinutes = Math.max(...past.map(p=>toNum(p.minutes)));
-      const bestSpeed = Math.max(...past.map(p=>toNum(p.speed)));
-      const bestIncline = Math.max(...past.map(p=>toNum(p.incline)));
-      const curMinutes = toNum(ex.minutes);
-      const curSpeed = toNum(ex.speed);
-      const curIncline = toNum(ex.incline);
-      const beatMinutes = curMinutes > 0 && curMinutes > bestMinutes;
-      const beatSpeed = curSpeed > 0 && curSpeed > bestSpeed;
-      const beatIncline = curIncline > 0 && curIncline > bestIncline;
-      const won = beatMinutes || beatSpeed || beatIncline;
-      const flawless = beatMinutes && beatSpeed && beatIncline;
-      return { name: ex.name, won, flawless, beatMinutes, beatSpeed, beatIncline, bestMinutes, bestSpeed, bestIncline, curMinutes, curSpeed, curIncline, isWalking:true };
-    }
-
-    const bestVolume = Math.max(...past.map(exerciseVolume));
-    const bestWeight = Math.max(...past.map(p=>toNum(p.weight)));
-    const bestReps = Math.max(...past.map(p=>toNum(p.reps)));
-
-    const curVolume = exerciseVolume(ex);
-    const curWeight = toNum(ex.weight);
-    const curReps = toNum(ex.reps);
-
-    const beatVolume = curVolume > 0 && curVolume > bestVolume;
-    const beatWeight = curWeight > 0 && curWeight > bestWeight;
-    const beatReps = curReps > 0 && curReps > bestReps;
-    const won = beatVolume || beatWeight || beatReps;
-    const flawless = beatVolume && beatWeight && beatReps;
-
-    return { name: ex.name, won, flawless, beatVolume, beatWeight, beatReps, bestVolume, bestWeight, bestReps, curVolume, curWeight, curReps };
-  }
-
-  // Runs boss fights for every exercise in a session, awards XP, and returns
-  // the results so the UI can show a summary.
-  function runBossFights(exercises, excludeHistoryIdx, excludeDayIndex){
-    const results = [];
-    let xpGained = 0;
-    exercises.forEach(ex=>{
-      if(!ex.name || !ex.name.trim()) return;
-      const result = evaluateBossFight(ex, excludeHistoryIdx, excludeDayIndex);
-      if(result){
-        results.push(result);
-        if(result.flawless) xpGained += 25;
-        else if(result.won) xpGained += 10;
-      }
-    });
-    if(xpGained > 0){
-      state.xp = (state.xp || 0) + xpGained;
-    }
-    return { results, xpGained };
-  }
-
-  function showBossFightToast(bossFightSummary){
-    const { results, xpGained } = bossFightSummary;
-    const wins = results.filter(r=>r.won);
-    if(!wins.length) return;
-    const names = wins.map(r=>r.name).join(', ');
-    const flawlessCount = wins.filter(r=>r.flawless).length;
-    const tag = flawlessCount ? ' — flawless victory!' : '';
-    showToast(`🏆 Boss beaten: ${names}${tag} +${xpGained} XP`);
-  }
-
   document.getElementById('saveLogBtn').onclick = ()=>{
     const cleaned = exRows.filter(e=> e.name && e.name.trim());
     const notes = document.getElementById('sessionNotes').value.trim();
@@ -1834,15 +1669,9 @@
       day.notes = notes;
       day.status = 'done';
       day.excuse = null;
-      const bossFightSummary = runBossFights(cleaned, null, logDayIndex);
       saveState();
       render();
-      updateXpUI();
-      if(bossFightSummary.xpGained > 0){
-        showBossFightToast(bossFightSummary);
-      } else {
-        showToast('Session saved. Nice work.');
-      }
+      showToast('Session saved. Nice work.');
       maybeOfferWeekComplete();
     } else {
       const rec = state.history[logTargetHistoryIdx];
@@ -1852,7 +1681,6 @@
       day.notes = notes;
       day.status = 'done';
       day.excuse = null;
-      const bossFightSummary = runBossFights(cleaned, logTargetHistoryIdx, logDayIndex);
       // Recompute this past week's rollup stats to reflect the edit.
       const prevCompleted = rec.completed;
       rec.completed = Object.values(rec.days).filter(d=>d.status==='done').length;
@@ -1869,13 +1697,8 @@
       saveState();
       renderHistoryDayList(logTargetHistoryIdx);
       renderHistory();
-      updateXpUI();
       updateBrokenPromisesUI();
-      if(bossFightSummary.xpGained > 0){
-        showBossFightToast(bossFightSummary);
-      } else {
-        showToast(wasDone ? 'Session updated.' : 'Added a session you forgot to log.');
-      }
+      showToast(wasDone ? 'Session updated.' : 'Added a session you forgot to log.');
     }
 
     document.getElementById('logScrim').classList.remove('show');
@@ -2053,12 +1876,8 @@
   }
 
   // ---------------------------------------------------------------------
-  // XP + Broken Promises UI
+  // Broken Promises UI
   // ---------------------------------------------------------------------
-  function updateXpUI(){
-    document.getElementById('xpVal').textContent = state.xp || 0;
-  }
-
   function updateBrokenPromisesUI(){
     const count = state.brokenPromises || 0;
     const badge = document.getElementById('brokenBadge');
@@ -2133,7 +1952,6 @@
 
   render();
   updateAuthUI();
-  updateXpUI();
   updateBrokenPromisesUI();
 
   if(!state.onboarded){
