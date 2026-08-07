@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+    <title>Gym Tracker</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f4f4f4;
+            color: #222;
+        }
+
+        header {
+            display: flex;
+            background: #222;
+        }
+        header button {
+            flex: 1;
+            border: none;
+            background: none;
+            color: white;
+            padding: 16px;
+            font-size: 18px;
+            cursor: pointer;
+        }
+        header button.active {
+            background: #444;
+        }
+
+        .page {
+            display: none;
+            padding: 18px;
+        }
+        .page.active {
+            display: block;
+        }
+
+        .card {
+            background: white;
+            border-radius: 14px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, .15);
+        }
+        .history-card {
+            background: white;
+            border-radius: 14px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, .15);
+            overflow-x: auto;
+        }
+
+        .center {
+            text-align: center;
+        }
+
+        .exercise {
+            font-size: 26px;
+            font-weight: bold;
+            margin-bottom: 6px;
+            line-height: 1.3;
+        }
+        .exercise-sub {
+            font-size: 16px;
+            font-weight: normal;
+            color: #555;
+            margin-bottom: 12px;
+        }
+
+        .set {
+            font-size: 22px;
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        .weight {
+            font-size: 52px;
+            font-weight: bold;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .previous {
+            text-align: center;
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .adjust {
+            height: 70px;
+            font-size: 28px;
+            border: none;
+            border-radius: 12px;
+            background: #e8e8e8;
+            cursor: pointer;
+        }
+        .adjust:active {
+            background: #d0d0d0;
+        }
+
+        .done {
+            width: 100%;
+            height: 70px;
+            margin-top: 18px;
+            font-size: 24px;
+            border: none;
+            border-radius: 12px;
+            background: #2e7d32;
+            color: white;
+            cursor: pointer;
+        }
+        .done:active {
+            background: #1e5d22;
+        }
+
+        .start {
+            width: 100%;
+            height: 70px;
+            font-size: 24px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, .15);
+        }
+        td,
+        th {
+            border: 1px solid #ddd;
+            padding: 10px 8px;
+            text-align: center;
+        }
+        th {
+            background: #222;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+
+        .complete {
+            text-align: center;
+            font-size: 28px;
+            color: green;
+        }
+
+        .empty-history {
+            text-align: center;
+            padding: 40px 20px;
+            color: #888;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <button id="workoutTab" class="active">Workout</button>
+        <button id="historyTab">History</button>
+    </header>
+
+    <div id="workoutPage" class="page active">
+        <div class="card" id="content"></div>
+    </div>
+
+    <div id="historyPage" class="page">
+        <div class="history-card" id="historyContent"></div>
+    </div>
+
+    <script>
+        // ─── EXERCISE DEFINITIONS ──────────────────────────────────────────────
+        const exercises = [
+            { name: "Chest Press", min: 5, max: 150, step: 2.5, sets: 3, reps: "8–12" },
+            { name: "Lat Pulldown", min: 5, max: 150, step: 2.5, sets: 3, reps: "8–12" },
+            { name: "Shoulder Press", min: 5, max: 100, step: 2.5, sets: 3, reps: "8–12" },
+            { name: "Assisted Pull-ups", min: 5, max: 150, step: 2.5, sets: 2, reps: "6–10" },
+            { name: "Assisted Dips", min: 5, max: 150, step: 2.5, sets: 2, reps: "8–12" },
+            { name: "Leg Press", min: 20, max: 300, step: 5, sets: 3, reps: "10–15" },
+            { name: "Leg Curl", min: 5, max: 100, step: 2.5, sets: 3, reps: "10–15" },
+            { name: "Incline Walk", walk: true }
+        ];
+
+        // ─── STATE ──────────────────────────────────────────────────────────────
+        let historyData = JSON.parse(localStorage.getItem("history") || "[]");
+        let day = historyData.length + 1;
+
+        let exerciseIndex = 0;
+        let setIndex = 1;
+        let session = {};
+        let currentWeight = 0;
+
+        // ─── HELPERS ──────────────────────────────────────────────────────────
+        function lastWeight(name) {
+            for (let i = historyData.length - 1; i >= 0; i--) {
+                if (historyData[i][name]) {
+                    const arr = historyData[i][name];
+                    return arr[arr.length - 1];
+                }
+            }
+            return null;
+        }
+
+        function getExerciseLabel(ex) {
+            return `${ex.name} — ${ex.sets} sets × ${ex.reps} reps`;
+        }
+
+        // ─── RENDER WORKOUT ────────────────────────────────────────────────────
+        function render() {
+            const el = document.getElementById("content");
+
+            // ── all exercises done ──
+            if (exerciseIndex >= exercises.length) {
+                historyData.push(session);
+                localStorage.setItem("history", JSON.stringify(historyData));
+
+                el.innerHTML = `
+                    <div class="complete">
+                        🎉<br><br>
+                        Workout Complete!<br><br>
+                        <button class="done" onclick="restart()">Start Day ${day + 1}</button>
+                    </div>
+                `;
+                renderHistory();
+                return;
+            }
+
+            const ex = exercises[exerciseIndex];
+
+            // ── Incline Walk (special) ──
+            if (ex.walk) {
+                const walk = session["Incline Walk"] || { incline: 8, speed: 5 };
+                el.innerHTML = `
+                    <div class="exercise">Incline Walk</div>
+                    <div class="exercise-sub">Walking</div>
+                    <div class="set">Incline</div>
+                    <div class="weight" id="incline">${walk.incline}%</div>
+                    <div class="grid">
+                        <button class="adjust" onclick="changeIncline(-1)">−</button>
+                        <button class="adjust" onclick="changeIncline(1)">+</button>
+                    </div>
+                    <div class="set" style="margin-top:20px;">Speed</div>
+                    <div class="weight" id="speed">${walk.speed.toFixed(1)}</div>
+                    <div class="grid">
+                        <button class="adjust" onclick="changeSpeed(-0.5)">−</button>
+                        <button class="adjust" onclick="changeSpeed(0.5)">+</button>
+                    </div>
+                    <button class="done" onclick="finishWalk()">Finished</button>
+                `;
+                return;
+            }
+
+            // ── weight-based exercises ──
+            const previous = lastWeight(ex.name);
+            currentWeight = previous ?? ex.min;
+
+            el.innerHTML = `
+                <div class="exercise">${getExerciseLabel(ex)}</div>
+                <div class="set">Set ${setIndex} / ${ex.sets}</div>
+                <div class="previous">
+                    Last: ${previous ?? "—"} kg
+                </div>
+                <div class="weight" id="weight">${currentWeight}</div>
+                <div class="grid">
+                    <button class="adjust" onclick="change(-5)">−5</button>
+                    <button class="adjust" onclick="change(-${ex.step})">−${ex.step}</button>
+                    <button class="adjust" onclick="change(${ex.step})">+${ex.step}</button>
+                    <button class="adjust" onclick="change(5)">+5</button>
+                </div>
+                <button class="done" onclick="saveSet()">✓ Set Done</button>
+            `;
+        }
+
+        // ─── WEIGHT ADJUSTMENT ──────────────────────────────────────────────
+        function change(v) {
+            const ex = exercises[exerciseIndex];
+            currentWeight = Math.max(ex.min, Math.min(ex.max, currentWeight + v));
+            const w = document.getElementById("weight");
+            if (w) w.innerText = currentWeight;
+        }
+
+        function saveSet() {
+            const ex = exercises[exerciseIndex];
+            if (!session[ex.name]) session[ex.name] = [];
+            session[ex.name].push(currentWeight);
+
+            if (setIndex < ex.sets) {
+                setIndex++;
+            } else {
+                exerciseIndex++;
+                setIndex = 1;
+            }
+            render();
+        }
+
+        // ─── WALK CONTROLS ────────────────────────────────────────────────────
+        function changeIncline(v) {
+            if (!session["Incline Walk"]) {
+                session["Incline Walk"] = { incline: 8, speed: 5 };
+            }
+            const w = session["Incline Walk"];
+            w.incline = Math.max(0, Math.min(15, w.incline + v));
+            const el = document.getElementById("incline");
+            if (el) el.innerText = w.incline + "%";
+        }
+
+        function changeSpeed(v) {
+            if (!session["Incline Walk"]) {
+                session["Incline Walk"] = { incline: 8, speed: 5 };
+            }
+            const w = session["Incline Walk"];
+            w.speed = Math.max(2, Math.min(8, w.speed + v));
+            const el = document.getElementById("speed");
+            if (el) el.innerText = w.speed.toFixed(1);
+        }
+
+        function finishWalk() {
+            exerciseIndex++;
+            render();
+        }
+
+        // ─── RESTART ──────────────────────────────────────────────────────────
+        function restart() {
+            day++;
+            exerciseIndex = 0;
+            setIndex = 1;
+            session = {};
+            render();
+        }
+
+        // ─── RENDER HISTORY ──────────────────────────────────────────────────
+        function renderHistory() {
+            const el = document.getElementById("historyContent");
+            if (!el) return;
+
+            if (historyData.length === 0) {
+                el.innerHTML = `
+                    <div class="empty-history">
+                        <div style="font-size:40px;margin-bottom:12px;">📋</div>
+                        No workout history yet.<br>
+                        Complete a workout to see your progress here.
+                    </div>
+                `;
+                return;
+            }
+
+            let html = `<table><tr><th>Exercise</th>`;
+            for (let i = 0; i < historyData.length; i++) {
+                html += `<th>D${i + 1}</th>`;
+            }
+            html += `</tr>`;
+
+            exercises.forEach(ex => {
+                html += `<tr><td><strong>${ex.name}</strong></td>`;
+                historyData.forEach(dayData => {
+                    if (ex.walk) {
+                        const w = dayData["Incline Walk"];
+                        html += `<td>${w ? `${w.incline}%<br>${w.speed}` : "−"}</td>`;
+                    } else {
+                        const vals = dayData[ex.name];
+                        html += `<td>${vals ? vals.join(" / ") : "−"}</td>`;
+                    }
+                });
+                html += `</tr>`;
+            });
+
+            html += `</table>`;
+            el.innerHTML = html;
+        }
+
+        // ─── TAB SWITCHING ────────────────────────────────────────────────────
+        function switchTab(tabName) {
+            const workoutTab = document.getElementById("workoutTab");
+            const historyTab = document.getElementById("historyTab");
+            const workoutPage = document.getElementById("workoutPage");
+            const historyPage = document.getElementById("historyPage");
+
+            if (tabName === "workout") {
+                workoutTab.classList.add("active");
+                historyTab.classList.remove("active");
+                workoutPage.classList.add("active");
+                historyPage.classList.remove("active");
+            } else {
+                historyTab.classList.add("active");
+                workoutTab.classList.remove("active");
+                historyPage.classList.add("active");
+                workoutPage.classList.remove("active");
+                renderHistory();
+            }
+        }
+
+        document.getElementById("workoutTab").onclick = function() {
+            switchTab("workout");
+        };
+        document.getElementById("historyTab").onclick = function() {
+            switchTab("history");
+        };
+
+        // ─── INIT ─────────────────────────────────────────────────────────────
+        render();
+        renderHistory();
+    </script>
+
+</body>
+</html>
