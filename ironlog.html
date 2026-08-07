@@ -229,6 +229,18 @@
   /* ---------- Main ---------- */
   main{max-width:720px; margin:0 auto; padding:28px 20px 100px;}
 
+  .week-close-banner{
+    display:none; flex-direction:column; gap:12px;
+    background:linear-gradient(135deg, rgba(201,160,106,0.16), rgba(201,160,106,0.05));
+    border:1px solid var(--brass-dim); border-radius:14px; padding:16px; margin-bottom:22px;
+  }
+  .week-close-banner.show{display:flex;}
+  .week-close-banner .wcb-icon{font-size:22px;}
+  .week-close-banner .wcb-text b{font-family:'Oswald'; font-size:15px; letter-spacing:0.02em; display:block; color:var(--brass);}
+  .week-close-banner .wcb-text span{font-size:12px; color:var(--chalk-dim); line-height:1.4;}
+  .week-close-banner .wcb-actions{display:flex; gap:8px;}
+  .week-close-banner .wcb-actions .btn{flex:1; padding:9px 12px; font-size:12px;}
+
   .hero{margin-bottom:34px;}
   .eyebrow{font-size:12px; color:var(--brass); letter-spacing:0.18em; text-transform:uppercase; font-weight:600; margin-bottom:8px; display:block;}
   .hero h1{font-size:clamp(30px,7vw,44px); margin:0 0 6px; line-height:1;}
@@ -254,6 +266,14 @@
   }
   .plate .pnum{font-family:'Oswald'; font-size:13px; color:var(--chalk-faint); z-index:1; font-weight:600;}
   .plate.today{border-color:var(--brass); box-shadow:0 0 0 3px rgba(201,160,106,0.15);}
+  .makeup-marker{
+    position:absolute; top:-4px; right:-4px;
+    width:18px; height:18px; border-radius:50%;
+    background:var(--brass); color:var(--ink);
+    font-size:11px; font-weight:700;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 0 0 2px var(--ink);
+  }
   .plate.done{
     background:linear-gradient(145deg, var(--brass), var(--brass-dim));
     border-color:var(--brass);
@@ -370,10 +390,22 @@
   .ex-row .ex-sets, .ex-row .ex-reps, .ex-row .ex-weight{flex:1; width:0; text-align:center;}
   .ex-row .rm{background:none; border:none; color:var(--chalk-faint); font-size:16px; padding:2px 6px; flex:0;}
   .ex-row .rm:hover{color:var(--rust);}
-  .ex-row-wrap{display:flex; flex-direction:column; gap:4px;}
+  .ex-row-wrap{display:flex; flex-direction:column; gap:4px; position:relative;}
   .boss-hint{font-size:11px; padding:0 4px; font-family:'JetBrains Mono';}
   .boss-hint .bh-boss{color:var(--brass);}
   .boss-hint .bh-new{color:var(--chalk-faint);}
+  .ex-sublabel{font-size:11px; color:var(--chalk-faint); padding:0 4px; line-height:1.4;}
+  .ex-autocomplete{
+    position:relative; display:flex; flex-direction:column;
+  }
+  .ex-autocomplete:empty{display:none;}
+  .ex-autocomplete .ac-option{
+    text-align:left; background:var(--iron-3); border:1px solid var(--line); border-top:none;
+    color:var(--chalk-dim); font-size:12px; padding:9px 12px;
+  }
+  .ex-autocomplete .ac-option:first-child{border-top:1px solid var(--line); border-radius:0;}
+  .ex-autocomplete .ac-option:last-child{border-bottom-left-radius:8px; border-bottom-right-radius:8px;}
+  .ex-autocomplete .ac-option:hover{background:var(--iron-2); color:var(--chalk);}
   .ex-head-row{display:flex; gap:8px; padding:0 10px; font-size:10px; text-transform:uppercase; letter-spacing:0.06em; color:var(--chalk-faint); margin-top:14px; margin-bottom:6px;}
   .ex-head-row span:nth-child(1){flex:2;}
   .ex-head-row span:nth-child(2), .ex-head-row span:nth-child(3), .ex-head-row span:nth-child(4){flex:1; text-align:center;}
@@ -559,6 +591,18 @@
 </aside>
 
 <main>
+  <div class="week-close-banner" id="weekCloseBanner">
+    <div class="wcb-icon">🎉</div>
+    <div class="wcb-text">
+      <b>Target hit!</b>
+      <span>You can keep logging extra sessions, or close out the week now.</span>
+    </div>
+    <div class="wcb-actions">
+      <button class="btn btn-ghost" id="dismissWeekClose">Keep going</button>
+      <button class="btn btn-primary" id="confirmWeekClose">Close out week</button>
+    </div>
+  </div>
+
   <div class="hero">
     <span class="eyebrow" id="weekRangeLabel">This Week</span>
     <h1>Show up. Log it.</h1>
@@ -687,6 +731,7 @@
       <button class="btn btn-ghost" id="cancelLog">Cancel</button>
       <button class="btn btn-primary" id="saveLogBtn">Save session</button>
     </div>
+    <button class="btn btn-danger btn-block" id="uncompleteDayBtn" style="display:none; margin-top:10px;">Clear this day (undo)</button>
   </div>
 </div>
 
@@ -778,18 +823,36 @@
       target: 3,
       preferredDays: [0,2,4], // Mon/Wed/Fri default (Monday-indexed)
       weekStartISO: startOfWeekISO(new Date()),
-      days: buildEmptyDays(), // index 0-6 (Mon-Sun) -> {status, excuse, exercises, notes, movedFrom}
+      days: buildEmptyDays(), // index 0-6 (Mon-Sun) -> {status, excuse, exercises, notes, movedFrom, makeupReason}
       streak: 0,
       history: [], // completed weeks
       user: null,  // {name, email, uid}
-      xp: 0,               // lifetime XP earned by beating past performance
-      brokenPromises: 0    // lifetime count of target sessions a week fell short by
+      xp: 0,                  // lifetime XP earned by beating past performance
+      brokenPromises: 0,      // lifetime count of target sessions a week fell short by
+      nextWeekMakeups: []     // [{dayIndex, reason}] committed while rescheduling into next week
     };
   }
 
   function buildEmptyDays(){
     const days = {};
-    for(let i=0;i<7;i++){ days[i] = { status:'pending', excuse:null, exercises:[], notes:'', movedFrom:null }; }
+    for(let i=0;i<7;i++){ days[i] = { status:'pending', excuse:null, exercises:[], notes:'', movedFrom:null, makeupReason:null }; }
+    return days;
+  }
+
+  // Applies any make-up commitments stashed for "next week" while that week
+  // was still in the future (see the reschedule picker). Marks the target
+  // days so the plate/log list can show why they're already earmarked, then
+  // clears the consumed commitments so they don't reapply later.
+  function applyPendingMakeups(days){
+    const pending = state.nextWeekMakeups || [];
+    if(!pending.length) return days;
+    pending.forEach(m=>{
+      if(days[m.dayIndex]){
+        days[m.dayIndex].makeupReason = m.reason;
+        if(!state.preferredDays.includes(m.dayIndex)) state.preferredDays.push(m.dayIndex);
+      }
+    });
+    state.nextWeekMakeups = [];
     return days;
   }
 
@@ -833,7 +896,7 @@
         archiveWeek(false);
       }
       state.weekStartISO = currentStart;
-      state.days = buildEmptyDays();
+      state.days = applyPendingMakeups(buildEmptyDays());
       saveState();
     }
   }
@@ -878,6 +941,12 @@
       const d = parseInt(btn.dataset.day,10);
       btn.classList.toggle('active', state.preferredDays.includes(d));
     });
+    // Keep the "target hit" banner in sync — hide it if the user un-completed
+    // a day and dropped back below target.
+    const doneCount = Object.values(state.days).filter(d=>d.status==='done').length;
+    if(doneCount < state.target){
+      document.getElementById('weekCloseBanner').classList.remove('show');
+    }
   }
 
   function renderWeekLabel(){
@@ -910,6 +979,9 @@
       if(i===todayIndex()) cls += ' today';
       plate.className = cls;
       plate.innerHTML = `<span class="pnum">${dates[i].getDate()}</span>`;
+      if(day.makeupReason && day.status==='pending'){
+        plate.innerHTML += `<span class="makeup-marker" title="${escapeAttr(day.makeupReason)}">↻</span>`;
+      }
 
       btn.appendChild(plate);
       btn.onclick = ()=> handlePlateClick(i);
@@ -926,9 +998,11 @@
 
   function scheduledIndices(){
     // Which days are actually "gym days" this week: preferred days if enough are set,
-    // otherwise just treat status-bearing days as scheduled.
+    // plus any day that already has a status, plus any committed make-up day —
+    // regardless of where it falls in the preferred-days list.
     const explicit = Object.keys(state.days).filter(i=> state.days[i].status !== 'pending').map(Number);
-    const set = new Set([...state.preferredDays.slice(0, state.target), ...explicit]);
+    const makeups = Object.keys(state.days).filter(i=> state.days[i].makeupReason).map(Number);
+    const set = new Set([...state.preferredDays.slice(0, state.target), ...explicit, ...makeups]);
     return Array.from(set);
   }
 
@@ -952,7 +1026,8 @@
 
     relevant.sort((a,b)=>a-b).forEach(i=>{
       const day = state.days[i];
-      if(day.status==='pending' && !isPastDay(i) && i!==todayIndex()) return;
+      const showAnyway = day.makeupReason && day.status==='pending';
+      if(day.status==='pending' && !isPastDay(i) && i!==todayIndex() && !showAnyway) return;
       const card = document.createElement('div');
       card.className = 'log-card';
 
@@ -969,12 +1044,15 @@
       if(day.movedFrom !== null && day.movedFrom !== undefined){
         inner += `<div class="empty-hint">↳ Made up for missed ${DAY_NAMES[day.movedFrom]} session</div>`;
       }
+      if(day.makeupReason && day.status==='pending'){
+        inner += `<div class="empty-hint" style="color:var(--brass);">↻ Make-up day — ${escapeHtml(day.makeupReason)}</div>`;
+      }
       if(day.excuse){
         inner += `<div class="excuse-note">"${escapeHtml(day.excuse)}"</div>`;
       }
       if(day.exercises && day.exercises.length){
         inner += `<div class="exercise-chip-row">` + day.exercises.map(ex=>
-          `<span class="exercise-chip">${escapeHtml(ex.name)} <span class="ew">${[ex.sets&&ex.sets+'×',ex.reps,ex.weight&&ex.weight+'kg'].filter(Boolean).join(' ')}</span></span>`
+          `<span class="exercise-chip">${escapeHtml(ex.name)} <span class="ew">${formatExerciseMetrics(ex)}</span></span>`
         ).join('') + `</div>`;
       }
       if(day.notes){
@@ -1047,7 +1125,7 @@
       }
       if(day.exercises && day.exercises.length){
         inner += `<div class="exercise-chip-row">` + day.exercises.map(ex=>
-          `<span class="exercise-chip">${escapeHtml(ex.name)} <span class="ew">${[ex.sets&&ex.sets+'×',ex.reps,ex.weight&&ex.weight+'kg'].filter(Boolean).join(' ')}</span></span>`
+          `<span class="exercise-chip">${escapeHtml(ex.name)} <span class="ew">${formatExerciseMetrics(ex)}</span></span>`
         ).join('') + `</div>`;
       }
       if(day.notes){
@@ -1172,6 +1250,15 @@
     return div.innerHTML;
   }
 
+  // Formats an exercise's metrics for the small chip badges shown in day
+  // summaries — walking exercises show minutes/incline instead of sets/reps/weight.
+  function formatExerciseMetrics(ex){
+    if(isInclinedWalking(ex.name)){
+      return [ex.minutes && ex.minutes+' min', ex.incline && ex.incline+'% incline'].filter(Boolean).join(' · ');
+    }
+    return [ex.sets && ex.sets+'×', ex.reps, ex.weight && ex.weight+'kg'].filter(Boolean).join(' ');
+  }
+
   // ---------------------------------------------------------------------
   // Plate click / missed-day flow
   // ---------------------------------------------------------------------
@@ -1250,27 +1337,88 @@
     finalizeWeek();
   };
 
+  // Builds a flat list of candidate real dates for rescheduling: any open day
+  // from tomorrow through the end of *next* week. If nothing is open in the
+  // current week, this naturally spills into next week so the user always has
+  // somewhere to put the make-up session.
+  function getRescheduleCandidates(){
+    const candidates = [];
+    const today = new Date(); today.setHours(0,0,0,0);
+
+    // Remaining days in the current week.
+    const liveDates = getWeekDates();
+    for(let i=0;i<7;i++){
+      if(isPastDay(i) || i===pendingMissedIndex) continue;
+      if(state.days[i].status !== 'pending') continue;
+      candidates.push({ scope:'thisWeek', dayIndex:i, date: liveDates[i] });
+    }
+
+    // All of next week, in case nothing is left this week (or the user wants
+    // to push it there anyway).
+    const nextWeekStart = new Date(liveDates[6]);
+    nextWeekStart.setDate(nextWeekStart.getDate() + 1);
+    for(let i=0;i<7;i++){
+      const d = new Date(nextWeekStart);
+      d.setDate(d.getDate()+i);
+      candidates.push({ scope:'nextWeek', dayIndex:i, date:d });
+    }
+
+    return candidates;
+  }
+
   function openReschedulePicker(){
     document.getElementById('missedScrim').classList.remove('show');
     const row = document.getElementById('dayPickRow');
     row.innerHTML = '';
-    let selected = null;
-    for(let i=0;i<7;i++){
-      const btn = document.createElement('button');
-      btn.className = 'day-pick';
-      btn.textContent = DAY_NAMES[i].slice(0,3);
-      const takenOrPast = isPastDay(i) || state.days[i].status !== 'pending' || i===pendingMissedIndex;
-      if(takenOrPast){ btn.classList.add('disabled'); }
-      btn.onclick = ()=>{
-        if(takenOrPast) return;
-        row.querySelectorAll('.day-pick').forEach(b=>b.classList.remove('selected'));
-        btn.classList.add('selected');
-        selected = i;
-        row.dataset.selected = i;
-      };
-      row.appendChild(btn);
+    row.dataset.selected = '';
+    row.dataset.selectedScope = '';
+
+    const candidates = getRescheduleCandidates();
+    const thisWeekOnes = candidates.filter(c=>c.scope==='thisWeek');
+    const nextWeekOnes = candidates.filter(c=>c.scope==='nextWeek');
+
+    if(thisWeekOnes.length){
+      row.appendChild(rescheduleSectionLabel('This week'));
+      const grid = document.createElement('div');
+      grid.className = 'day-pick-row';
+      thisWeekOnes.forEach(c=> grid.appendChild(rescheduleDayButton(c, row)));
+      row.appendChild(grid);
+    } else {
+      row.appendChild(rescheduleSectionLabel("No days left this week — pick from next week"));
     }
+
+    const nextGrid = document.createElement('div');
+    nextGrid.className = 'day-pick-row';
+    nextWeekOnes.forEach(c=> nextGrid.appendChild(rescheduleDayButton(c, row)));
+    if(!thisWeekOnes.length || nextWeekOnes.length){
+      row.appendChild(rescheduleSectionLabel('Next week', thisWeekOnes.length>0));
+      row.appendChild(nextGrid);
+    }
+
     document.getElementById('rescheduleScrim').classList.add('show');
+  }
+
+  function rescheduleSectionLabel(text, subtle){
+    const el = document.createElement('div');
+    el.className = 'field-label';
+    el.style.marginTop = subtle ? '14px' : '0';
+    el.textContent = text;
+    return el;
+  }
+
+  function rescheduleDayButton(candidate, row){
+    const btn = document.createElement('button');
+    btn.className = 'day-pick';
+    const label = candidate.date.toLocaleDateString(undefined, {weekday:'short', day:'numeric', month:'short'});
+    btn.innerHTML = `<span style="display:block; font-size:10px; opacity:0.75;">${DAY_NAMES[candidate.dayIndex].slice(0,3)}</span>${candidate.date.getDate()} ${candidate.date.toLocaleDateString(undefined,{month:'short'})}`;
+    btn.title = label;
+    btn.onclick = ()=>{
+      row.querySelectorAll('.day-pick').forEach(b=>b.classList.remove('selected'));
+      btn.classList.add('selected');
+      row.dataset.selected = candidate.dayIndex;
+      row.dataset.selectedScope = candidate.scope;
+    };
+    return btn;
   }
 
   document.getElementById('cancelReschedule').onclick = ()=>{
@@ -1281,19 +1429,30 @@
   document.getElementById('confirmReschedule').onclick = ()=>{
     const row = document.getElementById('dayPickRow');
     const sel = row.dataset.selected;
+    const scope = row.dataset.selectedScope;
     if(sel === undefined || sel === null || sel === ''){
       showToast('Pick a day first.');
       return;
     }
     const target = parseInt(sel,10);
-    state.days[target].movedFrom = pendingMissedIndex;
-    // Add target day into preferred set for this week so it renders as scheduled
-    if(!state.preferredDays.includes(target)) state.preferredDays.push(target);
-    saveState();
+
+    if(scope === 'thisWeek'){
+      state.days[target].movedFrom = pendingMissedIndex;
+      if(!state.preferredDays.includes(target)) state.preferredDays.push(target);
+      saveState();
+      render();
+      showToast(`Rescheduled to ${DAY_NAMES[target]} this week.`);
+    } else {
+      // Next week isn't built yet in state.days — stash the make-up commitment
+      // and honor it once that week actually becomes the live week.
+      state.nextWeekMakeups = state.nextWeekMakeups || [];
+      state.nextWeekMakeups.push({ dayIndex: target, reason: `Missed ${DAY_NAMES[pendingMissedIndex]}` });
+      saveState();
+      showToast(`Rescheduled to ${DAY_NAMES[target]} next week.`);
+    }
+
     document.getElementById('rescheduleScrim').classList.remove('show');
     pendingMissedIndex = null;
-    render();
-    showToast(`Rescheduled to ${DAY_NAMES[target]}.`);
   };
 
   // ---------------------------------------------------------------------
@@ -1314,9 +1473,25 @@
     document.getElementById('sessionNotes').value = day.notes || '';
     const weekLabel = logTargetHistoryIdx === null ? '' : ` · ${state.history[logTargetHistoryIdx].label}`;
     document.getElementById('logTitle').textContent = `Log ${DAY_NAMES[i]}'s session${weekLabel}`;
+    // Only the live current week can be un-completed — past archived weeks
+    // are edited in place instead (there's no "week" to reopen for them).
+    document.getElementById('uncompleteDayBtn').style.display =
+      (logTargetHistoryIdx === null && day.status === 'done') ? 'block' : 'none';
     renderExRows();
     document.getElementById('logScrim').classList.add('show');
   }
+
+  document.getElementById('uncompleteDayBtn').onclick = ()=>{
+    const day = state.days[logDayIndex];
+    day.status = 'pending';
+    day.exercises = [];
+    day.notes = '';
+    day.excuse = null;
+    saveState();
+    document.getElementById('logScrim').classList.remove('show');
+    render();
+    showToast(`${DAY_NAMES[logDayIndex]} cleared. You can log it again anytime.`);
+  };
 
   function renderExRows(){
     const list = document.getElementById('exList');
@@ -1327,14 +1502,37 @@
 
       const row = document.createElement('div');
       row.className = 'ex-row';
-      row.innerHTML = `
-        <input class="ex-name" placeholder="Exercise name" value="${escapeAttr(ex.name)}" data-idx="${idx}" data-field="name">
-        <input class="ex-sets" placeholder="3" value="${escapeAttr(ex.sets)}" data-idx="${idx}" data-field="sets">
-        <input class="ex-reps" placeholder="10" value="${escapeAttr(ex.reps)}" data-idx="${idx}" data-field="reps">
-        <input class="ex-weight" placeholder="60" value="${escapeAttr(ex.weight)}" data-idx="${idx}" data-field="weight">
-        <button class="rm" data-idx="${idx}" aria-label="Remove exercise">✕</button>
-      `;
+      row.style.position = 'relative';
+
+      if(isInclinedWalking(ex.name)){
+        row.innerHTML = `
+          <input class="ex-name" placeholder="Exercise name" value="${escapeAttr(ex.name)}" data-idx="${idx}" data-field="name" autocomplete="off">
+          <input class="ex-reps" placeholder="Minutes" value="${escapeAttr(ex.minutes)}" data-idx="${idx}" data-field="minutes">
+          <input class="ex-weight" placeholder="Incline %" value="${escapeAttr(ex.incline)}" data-idx="${idx}" data-field="incline">
+          <button class="rm" data-idx="${idx}" aria-label="Remove exercise">✕</button>
+        `;
+      } else {
+        row.innerHTML = `
+          <input class="ex-name" placeholder="Exercise name" value="${escapeAttr(ex.name)}" data-idx="${idx}" data-field="name" autocomplete="off">
+          <input class="ex-sets" placeholder="3" value="${escapeAttr(ex.sets)}" data-idx="${idx}" data-field="sets">
+          <input class="ex-reps" placeholder="10" value="${escapeAttr(ex.reps)}" data-idx="${idx}" data-field="reps">
+          <input class="ex-weight" placeholder="60" value="${escapeAttr(ex.weight)}" data-idx="${idx}" data-field="weight">
+          <button class="rm" data-idx="${idx}" aria-label="Remove exercise">✕</button>
+        `;
+      }
       wrap.appendChild(row);
+
+      if(isInclinedWalking(ex.name)){
+        const subLabel = document.createElement('div');
+        subLabel.className = 'ex-sublabel';
+        subLabel.textContent = 'Treadmill incline walk — tracked by minutes and incline instead of sets/reps/weight.';
+        wrap.appendChild(subLabel);
+      }
+
+      const dropdown = document.createElement('div');
+      dropdown.className = 'ex-autocomplete';
+      dropdown.dataset.idx = idx;
+      wrap.appendChild(dropdown);
 
       const hint = document.createElement('div');
       hint.className = 'boss-hint';
@@ -1344,14 +1542,44 @@
 
       list.appendChild(wrap);
     });
+
     list.querySelectorAll('input').forEach(inp=>{
       inp.oninput = (e)=>{
         const idx = parseInt(e.target.dataset.idx,10);
-        exRows[idx][e.target.dataset.field] = e.target.value;
+        const field = e.target.dataset.field;
+        const wasWalking = isInclinedWalking(exRows[idx].name);
+        exRows[idx][field] = e.target.value;
+
+        if(field === 'name'){
+          showAutocomplete(idx, e.target.value);
+          const nowWalking = isInclinedWalking(exRows[idx].name);
+          if(wasWalking !== nowWalking){
+            // Field layout changes (sets/reps/weight <-> minutes/incline) — rebuild,
+            // then restore focus and cursor position to the name input just edited.
+            const cursorPos = e.target.selectionStart;
+            renderExRows();
+            const revived = list.querySelector(`input[data-idx="${idx}"][data-field="name"]`);
+            if(revived){ revived.focus(); revived.setSelectionRange(cursorPos, cursorPos); }
+            return;
+          }
+        }
         const hint = list.querySelector(`.boss-hint[data-idx="${idx}"]`);
         if(hint) updateBossHint(hint, exRows[idx]);
       };
+      inp.addEventListener('focus', (e)=>{
+        if(e.target.dataset.field === 'name'){
+          const idx = parseInt(e.target.dataset.idx,10);
+          showAutocomplete(idx, e.target.value);
+        }
+      });
+      inp.addEventListener('blur', ()=>{
+        // Delay so a click on a dropdown option registers before it's removed.
+        setTimeout(()=>{
+          list.querySelectorAll('.ex-autocomplete').forEach(d=> d.innerHTML = '');
+        }, 150);
+      });
     });
+
     list.querySelectorAll('.rm').forEach(rm=>{
       rm.onclick = (e)=>{
         const idx = parseInt(e.target.dataset.idx,10);
@@ -1361,6 +1589,31 @@
       };
     });
   }
+
+  // Filters known exercise names by substring and renders a tappable dropdown
+  // under the given row's name input.
+  function showAutocomplete(idx, query){
+    const list = document.getElementById('exList');
+    const dropdown = list.querySelector(`.ex-autocomplete[data-idx="${idx}"]`);
+    if(!dropdown) return;
+    const q = (query||'').trim().toLowerCase();
+    if(!q){ dropdown.innerHTML = ''; return; }
+
+    const known = getKnownExerciseNames();
+    const matches = known.filter(n=> n.toLowerCase().includes(q) && n.toLowerCase() !== q).slice(0, 5);
+    if(!matches.length){ dropdown.innerHTML = ''; return; }
+
+    dropdown.innerHTML = matches.map(n=>`<button type="button" class="ac-option" data-name="${escapeAttr(n)}">${escapeHtml(n)}</button>`).join('');
+    dropdown.querySelectorAll('.ac-option').forEach(btn=>{
+      btn.onmousedown = (e)=>{
+        e.preventDefault(); // fires before input blur clears the dropdown
+        exRows[idx].name = btn.dataset.name;
+        dropdown.innerHTML = '';
+        renderExRows();
+      };
+    });
+  }
+
 
   // Shows what this exercise's boss fight is chasing, live as the user types.
   function updateBossHint(hintEl, ex){
@@ -1375,6 +1628,13 @@
       hintEl.innerHTML = `<span class="bh-new">🆕 First time logging this — no boss to beat yet.</span>`;
       return;
     }
+    if(isInclinedWalking(ex.name)){
+      const bestMinutes = Math.max(...past.map(p=>toNum(p.minutes)));
+      const bestIncline = Math.max(...past.map(p=>toNum(p.incline)));
+      hintEl.style.display = 'block';
+      hintEl.innerHTML = `<span class="bh-boss">⚔ Boss to beat: ${bestMinutes>0?bestMinutes+' min · ':''}${bestIncline>0?bestIncline+'% incline':''}</span>`;
+      return;
+    }
     const bestWeight = Math.max(...past.map(p=>toNum(p.weight)));
     const bestReps = Math.max(...past.map(p=>toNum(p.reps)));
     const bestVolume = Math.max(...past.map(exerciseVolume));
@@ -1382,6 +1642,29 @@
     hintEl.innerHTML = `<span class="bh-boss">⚔ Boss to beat: ${bestWeight>0?bestWeight+'kg · ':''}${bestReps>0?bestReps+' reps · ':''}${bestVolume>0?bestVolume+' vol':''}</span>`;
   }
   function escapeAttr(v){ return (v===undefined||v===null) ? '' : String(v).replace(/"/g,'&quot;'); }
+
+  function isInclinedWalking(name){
+    return !!name && name.trim().toLowerCase() === 'inclined walking';
+  }
+
+  // Every unique exercise name ever logged, most-recently-used first, for autocomplete.
+  function getKnownExerciseNames(){
+    const seen = new Map(); // lowercase -> {name, lastUsed}
+    function scan(days, order){
+      Object.values(days).forEach(day=>{
+        (day.exercises||[]).forEach(ex=>{
+          if(!ex.name || !ex.name.trim()) return;
+          const key = ex.name.trim().toLowerCase();
+          if(!seen.has(key) || seen.get(key).order < order){
+            seen.set(key, { name: ex.name.trim(), order });
+          }
+        });
+      });
+    }
+    state.history.forEach((rec, i)=> scan(rec.days, i));
+    scan(state.days, state.history.length); // live week is most recent
+    return Array.from(seen.values()).sort((a,b)=> b.order - a.order).map(v=>v.name);
+  }
 
   document.getElementById('addExBtn').onclick = ()=>{
     exRows.push({name:'',sets:'',reps:'',weight:''});
@@ -1441,9 +1724,23 @@
 
   // Compares one freshly-logged exercise against its best prior instance.
   // Returns null if there's no prior data (first time = nothing to beat yet).
+  // Inclined Walking uses its own metrics (minutes, incline%) since sets/reps/weight
+  // don't apply to it.
   function evaluateBossFight(ex, excludeHistoryIdx, excludeDayIndex){
     const past = collectPastInstances(ex.name, excludeHistoryIdx, excludeDayIndex);
     if(!past.length) return null;
+
+    if(isInclinedWalking(ex.name)){
+      const bestMinutes = Math.max(...past.map(p=>toNum(p.minutes)));
+      const bestIncline = Math.max(...past.map(p=>toNum(p.incline)));
+      const curMinutes = toNum(ex.minutes);
+      const curIncline = toNum(ex.incline);
+      const beatMinutes = curMinutes > 0 && curMinutes > bestMinutes;
+      const beatIncline = curIncline > 0 && curIncline > bestIncline;
+      const won = beatMinutes || beatIncline;
+      const flawless = beatMinutes && beatIncline;
+      return { name: ex.name, won, flawless, beatMinutes, beatIncline, bestMinutes, bestIncline, curMinutes, curIncline, isWalking:true };
+    }
 
     const bestVolume = Math.max(...past.map(exerciseVolume));
     const bestWeight = Math.max(...past.map(p=>toNum(p.weight)));
@@ -1552,12 +1849,31 @@
   // ---------------------------------------------------------------------
   // Week completion
   // ---------------------------------------------------------------------
+  // Hitting the target no longer force-closes the week. It's too easy to
+  // accidentally log the wrong day and get locked out of fixing it. Instead
+  // we surface a dismissable nudge; the week only archives when the user
+  // explicitly confirms via the "Close out week" action in that nudge or
+  // taps "Start new week" from the summary.
   function maybeOfferWeekComplete(){
     const doneCount = Object.values(state.days).filter(d=>d.status==='done').length;
     if(doneCount >= state.target){
-      finalizeWeek();
+      offerWeekCloseOut();
     }
   }
+
+  function offerWeekCloseOut(){
+    const banner = document.getElementById('weekCloseBanner');
+    banner.classList.add('show');
+  }
+
+  document.getElementById('dismissWeekClose').onclick = ()=>{
+    document.getElementById('weekCloseBanner').classList.remove('show');
+  };
+
+  document.getElementById('confirmWeekClose').onclick = ()=>{
+    document.getElementById('weekCloseBanner').classList.remove('show');
+    finalizeWeek();
+  };
 
   function finalizeWeek(){
     archiveWeek(true);
@@ -1629,7 +1945,7 @@
     const currentStart = new Date(state.weekStartISO);
     currentStart.setDate(currentStart.getDate() + 7);
     state.weekStartISO = startOfWeekISO(currentStart);
-    state.days = buildEmptyDays();
+    state.days = applyPendingMakeups(buildEmptyDays());
     saveState();
     document.getElementById('summaryScrim').classList.remove('show');
     render();
