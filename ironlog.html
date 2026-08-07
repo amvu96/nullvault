@@ -1,0 +1,1874 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>IRON LOG — Weekly Training Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#141311;
+    --iron:#232120;
+    --iron-2:#2e2b29;
+    --iron-3:#3a3633;
+    --chalk:#f2efe9;
+    --chalk-dim:#c9c4ba;
+    --chalk-faint:#8a8580;
+    --rust:#e8482c;
+    --rust-dim:#a13623;
+    --brass:#c9a06a;
+    --brass-dim:#8a7150;
+    --line:rgba(242,239,233,0.10);
+    --radius:14px;
+    --shadow-deep: 0 20px 50px rgba(0,0,0,0.45);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(1200px 600px at 15% -10%, rgba(232,72,44,0.08), transparent 60%),
+      radial-gradient(900px 500px at 100% 0%, rgba(201,160,106,0.06), transparent 55%),
+      var(--ink);
+    color:var(--chalk);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  ::selection{background:var(--rust); color:var(--chalk);}
+
+  h1,h2,h3, .num, .plate-count, .streak-num{
+    font-family:'Oswald',sans-serif;
+    text-transform:uppercase;
+    letter-spacing:0.02em;
+  }
+  .mono{font-family:'JetBrains Mono',monospace;}
+
+  button{font-family:inherit; cursor:pointer;}
+  input, select, textarea{font-family:inherit;}
+
+  /* ---------- Topbar ---------- */
+  .topbar{
+    position:sticky; top:0; z-index:40;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:16px 20px;
+    background:linear-gradient(180deg, var(--ink) 60%, rgba(20,19,17,0.85));
+    backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--line);
+  }
+  .burger{
+    width:42px; height:42px; border-radius:10px;
+    background:var(--iron); border:1px solid var(--line);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px;
+    transition:background .15s ease, transform .15s ease;
+    position:relative;
+  }
+  .burger:hover{background:var(--iron-2);}
+  .burger:active{transform:scale(0.94);}
+  .burger span{width:18px; height:2px; background:var(--chalk); border-radius:2px; display:block;}
+  .broken-badge{
+    position:absolute; top:-6px; right:-6px;
+    min-width:19px; height:19px; padding:0 4px; border-radius:999px;
+    background:var(--rust); color:var(--chalk);
+    font-family:'Oswald'; font-size:11px; font-weight:700;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 0 0 2px var(--ink);
+    animation:brokenPulse 2s ease-in-out infinite;
+  }
+  @keyframes brokenPulse{
+    0%,100%{ box-shadow:0 0 0 2px var(--ink), 0 0 0 0 rgba(232,72,44,0.5); }
+    50%{ box-shadow:0 0 0 2px var(--ink), 0 0 0 5px rgba(232,72,44,0); }
+  }
+
+  .xp-chip{
+    display:flex; align-items:center; gap:5px;
+    padding:6px 11px; border-radius:999px;
+    background:var(--iron); border:1px solid var(--line);
+    font-family:'JetBrains Mono'; font-size:12px; color:var(--brass); font-weight:500;
+  }
+
+  .brand{display:flex; align-items:center; gap:10px;}
+  .brand-mark{
+    width:30px; height:30px; border-radius:50%;
+    background:conic-gradient(from 220deg, var(--rust), var(--brass), var(--rust));
+    box-shadow: inset 0 0 0 5px var(--ink), inset 0 0 0 6px rgba(242,239,233,0.15);
+  }
+  .brand-name{font-size:18px; font-weight:600; letter-spacing:0.08em;}
+  .brand-name b{color:var(--rust);}
+
+  .auth-chip{
+    display:flex; align-items:center; gap:8px;
+    padding:6px 12px 6px 6px; border-radius:999px;
+    background:var(--iron); border:1px solid var(--line);
+    font-size:13px; color:var(--chalk-dim);
+  }
+  .auth-chip img, .auth-chip .avatar{
+    width:26px; height:26px; border-radius:50%;
+    background:var(--iron-3);
+    display:flex; align-items:center; justify-content:center;
+    font-size:11px; font-weight:700; color:var(--chalk);
+  }
+
+  /* ---------- Sidebar ---------- */
+  .scrim{
+    position:fixed; inset:0; background:rgba(0,0,0,0.55);
+    opacity:0; pointer-events:none; transition:opacity .25s ease; z-index:50;
+  }
+  .scrim.show{opacity:1; pointer-events:auto;}
+
+  .sidebar{
+    position:fixed; top:0; left:0; bottom:0; width:300px; max-width:85vw;
+    background:var(--iron); border-right:1px solid var(--line);
+    transform:translateX(-100%); transition:transform .3s cubic-bezier(.2,.9,.25,1);
+    z-index:60; display:flex; flex-direction:column;
+    box-shadow:var(--shadow-deep);
+  }
+  .sidebar.open{transform:translateX(0);}
+  .sidebar-head{
+    padding:20px; border-bottom:1px solid var(--line);
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .sidebar-head h2{font-size:16px; margin:0; color:var(--chalk-dim); letter-spacing:0.12em;}
+
+  .broken-banner{
+    margin:0 16px 4px; padding:14px; border-radius:12px;
+    background:linear-gradient(135deg, rgba(232,72,44,0.16), rgba(232,72,44,0.06));
+    border:1px solid var(--rust-dim);
+    display:flex; align-items:center; gap:12px;
+  }
+  .broken-banner .bb-icon{font-size:22px;}
+  .broken-banner .bb-count{font-family:'Oswald'; font-size:15px; letter-spacing:0.02em; color:#ff8a75;}
+  .broken-banner .bb-sub{font-size:11px; color:var(--chalk-faint); margin-top:2px; line-height:1.4;}
+  .icon-btn{
+    width:32px; height:32px; border-radius:8px; border:1px solid var(--line);
+    background:transparent; color:var(--chalk-dim); font-size:16px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .icon-btn:hover{background:var(--iron-2); color:var(--chalk);}
+
+  .sidebar-body{padding:16px; overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:6px;}
+  .side-item{
+    display:flex; align-items:center; gap:12px;
+    padding:12px 12px; border-radius:10px;
+    background:transparent; border:none; color:var(--chalk); text-align:left;
+    font-size:14px; font-weight:500;
+  }
+  .side-item:hover{background:var(--iron-2);}
+  .side-item .ic{width:20px; text-align:center; opacity:.8;}
+  .side-divider{height:1px; background:var(--line); margin:10px 4px;}
+
+  .side-panel{display:none; flex-direction:column; gap:14px; padding:4px 4px 20px;}
+  .side-panel.active{display:flex;}
+
+  /* Calendar */
+  .cal-nav{display:flex; align-items:center; justify-content:space-between;}
+  .cal-month-label{font-family:'Oswald'; font-size:15px; letter-spacing:0.06em; color:var(--chalk);}
+  .cal-legend{display:flex; gap:14px; font-size:11px; color:var(--chalk-faint); flex-wrap:wrap;}
+  .cal-legend span{display:flex; align-items:center; gap:5px;}
+  .cal-dot{width:8px; height:8px; border-radius:50%; display:inline-block; background:var(--iron-3);}
+  .cal-dot.done{background:var(--brass);}
+  .cal-dot.missed{background:var(--rust);}
+  .cal-dot.today{background:transparent; border:1.5px solid var(--chalk);}
+  .cal-weekday-row{display:grid; grid-template-columns:repeat(7,1fr); text-align:center; font-size:10px; color:var(--chalk-faint); letter-spacing:0.06em; padding:0 2px;}
+  .cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:4px;}
+  .cal-cell{
+    aspect-ratio:1; border-radius:8px; background:var(--iron-2); border:1px solid transparent;
+    display:flex; align-items:center; justify-content:center; position:relative;
+    font-size:12px; color:var(--chalk-dim); font-family:'JetBrains Mono';
+  }
+  .cal-cell.empty{background:transparent;}
+  .cal-cell.today{border-color:var(--chalk);}
+  .cal-cell.done{background:linear-gradient(145deg, var(--brass), var(--brass-dim)); color:var(--ink); font-weight:700;}
+  .cal-cell.missed{background:linear-gradient(145deg, var(--rust), var(--rust-dim)); color:var(--chalk); font-weight:700;}
+  .cal-cell.future{opacity:0.4;}
+  .cal-cell.clickable{cursor:pointer;}
+  .cal-cell.clickable:hover{outline:1px solid var(--chalk-faint);}
+  .cal-cell.has-note::after{
+    content:''; position:absolute; bottom:3px; width:4px; height:4px; border-radius:50%;
+    background:currentColor; opacity:0.7;
+  }
+  .field-label{font-size:11px; text-transform:uppercase; letter-spacing:0.1em; color:var(--chalk-faint); margin-bottom:6px; display:block;}
+  .field-input{
+    width:100%; padding:10px 12px; border-radius:8px;
+    background:var(--iron-2); border:1px solid var(--line); color:var(--chalk); font-size:14px;
+  }
+  .field-input:focus{outline:2px solid var(--rust); outline-offset:1px;}
+  .stepper{display:flex; align-items:center; gap:12px;}
+  .stepper button{
+    width:36px; height:36px; border-radius:8px; background:var(--iron-2); border:1px solid var(--line);
+    color:var(--chalk); font-size:16px; font-weight:700;
+  }
+  .stepper button:hover{background:var(--iron-3);}
+  .stepper .val{font-family:'Oswald'; font-size:22px; min-width:28px; text-align:center;}
+
+  .day-toggle-row{display:flex; flex-wrap:wrap; gap:6px;}
+  .day-toggle{
+    width:38px; height:38px; border-radius:8px; background:var(--iron-2); border:1px solid var(--line);
+    color:var(--chalk-dim); font-size:11px; font-weight:700;
+  }
+  .day-toggle.active{background:var(--rust); border-color:var(--rust); color:var(--chalk);}
+
+  .btn{
+    padding:11px 16px; border-radius:9px; border:1px solid var(--line);
+    background:var(--iron-2); color:var(--chalk); font-size:13px; font-weight:600;
+    letter-spacing:0.03em; display:flex; align-items:center; justify-content:center; gap:8px;
+  }
+  .btn:hover{background:var(--iron-3);}
+  .btn-primary{background:var(--rust); border-color:var(--rust); color:var(--chalk);}
+  .btn-primary:hover{background:#ff5236;}
+  .btn-google{background:var(--chalk); color:var(--ink); border-color:var(--chalk);}
+  .btn-google:hover{background:#ffffff;}
+  .btn-ghost{background:transparent;}
+  .btn-danger{background:transparent; border-color:var(--rust-dim); color:#ff8a75;}
+  .btn-danger:hover{background:rgba(232,72,44,0.1);}
+  .btn-block{width:100%;}
+
+  .sidebar-foot{padding:16px 20px; border-top:1px solid var(--line); font-size:11px; color:var(--chalk-faint); display:flex; justify-content:space-between; align-items:center;}
+
+  /* ---------- Main ---------- */
+  main{max-width:720px; margin:0 auto; padding:28px 20px 100px;}
+
+  .hero{margin-bottom:34px;}
+  .eyebrow{font-size:12px; color:var(--brass); letter-spacing:0.18em; text-transform:uppercase; font-weight:600; margin-bottom:8px; display:block;}
+  .hero h1{font-size:clamp(30px,7vw,44px); margin:0 0 6px; line-height:1;}
+  .hero p{color:var(--chalk-dim); font-size:15px; margin:0; max-width:46ch;}
+
+  /* Plate week strip — signature element */
+  .plate-strip{
+    display:flex; align-items:flex-end; gap:14px; padding:26px 6px 10px;
+    overflow-x:auto;
+  }
+  .plate-wrap{display:flex; flex-direction:column; align-items:center; gap:10px; flex-shrink:0;}
+  .plate{
+    width:64px; height:64px; border-radius:50%;
+    position:relative;
+    background: var(--iron-2);
+    border:3px solid var(--iron-3);
+    display:flex; align-items:center; justify-content:center;
+    transition:transform .2s ease, background .3s ease, border-color .3s ease, box-shadow .3s ease;
+  }
+  .plate::after{
+    content:''; position:absolute; inset:14px; border-radius:50%;
+    border:2px solid rgba(0,0,0,0.25);
+  }
+  .plate .pnum{font-family:'Oswald'; font-size:13px; color:var(--chalk-faint); z-index:1; font-weight:600;}
+  .plate.today{border-color:var(--brass); box-shadow:0 0 0 3px rgba(201,160,106,0.15);}
+  .plate.done{
+    background:linear-gradient(145deg, var(--brass), var(--brass-dim));
+    border-color:var(--brass);
+  }
+  .plate.done .pnum{color:var(--ink);}
+  .plate.missed{
+    background:linear-gradient(145deg, var(--rust), var(--rust-dim));
+    border-color:var(--rust);
+  }
+  .plate.missed .pnum{color:var(--chalk);}
+  .plate.rest{opacity:0.35;}
+  .plate-btn{background:none; border:none; padding:0;}
+  .plate-btn:active .plate{transform:scale(0.92);}
+  .plate-label{font-size:10px; text-transform:uppercase; letter-spacing:0.08em; color:var(--chalk-faint); font-weight:600;}
+
+  .stat-row{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:28px 0;}
+  .stat-card{
+    background:var(--iron); border:1px solid var(--line); border-radius:12px; padding:16px 14px;
+  }
+  .stat-card .stat-num{font-family:'Oswald'; font-size:28px; line-height:1; color:var(--chalk);}
+  .stat-card.accent .stat-num{color:var(--brass);}
+  .stat-card .stat-label{font-size:11px; color:var(--chalk-faint); text-transform:uppercase; letter-spacing:0.08em; margin-top:6px;}
+
+  .section-head{display:flex; align-items:center; justify-content:space-between; margin:36px 0 14px;}
+  .section-head h3{font-size:13px; color:var(--chalk-faint); letter-spacing:0.14em; margin:0;}
+
+  .log-list{display:flex; flex-direction:column; gap:10px;}
+  .log-card{
+    background:var(--iron); border:1px solid var(--line); border-radius:12px; padding:16px;
+    display:flex; flex-direction:column; gap:10px;
+  }
+  .log-card-head{display:flex; align-items:center; justify-content:space-between;}
+  .log-card-head .day-name{font-family:'Oswald'; font-size:16px; letter-spacing:0.04em;}
+  .badge{font-size:10px; padding:3px 9px; border-radius:999px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase;}
+  .badge.done{background:rgba(201,160,106,0.18); color:var(--brass);}
+  .badge.missed{background:rgba(232,72,44,0.18); color:#ff8a75;}
+  .badge.pending{background:rgba(242,239,233,0.08); color:var(--chalk-faint);}
+  .excuse-note{font-size:13px; color:var(--chalk-dim); font-style:italic; border-left:2px solid var(--rust-dim); padding-left:10px;}
+  .exercise-chip-row{display:flex; flex-wrap:wrap; gap:6px;}
+  .exercise-chip{
+    font-size:12px; background:var(--iron-2); border:1px solid var(--line); border-radius:7px; padding:5px 9px;
+    color:var(--chalk-dim); display:flex; align-items:center; gap:6px;
+  }
+  .exercise-chip .ew{color:var(--chalk-faint); font-family:'JetBrains Mono'; font-size:11px;}
+  .empty-hint{font-size:13px; color:var(--chalk-faint);}
+
+  .fab-log{
+    position:fixed; right:20px; bottom:24px; z-index:30;
+    width:auto; padding:14px 20px; border-radius:999px;
+    background:var(--rust); color:var(--chalk); border:none;
+    font-weight:700; font-size:14px; letter-spacing:0.02em;
+    box-shadow:0 10px 28px rgba(232,72,44,0.35);
+    display:flex; align-items:center; gap:8px;
+  }
+  .fab-log:hover{background:#ff5236;}
+  .fab-log:active{transform:scale(0.97);}
+
+  /* ---------- Modals ---------- */
+  .modal-scrim{
+    position:fixed; inset:0; background:rgba(10,9,8,0.72); backdrop-filter:blur(3px);
+    display:none; align-items:flex-end; justify-content:center; z-index:100;
+  }
+  .modal-scrim.show{display:flex;}
+  #logScrim{ z-index:110; } /* must sit above historyDetailScrim when editing a past-week day */
+  @media(min-width:640px){ .modal-scrim{align-items:center;} }
+
+  .modal{
+    width:100%; max-width:460px; background:var(--iron);
+    border:1px solid var(--line); border-top-left-radius:20px; border-top-right-radius:20px;
+    padding:26px 22px 28px; box-shadow:var(--shadow-deep);
+    animation:slideUp .28s cubic-bezier(.2,.9,.25,1);
+    max-height:88vh; overflow-y:auto;
+  }
+  @media(min-width:640px){ .modal{border-radius:18px;} }
+  @keyframes slideUp{ from{transform:translateY(24px); opacity:0;} to{transform:translateY(0); opacity:1;} }
+
+  .modal.urgent{border:1px solid var(--rust-dim); box-shadow:0 0 0 1px rgba(232,72,44,0.15), var(--shadow-deep);}
+  .modal-icon{
+    width:48px; height:48px; border-radius:50%; background:rgba(232,72,44,0.15);
+    display:flex; align-items:center; justify-content:center; font-size:22px; margin-bottom:14px;
+  }
+  .modal h2{font-size:22px; margin:0 0 6px;}
+  .modal p.sub{color:var(--chalk-dim); font-size:14px; margin:0 0 20px; line-height:1.5;}
+
+  .option-list{display:flex; flex-direction:column; gap:10px; margin-bottom:6px;}
+  .option-card{
+    text-align:left; background:var(--iron-2); border:1px solid var(--line); border-radius:11px;
+    padding:14px; display:flex; align-items:center; gap:12px; color:var(--chalk);
+  }
+  .option-card:hover{background:var(--iron-3); border-color:var(--brass-dim);}
+  .option-card .oc-ic{font-size:18px; width:26px; text-align:center;}
+  .option-card .oc-text b{display:block; font-size:14px;}
+  .option-card .oc-text span{font-size:12px; color:var(--chalk-faint);}
+
+  .day-pick-row{display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:14px 0 18px;}
+  .day-pick{
+    padding:12px 4px; border-radius:9px; background:var(--iron-2); border:1px solid var(--line);
+    color:var(--chalk-dim); font-size:12px; font-weight:700;
+  }
+  .day-pick.disabled{opacity:0.3; pointer-events:none;}
+  .day-pick.selected{background:var(--brass); border-color:var(--brass); color:var(--ink);}
+
+  .textarea-block{margin-bottom:16px;}
+  textarea.field-input{min-height:90px; resize:vertical; line-height:1.5;}
+
+  .modal-actions{display:flex; gap:10px; margin-top:6px;}
+  .modal-actions .btn{flex:1;}
+
+  /* Exercise log modal */
+  .ex-row{display:flex; gap:8px; align-items:center; background:var(--iron-2); border:1px solid var(--line); border-radius:10px; padding:10px;}
+  .ex-row input{background:transparent; border:none; color:var(--chalk); font-size:13px; padding:4px;}
+  .ex-row input:focus{outline:none;}
+  .ex-row .ex-name{flex:2; min-width:0;}
+  .ex-row .ex-sets, .ex-row .ex-reps, .ex-row .ex-weight{flex:1; width:0; text-align:center;}
+  .ex-row .rm{background:none; border:none; color:var(--chalk-faint); font-size:16px; padding:2px 6px; flex:0;}
+  .ex-row .rm:hover{color:var(--rust);}
+  .ex-row-wrap{display:flex; flex-direction:column; gap:4px;}
+  .boss-hint{font-size:11px; padding:0 4px; font-family:'JetBrains Mono';}
+  .boss-hint .bh-boss{color:var(--brass);}
+  .boss-hint .bh-new{color:var(--chalk-faint);}
+  .ex-head-row{display:flex; gap:8px; padding:0 10px; font-size:10px; text-transform:uppercase; letter-spacing:0.06em; color:var(--chalk-faint); margin-top:14px; margin-bottom:6px;}
+  .ex-head-row span:nth-child(1){flex:2;}
+  .ex-head-row span:nth-child(2), .ex-head-row span:nth-child(3), .ex-head-row span:nth-child(4){flex:1; text-align:center;}
+  .ex-list{display:flex; flex-direction:column; gap:8px; max-height:34vh; overflow-y:auto; padding-right:2px;}
+  .add-ex-btn{margin-top:10px; width:100%; padding:10px; border-radius:9px; border:1px dashed var(--line); background:transparent; color:var(--chalk-faint); font-size:13px;}
+  .add-ex-btn:hover{color:var(--chalk); border-color:var(--chalk-faint);}
+
+  /* Week summary */
+  .summary-hero{text-align:center; padding:6px 0 18px;}
+  .summary-hero .ring{
+    width:120px; height:120px; margin:0 auto 14px; border-radius:50%; position:relative;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .summary-hero .ring svg{position:absolute; inset:0; transform:rotate(-90deg);}
+  .summary-hero .ring .pct{font-family:'Oswald'; font-size:30px; z-index:1;}
+  .summary-hero h2{margin:0 0 4px;}
+  .summary-hero p{color:var(--chalk-dim); font-size:13px; margin:0;}
+  .summary-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:18px 0;}
+  .summary-grid .sg-card{background:var(--iron-2); border:1px solid var(--line); border-radius:10px; padding:12px;}
+  .summary-grid .sg-num{font-family:'Oswald'; font-size:22px;}
+  .summary-grid .sg-label{font-size:11px; color:var(--chalk-faint); text-transform:uppercase; letter-spacing:0.06em; margin-top:2px;}
+  .summary-excuses{margin-top:6px;}
+  .summary-excuses .se-item{font-size:12px; color:var(--chalk-dim); padding:8px 0; border-bottom:1px solid var(--line);}
+  .summary-excuses .se-item:last-child{border-bottom:none;}
+  .summary-excuses .se-item b{color:var(--chalk);}
+
+  .toast{
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px);
+    background:var(--iron-2); border:1px solid var(--line); color:var(--chalk);
+    padding:12px 18px; border-radius:10px; font-size:13px; opacity:0; pointer-events:none;
+    transition:all .25s ease; z-index:200; box-shadow:var(--shadow-deep);
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:0.01ms !important; transition-duration:0.01ms !important;}
+  }
+
+  .signin-note{font-size:12px; color:var(--chalk-faint); line-height:1.6; background:var(--iron-2); border:1px solid var(--line); border-radius:10px; padding:12px;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div style="display:flex; align-items:center; gap:14px;">
+    <button class="burger" id="burgerBtn" aria-label="Open menu">
+      <span></span><span></span><span></span>
+      <span class="broken-badge" id="brokenBadge" style="display:none;">0</span>
+    </button>
+    <div class="brand">
+      <div class="brand-mark"></div>
+      <div class="brand-name">IRON<b>LOG</b></div>
+    </div>
+  </div>
+  <div style="display:flex; align-items:center; gap:10px;">
+    <div class="xp-chip" id="xpChip" title="Lifetime XP">
+      <span>⚡</span><span id="xpVal">0</span>
+    </div>
+    <button class="auth-chip" id="authChip">
+      <span class="avatar" id="avatarInitial">?</span>
+      <span id="authChipText">Sign in</span>
+    </button>
+  </div>
+</div>
+
+<div class="scrim" id="scrim"></div>
+
+<aside class="sidebar" id="sidebar" aria-label="Menu">
+  <div class="sidebar-head">
+    <h2>Menu</h2>
+    <button class="icon-btn" id="closeSidebar" aria-label="Close menu">✕</button>
+  </div>
+  <div class="broken-banner" id="brokenBanner" style="display:none;">
+    <span class="bb-icon">💔</span>
+    <div>
+      <div class="bb-count" id="brokenBannerCount">0 broken promises</div>
+      <div class="bb-sub">Sessions you committed to and never made up</div>
+    </div>
+  </div>
+  <div class="sidebar-body">
+
+    <button class="side-item" data-panel="panelMain">
+      <span class="ic">🏠</span> Overview
+    </button>
+    <button class="side-item" data-panel="panelSchedule">
+      <span class="ic">📅</span> Weekly Schedule
+    </button>
+    <button class="side-item" data-panel="panelAccount">
+      <span class="ic">👤</span> Account & Sync
+    </button>
+    <button class="side-item" data-panel="panelHistory">
+      <span class="ic">📜</span> Past Weeks
+    </button>
+    <button class="side-item" data-panel="panelCalendar">
+      <span class="ic">🗓️</span> Calendar
+    </button>
+    <div class="side-divider"></div>
+
+    <!-- Overview panel -->
+    <div class="side-panel active" id="panelMain">
+      <p class="empty-hint">Set your weekly gym-day target and manage sign-in from here. Tap a menu item above to jump to a section.</p>
+    </div>
+
+    <!-- Schedule / settings panel -->
+    <div class="side-panel" id="panelSchedule">
+      <div>
+        <span class="field-label">Gym days per week</span>
+        <div class="stepper">
+          <button id="stepDown">−</button>
+          <span class="val" id="targetVal">3</span>
+          <button id="stepUp">+</button>
+        </div>
+      </div>
+      <div>
+        <span class="field-label">Preferred days (optional)</span>
+        <div class="day-toggle-row" id="preferredDays">
+          <button class="day-toggle" data-day="0">M</button>
+          <button class="day-toggle" data-day="1">T</button>
+          <button class="day-toggle" data-day="2">W</button>
+          <button class="day-toggle" data-day="3">T</button>
+          <button class="day-toggle" data-day="4">F</button>
+          <button class="day-toggle" data-day="5">S</button>
+          <button class="day-toggle" data-day="6">S</button>
+        </div>
+        <p class="empty-hint" style="margin-top:8px;">Highlighting a day is just a personal reminder — you can still log or move any day.</p>
+      </div>
+      <button class="btn btn-primary btn-block" id="saveSchedule">Save schedule</button>
+    </div>
+
+    <!-- Account panel -->
+    <div class="side-panel" id="panelAccount">
+      <div id="signedOutBlock">
+        <p class="empty-hint" style="margin-bottom:10px;">Sign in with Google to sync your settings and history across devices via Firebase.</p>
+        <button class="btn btn-google btn-block" id="googleSignInBtn">
+          <span style="font-size:15px;">G</span> Continue with Google
+        </button>
+        <div class="signin-note" style="margin-top:12px;">
+          This demo ships without a live Firebase project connected. See the "Firebase setup" note in the code comments to connect your own project — once configured, this button performs a real Google sign-in and syncs data to Firestore.
+        </div>
+      </div>
+      <div id="signedInBlock" style="display:none;">
+        <div class="log-card" style="flex-direction:row; align-items:center; gap:12px;">
+          <span class="avatar" id="avatarInitialLarge" style="width:40px;height:40px;font-size:14px;">?</span>
+          <div>
+            <div style="font-weight:600; font-size:14px;" id="userName">—</div>
+            <div style="font-size:12px; color:var(--chalk-faint);" id="userEmail">—</div>
+          </div>
+        </div>
+        <button class="btn btn-danger btn-block" id="signOutBtn" style="margin-top:12px;">Sign out</button>
+      </div>
+    </div>
+
+    <!-- History panel -->
+    <div class="side-panel" id="panelHistory">
+      <div id="historyList" class="log-list">
+        <p class="empty-hint">No completed weeks yet. Finish your first week to see it here.</p>
+      </div>
+    </div>
+
+    <!-- Calendar panel -->
+    <div class="side-panel" id="panelCalendar">
+      <div class="cal-nav">
+        <button class="icon-btn" id="calPrevBtn" aria-label="Previous month">‹</button>
+        <span class="cal-month-label" id="calMonthLabel">Month Year</span>
+        <button class="icon-btn" id="calNextBtn" aria-label="Next month">›</button>
+      </div>
+      <div class="cal-legend">
+        <span><i class="cal-dot done"></i> Done</span>
+        <span><i class="cal-dot missed"></i> Missed</span>
+        <span><i class="cal-dot today"></i> Today</span>
+      </div>
+      <div class="cal-weekday-row">
+        <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+    </div>
+
+  </div>
+  <div class="sidebar-foot">
+    <span>Iron Log v1.0</span>
+    <span class="mono" id="dataMode">local</span>
+  </div>
+</aside>
+
+<main>
+  <div class="hero">
+    <span class="eyebrow" id="weekRangeLabel">This Week</span>
+    <h1>Show up. Log it.</h1>
+    <p>Track your gym days like plates on a bar — every session fills one in. Miss one and you'll need to explain yourself before you can move on.</p>
+  </div>
+
+  <div class="plate-strip" id="plateStrip"></div>
+
+  <div class="stat-row">
+    <div class="stat-card accent">
+      <div class="stat-num" id="statCompleted">0</div>
+      <div class="stat-label">Completed</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num" id="statTarget">3</div>
+      <div class="stat-label">Target</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num" id="statStreak">0</div>
+      <div class="stat-label">Week streak</div>
+    </div>
+  </div>
+
+  <div class="section-head">
+    <h3>THIS WEEK'S LOG</h3>
+  </div>
+  <div class="log-list" id="weekLogList"></div>
+
+</main>
+
+<button class="fab-log" id="fabLog">🏋️ Log today's session</button>
+
+<!-- Getting started onboarding -->
+<div class="modal-scrim" id="onboardScrim">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="onboardTitle">
+    <div id="onboardStep1">
+      <div class="modal-icon" style="background:rgba(201,160,106,0.15);">🏋️</div>
+      <h2 id="onboardTitle">Welcome to Iron Log</h2>
+      <p class="sub">A quick setup, then you're training. First: how many days a week do you want to hit the gym?</p>
+
+      <div style="display:flex; align-items:center; justify-content:center; gap:20px; margin:26px 0 8px;">
+        <button class="stepper-btn" id="obStepDown" style="width:44px;height:44px;border-radius:10px;background:var(--iron-2);border:1px solid var(--line);color:var(--chalk);font-size:20px;font-weight:700;">−</button>
+        <div style="text-align:center;">
+          <div class="num" id="obTargetVal" style="font-size:44px; line-height:1; color:var(--brass);">3</div>
+          <div class="plate-label" style="margin-top:4px;">days / week</div>
+        </div>
+        <button class="stepper-btn" id="obStepUp" style="width:44px;height:44px;border-radius:10px;background:var(--iron-2);border:1px solid var(--line);color:var(--chalk);font-size:20px;font-weight:700;">+</button>
+      </div>
+
+      <div class="modal-actions" style="margin-top:24px;">
+        <button class="btn btn-primary btn-block" id="obNextBtn">Continue</button>
+      </div>
+    </div>
+
+    <div id="onboardStep2" style="display:none;">
+      <div class="modal-icon" style="background:rgba(201,160,106,0.15);">📅</div>
+      <h2>Pick your training days</h2>
+      <p class="sub" id="obDaysSub">Choose 3 days you'd like to train. You can always change this later in the Weekly Schedule menu.</p>
+
+      <div class="day-pick-row" id="obDayPickRow" style="grid-template-columns:repeat(7,1fr);"></div>
+
+      <div class="modal-actions" style="margin-top:20px;">
+        <button class="btn btn-ghost" id="obBackBtn">Back</button>
+        <button class="btn btn-primary" id="obFinishBtn">Start training</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Missed day modal (non-dismissable) -->
+<div class="modal-scrim" id="missedScrim">
+  <div class="modal urgent" role="dialog" aria-modal="true" aria-labelledby="missedTitle">
+    <div class="modal-icon">⚠️</div>
+    <h2 id="missedTitle">You missed a gym day</h2>
+    <p class="sub" id="missedSub">Yesterday was set as a training day and it wasn't logged. Explain what happened, then choose how to move forward.</p>
+
+    <div class="textarea-block">
+      <span class="field-label">What happened?</span>
+      <textarea class="field-input" id="excuseText" placeholder="e.g. Work ran late, wasn't feeling well, traveling..."></textarea>
+    </div>
+
+    <div class="option-list">
+      <button class="option-card" id="pickAnotherDayBtn">
+        <span class="oc-ic">🔁</span>
+        <span class="oc-text"><b>Reschedule this session</b><span>Pick another open day this week to make it up</span></span>
+      </button>
+      <button class="option-card" id="markCompleteBtn">
+        <span class="oc-ic">✅</span>
+        <span class="oc-text"><b>Mark week complete anyway</b><span>Close out the week without making it up</span></span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Reschedule day picker -->
+<div class="modal-scrim" id="rescheduleScrim">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="rescheduleTitle">
+    <h2 id="rescheduleTitle">Pick a make-up day</h2>
+    <p class="sub">Choose a remaining open day this week to reschedule your missed session to.</p>
+    <div class="day-pick-row" id="dayPickRow"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="cancelReschedule">Back</button>
+      <button class="btn btn-primary" id="confirmReschedule">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- Exercise log modal -->
+<div class="modal-scrim" id="logScrim">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="logTitle">
+    <h2 id="logTitle">Log today's session</h2>
+    <p class="sub">Add every exercise you did — sets, reps, and weight are optional but help track progress.</p>
+
+    <div class="ex-head-row">
+      <span>Exercise</span><span>Sets</span><span>Reps</span><span>Wt</span>
+    </div>
+    <div class="ex-list" id="exList"></div>
+    <button class="add-ex-btn" id="addExBtn">+ Add exercise</button>
+
+    <div class="textarea-block" style="margin-top:16px;">
+      <span class="field-label">Notes (optional)</span>
+      <textarea class="field-input" id="sessionNotes" placeholder="How did it feel? Anything to remember for next time?" style="min-height:60px;"></textarea>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="cancelLog">Cancel</button>
+      <button class="btn btn-primary" id="saveLogBtn">Save session</button>
+    </div>
+  </div>
+</div>
+
+<!-- Week complete summary modal -->
+<div class="modal-scrim" id="summaryScrim">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="summaryTitle">
+    <div class="summary-hero">
+      <div class="ring" id="summaryRing">
+        <svg width="120" height="120" viewBox="0 0 120 120">
+          <circle cx="60" cy="60" r="52" fill="none" stroke="#3a3633" stroke-width="10"/>
+          <circle id="summaryArc" cx="60" cy="60" r="52" fill="none" stroke="#c9a06a" stroke-width="10" stroke-linecap="round" stroke-dasharray="327" stroke-dashoffset="327"/>
+        </svg>
+        <span class="pct" id="summaryPct">0%</span>
+      </div>
+      <h2 id="summaryTitle">Week complete</h2>
+      <p id="summarySub">Here's how it went.</p>
+    </div>
+    <div class="summary-grid">
+      <div class="sg-card"><div class="sg-num" id="sgCompleted">0</div><div class="sg-label">Sessions done</div></div>
+      <div class="sg-card"><div class="sg-num" id="sgMissed">0</div><div class="sg-label">Missed</div></div>
+      <div class="sg-card"><div class="sg-num" id="sgExercises">0</div><div class="sg-label">Exercises logged</div></div>
+      <div class="sg-card"><div class="sg-num" id="sgTarget">0</div><div class="sg-label">Target</div></div>
+    </div>
+    <div class="summary-excuses" id="summaryExcuses"></div>
+    <div class="modal-actions" style="margin-top:18px;">
+      <button class="btn btn-primary btn-block" id="startNewWeekBtn">Start new week</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Past week detail / edit modal -->
+<div class="modal-scrim" id="historyDetailScrim">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="historyDetailTitle">
+    <div class="modal-icon" style="background:rgba(201,160,106,0.15);">📜</div>
+    <h2 id="historyDetailTitle">Week</h2>
+    <p class="sub" id="historyDetailSub">Tap a day to add or edit exercises you logged.</p>
+    <div class="log-list" id="historyDayList"></div>
+    <div class="modal-actions" style="margin-top:18px;">
+      <button class="btn btn-primary btn-block" id="closeHistoryDetail">Done</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================================================
+   IRON LOG — Weekly Gym Tracker
+   -------------------------------------------------------------------------
+   FIREBASE SETUP (optional, for real Google sign-in + cross-device sync):
+   This app runs fully offline on localStorage by default. To connect a
+   real Firebase project:
+     1. Create a project at https://console.firebase.google.com
+     2. Enable Authentication > Google sign-in provider
+     3. Enable Firestore Database
+     4. Add the Firebase SDK script tags below <head> (firebase-app,
+        firebase-auth, firebase-firestore compat or modular SDK)
+     5. Paste your firebaseConfig into the CONFIG block below
+     6. Replace the mockGoogleSignIn() function with a real
+        signInWithPopup(auth, googleProvider) call, and replace
+        saveStateRemote()/loadStateRemote() with Firestore reads/writes
+        keyed by the signed-in user's uid.
+   Everything in this file is structured so those are the only swaps needed
+   — all state flows through loadState()/saveState() already.
+   ========================================================================= */
+
+  // ---- Firebase config placeholder (fill in to enable real sync) ----
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
+  const FIREBASE_ENABLED = false; // flip true once SDK + config are wired up
+
+  // ---------------------------------------------------------------------
+  // State
+  // ---------------------------------------------------------------------
+  // Week runs Monday(0) -> Sunday(6). All day indices in state use this order.
+  const DAY_NAMES = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  const DAY_SHORT = ['M','T','W','T','F','S','S'];
+  const STORAGE_KEY = 'ironlog_state_v2';
+
+  function defaultState(){
+    return {
+      onboarded: false,
+      target: 3,
+      preferredDays: [0,2,4], // Mon/Wed/Fri default (Monday-indexed)
+      weekStartISO: startOfWeekISO(new Date()),
+      days: buildEmptyDays(), // index 0-6 (Mon-Sun) -> {status, excuse, exercises, notes, movedFrom}
+      streak: 0,
+      history: [], // completed weeks
+      user: null,  // {name, email, uid}
+      xp: 0,               // lifetime XP earned by beating past performance
+      brokenPromises: 0    // lifetime count of target sessions a week fell short by
+    };
+  }
+
+  function buildEmptyDays(){
+    const days = {};
+    for(let i=0;i<7;i++){ days[i] = { status:'pending', excuse:null, exercises:[], notes:'', movedFrom:null }; }
+    return days;
+  }
+
+  // JS Date.getDay() is Sun=0..Sat=6. Convert to our Mon=0..Sun=6 index.
+  function toMondayIndex(jsDay){
+    return (jsDay + 6) % 7;
+  }
+
+  function startOfWeekISO(d){
+    const dt = new Date(d);
+    dt.setHours(0,0,0,0);
+    const diff = toMondayIndex(dt.getDay());
+    dt.setDate(dt.getDate() - diff);
+    return dt.toISOString();
+  }
+
+  let state = loadState();
+  ensureCurrentWeek();
+
+  function loadState(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(raw) return Object.assign(defaultState(), JSON.parse(raw));
+    }catch(e){}
+    return defaultState();
+  }
+
+  function saveState(){
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    // FIREBASE HOOK: if signed in and FIREBASE_ENABLED, also push to Firestore here.
+    // if (FIREBASE_ENABLED && state.user) saveStateRemote(state);
+  }
+
+  function ensureCurrentWeek(){
+    const currentStart = startOfWeekISO(new Date());
+    if(state.weekStartISO !== currentStart){
+      // New week began without explicit close-out (e.g. user returned late).
+      // Archive the previous week — even a week with zero activity still owes
+      // its full target in broken promises.
+      if(state.onboarded){
+        archiveWeek(false);
+      }
+      state.weekStartISO = currentStart;
+      state.days = buildEmptyDays();
+      saveState();
+    }
+  }
+
+  function hasAnyActivity(days){
+    return Object.values(days).some(d => d.status !== 'pending');
+  }
+
+  // ---------------------------------------------------------------------
+  // Date helpers
+  // ---------------------------------------------------------------------
+  function getWeekDates(){
+    const start = new Date(state.weekStartISO);
+    return Array.from({length:7}, (_,i)=>{
+      const d = new Date(start);
+      d.setDate(d.getDate()+i);
+      return d;
+    });
+  }
+  function todayIndex(){
+    return toMondayIndex(new Date().getDay());
+  }
+  function isPastDay(i){
+    return i < todayIndex();
+  }
+  function isFutureDay(i){
+    return i > todayIndex();
+  }
+
+  // ---------------------------------------------------------------------
+  // Rendering
+  // ---------------------------------------------------------------------
+  function render(){
+    renderWeekLabel();
+    renderPlates();
+    renderStats();
+    renderLogList();
+    renderHistory();
+    document.getElementById('targetVal').textContent = state.target;
+    document.getElementById('statTarget').textContent = state.target;
+    document.querySelectorAll('.day-toggle').forEach(btn=>{
+      const d = parseInt(btn.dataset.day,10);
+      btn.classList.toggle('active', state.preferredDays.includes(d));
+    });
+  }
+
+  function renderWeekLabel(){
+    const dates = getWeekDates();
+    const opts = {month:'short', day:'numeric'};
+    const label = `${dates[0].toLocaleDateString(undefined,opts)} – ${dates[6].toLocaleDateString(undefined,opts)}`;
+    document.getElementById('weekRangeLabel').textContent = `This Week · ${label}`;
+  }
+
+  function renderPlates(){
+    const strip = document.getElementById('plateStrip');
+    strip.innerHTML = '';
+    const dates = getWeekDates();
+    const scheduled = scheduledIndices();
+
+    for(let i=0;i<7;i++){
+      const day = state.days[i];
+      const wrap = document.createElement('div');
+      wrap.className = 'plate-wrap';
+
+      const btn = document.createElement('button');
+      btn.className = 'plate-btn';
+      btn.setAttribute('aria-label', `${DAY_NAMES[i]}: ${day.status}`);
+
+      const plate = document.createElement('div');
+      let cls = 'plate';
+      if(!scheduled.includes(i) && day.status==='pending') cls += ' rest';
+      if(day.status==='done') cls += ' done';
+      if(day.status==='missed') cls += ' missed';
+      if(i===todayIndex()) cls += ' today';
+      plate.className = cls;
+      plate.innerHTML = `<span class="pnum">${dates[i].getDate()}</span>`;
+
+      btn.appendChild(plate);
+      btn.onclick = ()=> handlePlateClick(i);
+
+      const label = document.createElement('span');
+      label.className = 'plate-label';
+      label.textContent = DAY_SHORT[i];
+
+      wrap.appendChild(btn);
+      wrap.appendChild(label);
+      strip.appendChild(wrap);
+    }
+  }
+
+  function scheduledIndices(){
+    // Which days are actually "gym days" this week: preferred days if enough are set,
+    // otherwise just treat status-bearing days as scheduled.
+    const explicit = Object.keys(state.days).filter(i=> state.days[i].status !== 'pending').map(Number);
+    const set = new Set([...state.preferredDays.slice(0, state.target), ...explicit]);
+    return Array.from(set);
+  }
+
+  function renderStats(){
+    const doneCount = Object.values(state.days).filter(d=>d.status==='done').length;
+    document.getElementById('statCompleted').textContent = doneCount;
+    document.getElementById('statStreak').textContent = state.streak;
+  }
+
+  function renderLogList(){
+    const list = document.getElementById('weekLogList');
+    list.innerHTML = '';
+    const dates = getWeekDates();
+    const scheduled = scheduledIndices();
+    const relevant = scheduled.length ? scheduled : [1,3,5];
+
+    if(relevant.every(i => state.days[i].status==='pending')){
+      list.innerHTML = `<p class="empty-hint">No sessions logged yet this week. Tap "Log today's session" once you've trained, or open Weekly Schedule to set your target days.</p>`;
+      return;
+    }
+
+    relevant.sort((a,b)=>a-b).forEach(i=>{
+      const day = state.days[i];
+      if(day.status==='pending' && !isPastDay(i) && i!==todayIndex()) return;
+      const card = document.createElement('div');
+      card.className = 'log-card';
+
+      let badge = `<span class="badge pending">Pending</span>`;
+      if(day.status==='done') badge = `<span class="badge done">Completed</span>`;
+      if(day.status==='missed') badge = `<span class="badge missed">Missed</span>`;
+
+      let inner = `
+        <div class="log-card-head">
+          <span class="day-name">${DAY_NAMES[i]} <span class="mono" style="color:var(--chalk-faint); font-size:11px;">${dates[i].toLocaleDateString(undefined,{month:'short',day:'numeric'})}</span></span>
+          ${badge}
+        </div>`;
+
+      if(day.movedFrom !== null && day.movedFrom !== undefined){
+        inner += `<div class="empty-hint">↳ Made up for missed ${DAY_NAMES[day.movedFrom]} session</div>`;
+      }
+      if(day.excuse){
+        inner += `<div class="excuse-note">"${escapeHtml(day.excuse)}"</div>`;
+      }
+      if(day.exercises && day.exercises.length){
+        inner += `<div class="exercise-chip-row">` + day.exercises.map(ex=>
+          `<span class="exercise-chip">${escapeHtml(ex.name)} <span class="ew">${[ex.sets&&ex.sets+'×',ex.reps,ex.weight&&ex.weight+'kg'].filter(Boolean).join(' ')}</span></span>`
+        ).join('') + `</div>`;
+      }
+      if(day.notes){
+        inner += `<div class="empty-hint">${escapeHtml(day.notes)}</div>`;
+      }
+
+      card.innerHTML = inner;
+      list.appendChild(card);
+    });
+  }
+
+  function renderHistory(){
+    const box = document.getElementById('historyList');
+    if(!state.history.length){
+      box.innerHTML = `<p class="empty-hint">No completed weeks yet. Finish your first week to see it here.</p>`;
+      return;
+    }
+    box.innerHTML = '';
+    state.history.slice().reverse().forEach((w, revIdx)=>{
+      const realIdx = state.history.length - 1 - revIdx;
+      const card = document.createElement('button');
+      card.className = 'log-card';
+      card.style.cssText = 'width:100%; text-align:left; border:1px solid var(--line); cursor:pointer;';
+      card.innerHTML = `
+        <div class="log-card-head">
+          <span class="day-name" style="font-size:14px;">${w.label}</span>
+          <span class="badge ${w.completed>=w.target ? 'done':'missed'}">${w.completed}/${w.target}</span>
+        </div>
+        <div class="empty-hint">${w.missed} missed · ${w.exercisesLogged} exercises logged</div>
+        <div class="empty-hint" style="color:var(--brass);">Tap to view or edit →</div>
+      `;
+      card.onclick = ()=> openHistoryWeek(realIdx);
+      box.appendChild(card);
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // Past week detail / edit
+  // ---------------------------------------------------------------------
+  function openHistoryWeek(idx){
+    const rec = state.history[idx];
+    document.getElementById('historyDetailTitle').textContent = rec.label;
+    document.getElementById('historyDetailSub').textContent =
+      `${rec.completed}/${rec.target} sessions logged. Tap any day to add or edit exercises.`;
+    renderHistoryDayList(idx);
+    document.getElementById('historyDetailScrim').classList.add('show');
+  }
+
+  function renderHistoryDayList(idx){
+    const rec = state.history[idx];
+    const list = document.getElementById('historyDayList');
+    list.innerHTML = '';
+    for(let i=0;i<7;i++){
+      const day = rec.days[i];
+      const card = document.createElement('button');
+      card.className = 'log-card';
+      card.style.cssText = 'width:100%; text-align:left; cursor:pointer;';
+
+      let badge = `<span class="badge pending">Not logged</span>`;
+      if(day.status==='done') badge = `<span class="badge done">Completed</span>`;
+      if(day.status==='missed') badge = `<span class="badge missed">Missed</span>`;
+
+      let inner = `
+        <div class="log-card-head">
+          <span class="day-name">${DAY_NAMES[i]}</span>
+          ${badge}
+        </div>`;
+      if(day.excuse){
+        inner += `<div class="excuse-note">"${escapeHtml(day.excuse)}"</div>`;
+      }
+      if(day.exercises && day.exercises.length){
+        inner += `<div class="exercise-chip-row">` + day.exercises.map(ex=>
+          `<span class="exercise-chip">${escapeHtml(ex.name)} <span class="ew">${[ex.sets&&ex.sets+'×',ex.reps,ex.weight&&ex.weight+'kg'].filter(Boolean).join(' ')}</span></span>`
+        ).join('') + `</div>`;
+      }
+      if(day.notes){
+        inner += `<div class="empty-hint">${escapeHtml(day.notes)}</div>`;
+      }
+      inner += `<div class="empty-hint" style="color:var(--brass);">${day.status==='done' ? 'Tap to edit' : 'Tap to log'} →</div>`;
+
+      card.innerHTML = inner;
+      card.onclick = ()=> openLogModal(i, idx);
+      list.appendChild(card);
+    }
+  }
+
+  document.getElementById('closeHistoryDetail').onclick = ()=>{
+    document.getElementById('historyDetailScrim').classList.remove('show');
+  };
+
+  // ---------------------------------------------------------------------
+  // Calendar
+  // ---------------------------------------------------------------------
+  let calViewDate = new Date(); // any date within the currently viewed month
+
+  // Given a real calendar Date, find the matching day-record (from the live
+  // week or an archived week) plus enough context to open/edit it.
+  function findDayRecord(date){
+    const target = new Date(date);
+    target.setHours(0,0,0,0);
+    const targetISO = target.toDateString();
+
+    // Check live current week first.
+    const liveDates = getWeekDates();
+    for(let i=0;i<7;i++){
+      if(liveDates[i].toDateString() === targetISO){
+        return { day: state.days[i], dayIndex:i, historyIdx:null };
+      }
+    }
+    // Check archived weeks.
+    for(let h=0; h<state.history.length; h++){
+      const rec = state.history[h];
+      const start = new Date(rec.weekStartISO);
+      for(let i=0;i<7;i++){
+        const d = new Date(start);
+        d.setDate(d.getDate()+i);
+        if(d.toDateString() === targetISO){
+          return { day: rec.days[i], dayIndex:i, historyIdx:h };
+        }
+      }
+    }
+    return null;
+  }
+
+  function renderCalendar(){
+    const label = calViewDate.toLocaleDateString(undefined, {month:'long', year:'numeric'});
+    document.getElementById('calMonthLabel').textContent = label;
+
+    const grid = document.getElementById('calGrid');
+    grid.innerHTML = '';
+
+    const year = calViewDate.getFullYear();
+    const month = calViewDate.getMonth();
+    const firstOfMonth = new Date(year, month, 1);
+    const leadingBlanks = toMondayIndex(firstOfMonth.getDay());
+    const daysInMonth = new Date(year, month+1, 0).getDate();
+
+    const today = new Date(); today.setHours(0,0,0,0);
+
+    for(let b=0; b<leadingBlanks; b++){
+      const blank = document.createElement('div');
+      blank.className = 'cal-cell empty';
+      grid.appendChild(blank);
+    }
+
+    for(let d=1; d<=daysInMonth; d++){
+      const cellDate = new Date(year, month, d);
+      cellDate.setHours(0,0,0,0);
+      const cell = document.createElement('div');
+      cell.className = 'cal-cell';
+      cell.textContent = d;
+
+      const isFuture = cellDate.getTime() > today.getTime();
+      const isToday = cellDate.getTime() === today.getTime();
+      if(isToday) cell.classList.add('today');
+      if(isFuture) cell.classList.add('future');
+
+      const found = findDayRecord(cellDate);
+      if(found && found.day){
+        if(found.day.status === 'done') cell.classList.add('done');
+        if(found.day.status === 'missed') cell.classList.add('missed');
+        if(found.day.exercises && found.day.exercises.length || found.day.excuse || found.day.notes){
+          cell.classList.add('has-note');
+        }
+      }
+
+      if(!isFuture && found){
+        cell.classList.add('clickable');
+        cell.onclick = ()=>{
+          closeSidebarFn();
+          if(found.historyIdx === null){
+            openLogModal(found.dayIndex);
+          } else {
+            openHistoryWeek(found.historyIdx);
+          }
+        };
+      }
+
+      grid.appendChild(cell);
+    }
+  }
+
+  document.getElementById('calPrevBtn').onclick = ()=>{
+    calViewDate = new Date(calViewDate.getFullYear(), calViewDate.getMonth()-1, 1);
+    renderCalendar();
+  };
+  document.getElementById('calNextBtn').onclick = ()=>{
+    calViewDate = new Date(calViewDate.getFullYear(), calViewDate.getMonth()+1, 1);
+    renderCalendar();
+  };
+
+  function escapeHtml(s){
+    const div = document.createElement('div');
+    div.textContent = s;
+    return div.innerHTML;
+  }
+
+  // ---------------------------------------------------------------------
+  // Plate click / missed-day flow
+  // ---------------------------------------------------------------------
+  let pendingMissedIndex = null;
+
+  function handlePlateClick(i){
+    const day = state.days[i];
+    if(isFutureDay(i)){
+      showToast("That day hasn't arrived yet.");
+      return;
+    }
+    if(day.status === 'done'){
+      openLogModal(i);
+      return;
+    }
+    if(day.preOnboarding){
+      // Happened before the app was set up — let them log it retroactively if they want,
+      // but never force an excuse for it.
+      openLogModal(i);
+      return;
+    }
+    if(day.status === 'pending' && (isPastDay(i))){
+      // A past scheduled day with no log = missed. Trigger mandatory modal.
+      const scheduled = scheduledIndices();
+      if(scheduled.includes(i)){
+        triggerMissedModal(i);
+      }
+      return;
+    }
+    if(i === todayIndex()){
+      openLogModal(i);
+    }
+  }
+
+  // Auto-detect missed days whenever we render: any scheduled past day still pending.
+  // Only runs once the user has completed onboarding and chosen a real schedule —
+  // otherwise a brand new install would immediately flag default days as "missed".
+  // Days that fell before the user finished onboarding are never flagged either.
+  function detectMissedDays(){
+    if(!state.onboarded) return;
+    const scheduled = scheduledIndices();
+    for(const i of scheduled){
+      if(isPastDay(i) && state.days[i].status === 'pending' && !state.days[i].preOnboarding){
+        triggerMissedModal(i);
+        return; // handle one at a time
+      }
+    }
+  }
+
+  function triggerMissedModal(i){
+    pendingMissedIndex = i;
+    document.getElementById('missedTitle').textContent = `You missed ${DAY_NAMES[i]}`;
+    document.getElementById('missedSub').textContent =
+      `${DAY_NAMES[i]} was set as a training day and it wasn't logged. Explain what happened, then choose how to move forward.`;
+    document.getElementById('excuseText').value = '';
+    document.getElementById('missedScrim').classList.add('show');
+  }
+
+  document.getElementById('pickAnotherDayBtn').onclick = ()=>{
+    const excuse = document.getElementById('excuseText').value.trim();
+    if(!excuse){ showToast('Add a quick excuse first.'); return; }
+    state.days[pendingMissedIndex].excuse = excuse;
+    state.days[pendingMissedIndex].status = 'missed';
+    saveState();
+    openReschedulePicker();
+  };
+
+  document.getElementById('markCompleteBtn').onclick = ()=>{
+    const excuse = document.getElementById('excuseText').value.trim();
+    if(!excuse){ showToast('Add a quick excuse first.'); return; }
+    state.days[pendingMissedIndex].excuse = excuse;
+    state.days[pendingMissedIndex].status = 'missed';
+    saveState();
+    document.getElementById('missedScrim').classList.remove('show');
+    pendingMissedIndex = null;
+    finalizeWeek();
+  };
+
+  function openReschedulePicker(){
+    document.getElementById('missedScrim').classList.remove('show');
+    const row = document.getElementById('dayPickRow');
+    row.innerHTML = '';
+    let selected = null;
+    for(let i=0;i<7;i++){
+      const btn = document.createElement('button');
+      btn.className = 'day-pick';
+      btn.textContent = DAY_NAMES[i].slice(0,3);
+      const takenOrPast = isPastDay(i) || state.days[i].status !== 'pending' || i===pendingMissedIndex;
+      if(takenOrPast){ btn.classList.add('disabled'); }
+      btn.onclick = ()=>{
+        if(takenOrPast) return;
+        row.querySelectorAll('.day-pick').forEach(b=>b.classList.remove('selected'));
+        btn.classList.add('selected');
+        selected = i;
+        row.dataset.selected = i;
+      };
+      row.appendChild(btn);
+    }
+    document.getElementById('rescheduleScrim').classList.add('show');
+  }
+
+  document.getElementById('cancelReschedule').onclick = ()=>{
+    document.getElementById('rescheduleScrim').classList.remove('show');
+    triggerMissedModal(pendingMissedIndex); // re-open, still mandatory
+  };
+
+  document.getElementById('confirmReschedule').onclick = ()=>{
+    const row = document.getElementById('dayPickRow');
+    const sel = row.dataset.selected;
+    if(sel === undefined || sel === null || sel === ''){
+      showToast('Pick a day first.');
+      return;
+    }
+    const target = parseInt(sel,10);
+    state.days[target].movedFrom = pendingMissedIndex;
+    // Add target day into preferred set for this week so it renders as scheduled
+    if(!state.preferredDays.includes(target)) state.preferredDays.push(target);
+    saveState();
+    document.getElementById('rescheduleScrim').classList.remove('show');
+    pendingMissedIndex = null;
+    render();
+    showToast(`Rescheduled to ${DAY_NAMES[target]}.`);
+  };
+
+  // ---------------------------------------------------------------------
+  // Exercise log modal
+  // ---------------------------------------------------------------------
+  let logDayIndex = null;
+  let exRows = [];
+  let logTargetHistoryIdx = null; // null = editing live current week; otherwise index into state.history
+
+  document.getElementById('fabLog').onclick = ()=> openLogModal(todayIndex());
+
+  function openLogModal(i, historyIdx){
+    logDayIndex = i;
+    logTargetHistoryIdx = (historyIdx === undefined) ? null : historyIdx;
+    const daysSource = logTargetHistoryIdx === null ? state.days : state.history[logTargetHistoryIdx].days;
+    const day = daysSource[i];
+    exRows = day.exercises && day.exercises.length ? day.exercises.map(e=>({...e})) : [{name:'',sets:'',reps:'',weight:''}];
+    document.getElementById('sessionNotes').value = day.notes || '';
+    const weekLabel = logTargetHistoryIdx === null ? '' : ` · ${state.history[logTargetHistoryIdx].label}`;
+    document.getElementById('logTitle').textContent = `Log ${DAY_NAMES[i]}'s session${weekLabel}`;
+    renderExRows();
+    document.getElementById('logScrim').classList.add('show');
+  }
+
+  function renderExRows(){
+    const list = document.getElementById('exList');
+    list.innerHTML = '';
+    exRows.forEach((ex, idx)=>{
+      const wrap = document.createElement('div');
+      wrap.className = 'ex-row-wrap';
+
+      const row = document.createElement('div');
+      row.className = 'ex-row';
+      row.innerHTML = `
+        <input class="ex-name" placeholder="Exercise name" value="${escapeAttr(ex.name)}" data-idx="${idx}" data-field="name">
+        <input class="ex-sets" placeholder="3" value="${escapeAttr(ex.sets)}" data-idx="${idx}" data-field="sets">
+        <input class="ex-reps" placeholder="10" value="${escapeAttr(ex.reps)}" data-idx="${idx}" data-field="reps">
+        <input class="ex-weight" placeholder="60" value="${escapeAttr(ex.weight)}" data-idx="${idx}" data-field="weight">
+        <button class="rm" data-idx="${idx}" aria-label="Remove exercise">✕</button>
+      `;
+      wrap.appendChild(row);
+
+      const hint = document.createElement('div');
+      hint.className = 'boss-hint';
+      hint.dataset.idx = idx;
+      updateBossHint(hint, ex);
+      wrap.appendChild(hint);
+
+      list.appendChild(wrap);
+    });
+    list.querySelectorAll('input').forEach(inp=>{
+      inp.oninput = (e)=>{
+        const idx = parseInt(e.target.dataset.idx,10);
+        exRows[idx][e.target.dataset.field] = e.target.value;
+        const hint = list.querySelector(`.boss-hint[data-idx="${idx}"]`);
+        if(hint) updateBossHint(hint, exRows[idx]);
+      };
+    });
+    list.querySelectorAll('.rm').forEach(rm=>{
+      rm.onclick = (e)=>{
+        const idx = parseInt(e.target.dataset.idx,10);
+        exRows.splice(idx,1);
+        if(!exRows.length) exRows.push({name:'',sets:'',reps:'',weight:''});
+        renderExRows();
+      };
+    });
+  }
+
+  // Shows what this exercise's boss fight is chasing, live as the user types.
+  function updateBossHint(hintEl, ex){
+    if(!ex.name || !ex.name.trim()){
+      hintEl.innerHTML = '';
+      hintEl.style.display = 'none';
+      return;
+    }
+    const past = collectPastInstances(ex.name, logTargetHistoryIdx, logDayIndex);
+    if(!past.length){
+      hintEl.style.display = 'block';
+      hintEl.innerHTML = `<span class="bh-new">🆕 First time logging this — no boss to beat yet.</span>`;
+      return;
+    }
+    const bestWeight = Math.max(...past.map(p=>toNum(p.weight)));
+    const bestReps = Math.max(...past.map(p=>toNum(p.reps)));
+    const bestVolume = Math.max(...past.map(exerciseVolume));
+    hintEl.style.display = 'block';
+    hintEl.innerHTML = `<span class="bh-boss">⚔ Boss to beat: ${bestWeight>0?bestWeight+'kg · ':''}${bestReps>0?bestReps+' reps · ':''}${bestVolume>0?bestVolume+' vol':''}</span>`;
+  }
+  function escapeAttr(v){ return (v===undefined||v===null) ? '' : String(v).replace(/"/g,'&quot;'); }
+
+  document.getElementById('addExBtn').onclick = ()=>{
+    exRows.push({name:'',sets:'',reps:'',weight:''});
+    renderExRows();
+  };
+
+  document.getElementById('cancelLog').onclick = ()=>{
+    document.getElementById('logScrim').classList.remove('show');
+    logTargetHistoryIdx = null;
+  };
+
+  // ---------------------------------------------------------------------
+  // Boss Fight — compete with your own past performance
+  // ---------------------------------------------------------------------
+  // Collects every previously-logged instance of a named exercise across
+  // all history weeks and any other already-saved day in the live week
+  // (never including the day currently being edited, so you can't beat
+  // yourself against your own in-progress entry).
+  function collectPastInstances(exerciseName, excludeHistoryIdx, excludeDayIndex){
+    const nameKey = exerciseName.trim().toLowerCase();
+    if(!nameKey) return [];
+    const instances = [];
+
+    // Live current week (only days other than the one being saved right now).
+    Object.entries(state.days).forEach(([idx, day])=>{
+      if(excludeHistoryIdx === null && parseInt(idx,10) === excludeDayIndex) return;
+      (day.exercises||[]).forEach(ex=>{
+        if(ex.name && ex.name.trim().toLowerCase() === nameKey){
+          instances.push(ex);
+        }
+      });
+    });
+
+    // All archived weeks.
+    state.history.forEach((rec, hIdx)=>{
+      Object.entries(rec.days).forEach(([idx, day])=>{
+        if(excludeHistoryIdx === hIdx && parseInt(idx,10) === excludeDayIndex) return;
+        (day.exercises||[]).forEach(ex=>{
+          if(ex.name && ex.name.trim().toLowerCase() === nameKey){
+            instances.push(ex);
+          }
+        });
+      });
+    });
+
+    return instances;
+  }
+
+  function toNum(v){
+    const n = parseFloat(v);
+    return isNaN(n) ? 0 : n;
+  }
+
+  function exerciseVolume(ex){
+    return toNum(ex.sets) * toNum(ex.reps) * toNum(ex.weight);
+  }
+
+  // Compares one freshly-logged exercise against its best prior instance.
+  // Returns null if there's no prior data (first time = nothing to beat yet).
+  function evaluateBossFight(ex, excludeHistoryIdx, excludeDayIndex){
+    const past = collectPastInstances(ex.name, excludeHistoryIdx, excludeDayIndex);
+    if(!past.length) return null;
+
+    const bestVolume = Math.max(...past.map(exerciseVolume));
+    const bestWeight = Math.max(...past.map(p=>toNum(p.weight)));
+    const bestReps = Math.max(...past.map(p=>toNum(p.reps)));
+
+    const curVolume = exerciseVolume(ex);
+    const curWeight = toNum(ex.weight);
+    const curReps = toNum(ex.reps);
+
+    const beatVolume = curVolume > 0 && curVolume > bestVolume;
+    const beatWeight = curWeight > 0 && curWeight > bestWeight;
+    const beatReps = curReps > 0 && curReps > bestReps;
+    const won = beatVolume || beatWeight || beatReps;
+    const flawless = beatVolume && beatWeight && beatReps;
+
+    return { name: ex.name, won, flawless, beatVolume, beatWeight, beatReps, bestVolume, bestWeight, bestReps, curVolume, curWeight, curReps };
+  }
+
+  // Runs boss fights for every exercise in a session, awards XP, and returns
+  // the results so the UI can show a summary.
+  function runBossFights(exercises, excludeHistoryIdx, excludeDayIndex){
+    const results = [];
+    let xpGained = 0;
+    exercises.forEach(ex=>{
+      if(!ex.name || !ex.name.trim()) return;
+      const result = evaluateBossFight(ex, excludeHistoryIdx, excludeDayIndex);
+      if(result){
+        results.push(result);
+        if(result.flawless) xpGained += 25;
+        else if(result.won) xpGained += 10;
+      }
+    });
+    if(xpGained > 0){
+      state.xp = (state.xp || 0) + xpGained;
+    }
+    return { results, xpGained };
+  }
+
+  function showBossFightToast(bossFightSummary){
+    const { results, xpGained } = bossFightSummary;
+    const wins = results.filter(r=>r.won);
+    if(!wins.length) return;
+    const names = wins.map(r=>r.name).join(', ');
+    const flawlessCount = wins.filter(r=>r.flawless).length;
+    const tag = flawlessCount ? ' — flawless victory!' : '';
+    showToast(`🏆 Boss beaten: ${names}${tag} +${xpGained} XP`);
+  }
+
+  document.getElementById('saveLogBtn').onclick = ()=>{
+    const cleaned = exRows.filter(e=> e.name && e.name.trim());
+    const notes = document.getElementById('sessionNotes').value.trim();
+
+    if(logTargetHistoryIdx === null){
+      const day = state.days[logDayIndex];
+      day.exercises = cleaned;
+      day.notes = notes;
+      day.status = 'done';
+      day.excuse = null;
+      const bossFightSummary = runBossFights(cleaned, null, logDayIndex);
+      saveState();
+      render();
+      updateXpUI();
+      if(bossFightSummary.xpGained > 0){
+        showBossFightToast(bossFightSummary);
+      } else {
+        showToast('Session saved. Nice work.');
+      }
+      maybeOfferWeekComplete();
+    } else {
+      const rec = state.history[logTargetHistoryIdx];
+      const day = rec.days[logDayIndex];
+      const wasDone = day.status === 'done';
+      day.exercises = cleaned;
+      day.notes = notes;
+      day.status = 'done';
+      day.excuse = null;
+      const bossFightSummary = runBossFights(cleaned, logTargetHistoryIdx, logDayIndex);
+      // Recompute this past week's rollup stats to reflect the edit.
+      const prevCompleted = rec.completed;
+      rec.completed = Object.values(rec.days).filter(d=>d.status==='done').length;
+      rec.missed = Object.values(rec.days).filter(d=>d.status==='missed').length;
+      rec.exercisesLogged = Object.values(rec.days).reduce((sum,d)=> sum + (d.exercises? d.exercises.length:0), 0);
+      // If logging this forgotten session pushes completed count up, that
+      // session no longer counts as a broken promise — true up both the
+      // per-week and lifetime counters.
+      if(rec.completed > prevCompleted){
+        const recovered = Math.min(rec.completed - prevCompleted, rec.brokenPromises || 0);
+        rec.brokenPromises = Math.max(0, (rec.brokenPromises||0) - recovered);
+        state.brokenPromises = Math.max(0, (state.brokenPromises||0) - recovered);
+      }
+      saveState();
+      renderHistoryDayList(logTargetHistoryIdx);
+      renderHistory();
+      updateXpUI();
+      updateBrokenPromisesUI();
+      if(bossFightSummary.xpGained > 0){
+        showBossFightToast(bossFightSummary);
+      } else {
+        showToast(wasDone ? 'Session updated.' : 'Added a session you forgot to log.');
+      }
+    }
+
+    document.getElementById('logScrim').classList.remove('show');
+  };
+
+  // ---------------------------------------------------------------------
+  // Week completion
+  // ---------------------------------------------------------------------
+  function maybeOfferWeekComplete(){
+    const doneCount = Object.values(state.days).filter(d=>d.status==='done').length;
+    if(doneCount >= state.target){
+      finalizeWeek();
+    }
+  }
+
+  function finalizeWeek(){
+    archiveWeek(true);
+    updateBrokenPromisesUI();
+    showSummary();
+  }
+
+  function archiveWeek(showAsCompleted){
+    const dates = getWeekDates();
+    const opts = {month:'short', day:'numeric'};
+    const label = `${dates[0].toLocaleDateString(undefined,opts)} – ${dates[6].toLocaleDateString(undefined,opts)}`;
+    const completed = Object.values(state.days).filter(d=>d.status==='done').length;
+    const missed = Object.values(state.days).filter(d=>d.status==='missed').length;
+    const exercisesLogged = Object.values(state.days).reduce((sum,d)=> sum + (d.exercises? d.exercises.length:0), 0);
+    const excuses = Object.entries(state.days)
+      .filter(([_,d])=>d.excuse)
+      .map(([i,d])=>({day:DAY_NAMES[i], excuse:d.excuse}));
+
+    // A broken promise is one target session that never happened this week,
+    // no matter how many reschedule attempts were made. If the target was 3
+    // and only 1 session landed, that's 2 broken promises.
+    const shortfall = Math.max(0, state.target - completed);
+    state.brokenPromises = (state.brokenPromises || 0) + shortfall;
+
+    const record = {
+      label, completed, target: state.target, missed, exercisesLogged, excuses,
+      brokenPromises: shortfall,
+      weekStartISO: state.weekStartISO,
+      days: JSON.parse(JSON.stringify(state.days)) // full snapshot so past weeks stay editable
+    };
+    state.history.push(record);
+    if(completed >= state.target) state.streak += 1; else state.streak = 0;
+    saveState();
+    return record;
+  }
+
+  function showSummary(){
+    const rec = state.history[state.history.length-1];
+    const pct = Math.min(100, Math.round((rec.completed / Math.max(1,rec.target)) * 100));
+    document.getElementById('summaryPct').textContent = pct + '%';
+    const circumference = 2 * Math.PI * 52;
+    const offset = circumference - (pct/100)*circumference;
+    document.getElementById('summaryArc').setAttribute('stroke-dasharray', circumference);
+    document.getElementById('summaryArc').setAttribute('stroke-dashoffset', circumference);
+    setTimeout(()=>{
+      document.getElementById('summaryArc').style.transition = 'stroke-dashoffset 1s ease';
+      document.getElementById('summaryArc').setAttribute('stroke-dashoffset', offset);
+    }, 50);
+
+    document.getElementById('summarySub').textContent = rec.label;
+    document.getElementById('sgCompleted').textContent = rec.completed;
+    document.getElementById('sgMissed').textContent = rec.missed;
+    document.getElementById('sgExercises').textContent = rec.exercisesLogged;
+    document.getElementById('sgTarget').textContent = rec.target;
+
+    const excusesBox = document.getElementById('summaryExcuses');
+    if(rec.excuses.length){
+      excusesBox.innerHTML = `<div class="field-label" style="margin-bottom:8px;">Excuses this week</div>` +
+        rec.excuses.map(e=>`<div class="se-item"><b>${e.day}:</b> ${escapeHtml(e.excuse)}</div>`).join('');
+    } else {
+      excusesBox.innerHTML = `<div class="empty-hint">Perfect week — no missed days.</div>`;
+    }
+
+    document.getElementById('summaryScrim').classList.add('show');
+  }
+
+  document.getElementById('startNewWeekBtn').onclick = ()=>{
+    // Advance to the Monday following the current week.
+    const currentStart = new Date(state.weekStartISO);
+    currentStart.setDate(currentStart.getDate() + 7);
+    state.weekStartISO = startOfWeekISO(currentStart);
+    state.days = buildEmptyDays();
+    saveState();
+    document.getElementById('summaryScrim').classList.remove('show');
+    render();
+  };
+
+  // ---------------------------------------------------------------------
+  // Sidebar / navigation
+  // ---------------------------------------------------------------------
+  const sidebar = document.getElementById('sidebar');
+  const scrimEl = document.getElementById('scrim');
+
+  function openSidebar(){ sidebar.classList.add('open'); scrimEl.classList.add('show'); }
+  function closeSidebarFn(){ sidebar.classList.remove('open'); scrimEl.classList.remove('show'); }
+
+  document.getElementById('burgerBtn').onclick = openSidebar;
+  document.getElementById('closeSidebar').onclick = closeSidebarFn;
+  scrimEl.onclick = closeSidebarFn;
+
+  document.querySelectorAll('.side-item[data-panel]').forEach(item=>{
+    item.onclick = ()=>{
+      document.querySelectorAll('.side-panel').forEach(p=>p.classList.remove('active'));
+      document.getElementById(item.dataset.panel).classList.add('active');
+      if(item.dataset.panel === 'panelCalendar'){
+        calViewDate = new Date(); // jump back to current month each time it's opened
+        renderCalendar();
+      }
+    };
+  });
+
+  // Schedule panel controls
+  document.getElementById('stepDown').onclick = ()=>{
+    state.target = Math.max(1, state.target - 1);
+    document.getElementById('targetVal').textContent = state.target;
+  };
+  document.getElementById('stepUp').onclick = ()=>{
+    state.target = Math.min(7, state.target + 1);
+    document.getElementById('targetVal').textContent = state.target;
+  };
+  document.querySelectorAll('.day-toggle').forEach(btn=>{
+    btn.onclick = ()=>{
+      const d = parseInt(btn.dataset.day,10);
+      const idx = state.preferredDays.indexOf(d);
+      if(idx>-1) state.preferredDays.splice(idx,1); else state.preferredDays.push(d);
+      btn.classList.toggle('active');
+    };
+  });
+  document.getElementById('saveSchedule').onclick = ()=>{
+    saveState();
+    render();
+    showToast('Schedule saved.');
+    closeSidebarFn();
+  };
+
+  // ---------------------------------------------------------------------
+  // Auth (mock by default; wire real Firebase per comments above)
+  // ---------------------------------------------------------------------
+  function updateAuthUI(){
+    const signedIn = !!state.user;
+    document.getElementById('signedOutBlock').style.display = signedIn ? 'none' : 'block';
+    document.getElementById('signedInBlock').style.display = signedIn ? 'block' : 'none';
+    document.getElementById('authChipText').textContent = signedIn ? state.user.name.split(' ')[0] : 'Sign in';
+    document.getElementById('dataMode').textContent = signedIn ? 'synced' : 'local';
+    const initial = signedIn ? state.user.name.charAt(0).toUpperCase() : '?';
+    document.getElementById('avatarInitial').textContent = initial;
+    document.getElementById('avatarInitialLarge').textContent = initial;
+    if(signedIn){
+      document.getElementById('userName').textContent = state.user.name;
+      document.getElementById('userEmail').textContent = state.user.email;
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // XP + Broken Promises UI
+  // ---------------------------------------------------------------------
+  function updateXpUI(){
+    document.getElementById('xpVal').textContent = state.xp || 0;
+  }
+
+  function updateBrokenPromisesUI(){
+    const count = state.brokenPromises || 0;
+    const badge = document.getElementById('brokenBadge');
+    const banner = document.getElementById('brokenBanner');
+    if(count > 0){
+      badge.style.display = 'flex';
+      badge.textContent = count > 99 ? '99+' : count;
+      banner.style.display = 'flex';
+      document.getElementById('brokenBannerCount').textContent =
+        `${count} broken promise${count===1?'':'s'}`;
+    } else {
+      badge.style.display = 'none';
+      banner.style.display = 'none';
+    }
+  }
+
+  document.getElementById('authChip').onclick = ()=>{
+    openSidebar();
+    document.querySelectorAll('.side-panel').forEach(p=>p.classList.remove('active'));
+    document.getElementById('panelAccount').classList.add('active');
+  };
+
+  document.getElementById('googleSignInBtn').onclick = ()=>{
+    if(FIREBASE_ENABLED){
+      // FIREBASE HOOK — real implementation once SDK is wired up:
+      // const provider = new firebase.auth.GoogleAuthProvider();
+      // firebase.auth().signInWithPopup(provider).then(result => {
+      //   state.user = { name: result.user.displayName, email: result.user.email, uid: result.user.uid };
+      //   saveState(); updateAuthUI();
+      //   loadStateRemote(state.user.uid); // merge/replace with cloud data
+      // });
+      return;
+    }
+    mockGoogleSignIn();
+  };
+
+  function mockGoogleSignIn(){
+    // Placeholder sign-in so the flow is demonstrable without a live Firebase project.
+    state.user = { name: 'Alex Rivera', email: 'alex.rivera@gmail.com', uid: 'mock-uid-local' };
+    saveState();
+    updateAuthUI();
+    showToast('Signed in (demo mode — connect Firebase for real Google auth).');
+  }
+
+  document.getElementById('signOutBtn').onclick = ()=>{
+    state.user = null;
+    saveState();
+    updateAuthUI();
+    showToast('Signed out.');
+  };
+
+  // ---------------------------------------------------------------------
+  // Toast
+  // ---------------------------------------------------------------------
+  let toastTimer;
+  function showToast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=> t.classList.remove('show'), 2600);
+  }
+
+  // ---------------------------------------------------------------------
+  // Init
+  // ---------------------------------------------------------------------
+  // ---------------------------------------------------------------------
+  // Getting started onboarding
+  // ---------------------------------------------------------------------
+  let obTarget = state.target || 3;
+  let obDays = [];
+
+  render();
+  updateAuthUI();
+  updateXpUI();
+  updateBrokenPromisesUI();
+
+  if(!state.onboarded){
+    openOnboarding();
+  } else {
+    // Check for missed days shortly after load so the modal feels intentional, not jarring.
+    setTimeout(detectMissedDays, 500);
+  }
+
+  function openOnboarding(){
+    obTarget = state.target || 3;
+    obDays = state.preferredDays.slice(0, obTarget);
+    document.getElementById('obTargetVal').textContent = obTarget;
+    document.getElementById('onboardStep1').style.display = 'block';
+    document.getElementById('onboardStep2').style.display = 'none';
+    document.getElementById('onboardScrim').classList.add('show');
+  }
+
+  document.getElementById('obStepDown').onclick = ()=>{
+    obTarget = Math.max(1, obTarget - 1);
+    document.getElementById('obTargetVal').textContent = obTarget;
+    if(obDays.length > obTarget) obDays = obDays.slice(0, obTarget);
+  };
+  document.getElementById('obStepUp').onclick = ()=>{
+    obTarget = Math.min(7, obTarget + 1);
+    document.getElementById('obTargetVal').textContent = obTarget;
+  };
+
+  document.getElementById('obNextBtn').onclick = ()=>{
+    document.getElementById('onboardStep1').style.display = 'none';
+    document.getElementById('onboardStep2').style.display = 'block';
+    document.getElementById('obDaysSub').textContent =
+      `Choose ${obTarget} day${obTarget===1?'':'s'} you'd like to train. You can always change this later in the Weekly Schedule menu.`;
+    renderObDayPicker();
+  };
+
+  document.getElementById('obBackBtn').onclick = ()=>{
+    document.getElementById('onboardStep2').style.display = 'none';
+    document.getElementById('onboardStep1').style.display = 'block';
+  };
+
+  function renderObDayPicker(){
+    const row = document.getElementById('obDayPickRow');
+    row.innerHTML = '';
+    DAY_NAMES.forEach((name, i)=>{
+      const btn = document.createElement('button');
+      btn.className = 'day-pick';
+      btn.textContent = name.slice(0,3);
+      if(obDays.includes(i)) btn.classList.add('selected');
+      btn.onclick = ()=>{
+        const idx = obDays.indexOf(i);
+        if(idx > -1){
+          obDays.splice(idx,1);
+        } else {
+          if(obDays.length >= obTarget){
+            showToast(`You picked ${obTarget} day${obTarget===1?'':'s'} — remove one to swap.`);
+            return;
+          }
+          obDays.push(i);
+        }
+        renderObDayPicker();
+      };
+      row.appendChild(btn);
+    });
+  }
+
+  document.getElementById('obFinishBtn').onclick = ()=>{
+    state.target = obTarget;
+    state.preferredDays = obDays.length ? obDays.slice().sort((a,b)=>a-b) : state.preferredDays.slice(0, obTarget);
+    state.onboarded = true;
+    // Days before right now happened before the app existed for this user —
+    // they can't be "missed". Mark them as pre-onboarding so detection skips them,
+    // but leave them tappable in case the user wants to log a session anyway.
+    const today = todayIndex();
+    for(let i=0; i<today; i++){
+      if(state.days[i].status === 'pending'){
+        state.days[i].preOnboarding = true;
+      }
+    }
+    saveState();
+    document.getElementById('onboardScrim').classList.remove('show');
+    render();
+    showToast(`You're set: ${state.target}x a week. Let's go.`);
+    setTimeout(detectMissedDays, 500);
+  };
+
+</script>
+</body>
+</html>
