@@ -1969,6 +1969,7 @@ document.getElementById('ledgerBody').addEventListener('click', (e)=>{
     const txt = prompt('Add a note explaining this transaction:');
     if (txt && txt.trim()){
       STATE.notes[id] = txt.trim();
+      saveState(); // <--- FIX: persist note
       renderLedger(); renderAnomalies();
     }
     return;
@@ -2171,6 +2172,7 @@ document.getElementById('anomalyList').addEventListener('click', (e)=>{
     const textarea = document.querySelector(`textarea[data-id="${id}"]`);
     if (textarea && textarea.value.trim()){
       STATE.notes[id] = textarea.value.trim();
+      saveState(); // <--- FIX: persist note
       renderAnomalies();
       renderLedger();
     }
@@ -2179,11 +2181,13 @@ document.getElementById('anomalyList').addEventListener('click', (e)=>{
     const card = editBtn.closest('.anomaly-card');
     const id = card.dataset.id;
     delete STATE.notes[id];
+    saveState(); // <--- FIX: persist deletion
     renderAnomalies();
   }
   if (dismissBtn){
     const id = dismissBtn.dataset.id;
     STATE.notes[id] = '(marked as not an anomaly)';
+    saveState(); // <--- FIX: persist dismissal
     renderAnomalies();
     renderLedger();
   }
