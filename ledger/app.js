@@ -512,6 +512,7 @@ async function handleFiles(fileList){
 
   if (STATE.transactions.length > 0){
     STATE.transactions.sort((a,b)=> b.date - a.date);
+    saveState(); // persist
     launchApp();
   }
 }
@@ -815,6 +816,50 @@ function generateInsights(txs, stats, catBreakdown, anomalies, recurring){
   return insights;
 }
 
+/* ============================================================
+   PERSISTENCE (localStorage)
+   ============================================================ */
+function saveState() {
+  const data = {
+    transactions: STATE.transactions,
+    sources: STATE.sources,
+    notes: STATE.notes,
+    categoryOverrides: STATE.categoryOverrides,
+    merchantOverrides: STATE.merchantOverrides,
+    view: STATE.view,
+    sort: STATE.sort,
+    filters: STATE.filters,
+    version: '1.0'
+  };
+  try {
+    localStorage.setItem('ledger_state', JSON.stringify(data));
+  } catch (e) { /* ignore quota errors */ }
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem('ledger_state');
+    if (!raw) return false;
+    const data = JSON.parse(raw);
+    // restore only if version matches (we can add migration later)
+    if (!data.version) return false;
+    STATE.transactions = data.transactions || [];
+    STATE.sources = data.sources || [];
+    STATE.notes = data.notes || {};
+    STATE.categoryOverrides = data.categoryOverrides || {};
+    STATE.merchantOverrides = data.merchantOverrides || {};
+    STATE.view = data.view || 'overview';
+    STATE.sort = data.sort || {key:'date', dir:'desc'};
+    STATE.filters = data.filters || {search:'', category:'', account:'', type:''};
+    // reset ID_SEQ to avoid collisions
+    ID_SEQ = STATE.transactions.length + 1;
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/* ---- Expose internals for UI ---- */
 window.LEDGER_PARSERS = { parseING, parseRevolut, parseGeneric, looksLikeINGFormat, looksLikeRevolutFormat, csvSplitLine };
 window.LEDGER_STATE = STATE;
 window.LEDGER_CATEGORIES = CATEGORIES;
@@ -822,5 +867,6 @@ window.LEDGER_CAT_MAP = CAT_MAP;
 window.LEDGER_HELPERS = { fmtDate, fmtMoney, fmtMonthKey, fmtMonthLabel, guessCategory, nextId, escapeHtml, normMerchant, merchantKey };
 window.LEDGER_ANALYTICS = { detectAnomalies, detectRecurring, computeStats, computeCategoryBreakdown, computeMonthlyFlow, computeBalanceSeries, generateInsights, quantile };
 window.LEDGER_INGEST = { handleFiles, detectAndParse };
+window.LEDGER_SAVE = saveState; // expose for UI to call after changes
 
 })();
