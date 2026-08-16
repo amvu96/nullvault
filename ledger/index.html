@@ -783,7 +783,7 @@ footer.app-footer{
 
 <script>
 /* =========================================================================
-   LEDGER — Full application (app + ui + persistence) with date filter
+   LEDGER — Full application with date filter affecting all views
    ========================================================================= */
 (function(){
 "use strict";
@@ -1539,7 +1539,6 @@ function getFilteredTransactions() {
     if (!t.date) return false;
     if (start && t.date < start) return false;
     if (end) {
-      // set end to end of day
       const endOfDay = new Date(end);
       endOfDay.setHours(23,59,59,999);
       if (t.date > endOfDay) return false;
@@ -1598,7 +1597,6 @@ function launchApp(){
   document.getElementById('topbarSub').textContent = STATE.sources.length + ' STATEMENT' + (STATE.sources.length>1?'S':'') + ' LOADED';
   document.getElementById('txCountPill').textContent = STATE.transactions.length + ' transactions';
 
-  // Set date filter inputs from saved state
   if (STATE.dateFilter.start) {
     document.getElementById('startDate').value = STATE.dateFilter.start.toISOString().split('T')[0];
   }
@@ -1628,15 +1626,18 @@ function populateFilterOptions(){
 }
 
 function renderAll(){
-  const filtered = getFilteredTransactions();
-  renderTape(filtered);
-  renderOverview(filtered);
-  renderLedger();
-  renderAnomalies();
+  const filteredTxs = getFilteredTransactions();
+  const filteredAnomalies = detectAnomalies(filteredTxs);
+
+  renderTape(filteredTxs, filteredAnomalies);
+  renderOverview(filteredTxs);
+  renderLedger(filteredTxs);
+  renderAnomalies(filteredAnomalies);
   renderSubscriptions();
   renderAccounts();
-  document.getElementById('ledgerBadge').textContent = STATE.transactions.length;
-  document.getElementById('anomalyBadge').textContent = ANOMALIES.length;
+
+  document.getElementById('ledgerBadge').textContent = filteredTxs.length;
+  document.getElementById('anomalyBadge').textContent = filteredAnomalies.length;
   updateDateFilterInfo();
   saveState();
 }
@@ -1654,7 +1655,7 @@ document.getElementById('tabs').addEventListener('click', (e)=>{
 });
 
 /* TAPE */
-function renderTape(txs){
+function renderTape(txs, anomalies){
   const stats = computeStats(txs);
   const tape = document.getElementById('tape');
   const period = stats.minDate && stats.maxDate
@@ -1689,8 +1690,8 @@ function renderTape(txs){
     </div>
     <div class="tape-cell">
       <div class="tape-label">Anomalies</div>
-      <div class="tape-value amber">${ANOMALIES.length}</div>
-      <div class="tape-sub">${ANOMALIES.filter(a=>a.severity==='high').length} high priority</div>
+      <div class="tape-value amber">${anomalies.length}</div>
+      <div class="tape-sub">${anomalies.filter(a=>a.severity==='high').length} high priority</div>
     </div>
   `;
 }
@@ -1700,7 +1701,9 @@ function renderOverview(txs){
   const catBreakdown = computeCategoryBreakdown(txs);
   const monthlyFlow = computeMonthlyFlow(txs);
   const stats = computeStats(txs);
-  const insights = generateInsights(txs, stats, catBreakdown, ANOMALIES, RECURRING);
+  const anomalies = detectAnomalies(txs);
+  const recurring = detectRecurring(txs);
+  const insights = generateInsights(txs, stats, catBreakdown, anomalies, recurring);
 
   const catEl = document.getElementById('catBreakdown');
   if (catBreakdown.length === 0){
@@ -1861,8 +1864,8 @@ function roundRect(ctx,x,y,w,h,r){
 }
 
 /* LEDGER */
-function getFilteredSortedTx(){
-  let list = STATE.transactions.slice();
+function getFilteredSortedTx(filteredTxs) {
+  let list = filteredTxs.slice(); // already date-filtered
   const f = STATE.filters;
 
   if (f.search){
@@ -1899,8 +1902,8 @@ function getFilteredSortedTx(){
   return list;
 }
 
-function renderLedger(){
-  const list = getFilteredSortedTx();
+function renderLedger(filteredTxs){
+  const list = getFilteredSortedTx(filteredTxs);
   const body = document.getElementById('ledgerBody');
   const empty = document.getElementById('ledgerEmpty');
 
@@ -1911,9 +1914,14 @@ function renderLedger(){
   }
   empty.style.display = 'none';
 
+  // Build a map of anomalies for the filtered set to highlight rows
+  const filteredAnomalies = detectAnomalies(filteredTxs);
+  const anomalyById = {};
+  filteredAnomalies.forEach(a=>{ anomalyById[a.tx.id] = a; });
+
   body.innerHTML = list.map(t=>{
     const cat = CAT_MAP[t.category] || CAT_MAP.other;
-    const anomaly = STATE.anomalyById[t.id];
+    const anomaly = anomalyById[t.id];
     const note = STATE.notes[t.id];
     return `
     <tr class="${anomaly?'anomaly-row':''}" data-id="${t.id}">
@@ -1932,18 +1940,30 @@ function renderLedger(){
   }).join('');
 }
 
-// filter/sort wiring
+// filter/sort wiring (these now call renderAll which uses filtered txs)
 document.getElementById('searchInput').addEventListener('input', (e)=>{
-  STATE.filters.search = e.target.value; renderLedger();
+  STATE.filters.search = e.target.value;
+  const filteredTxs = getFilteredTransactions();
+  renderLedger(filteredTxs);
+  renderAnomalies(detectAnomalies(filteredTxs));
 });
 document.getElementById('categoryFilter').addEventListener('change', (e)=>{
-  STATE.filters.category = e.target.value; renderLedger();
+  STATE.filters.category = e.target.value;
+  const filteredTxs = getFilteredTransactions();
+  renderLedger(filteredTxs);
+  renderAnomalies(detectAnomalies(filteredTxs));
 });
 document.getElementById('accountFilter').addEventListener('change', (e)=>{
-  STATE.filters.account = e.target.value; renderLedger();
+  STATE.filters.account = e.target.value;
+  const filteredTxs = getFilteredTransactions();
+  renderLedger(filteredTxs);
+  renderAnomalies(detectAnomalies(filteredTxs));
 });
 document.getElementById('typeFilter').addEventListener('change', (e)=>{
-  STATE.filters.type = e.target.value; renderLedger();
+  STATE.filters.type = e.target.value;
+  const filteredTxs = getFilteredTransactions();
+  renderLedger(filteredTxs);
+  renderAnomalies(detectAnomalies(filteredTxs));
 });
 document.querySelectorAll('.ledger thead th[data-sort]').forEach(th=>{
   th.addEventListener('click', ()=>{
@@ -1955,7 +1975,9 @@ document.querySelectorAll('.ledger thead th[data-sort]').forEach(th=>{
     }
     document.querySelectorAll('.ledger thead th').forEach(t=>t.classList.remove('sorted'));
     th.classList.add('sorted');
-    renderLedger();
+    const filteredTxs = getFilteredTransactions();
+    renderLedger(filteredTxs);
+    renderAnomalies(detectAnomalies(filteredTxs));
   });
 });
 
@@ -1969,8 +1991,10 @@ document.getElementById('ledgerBody').addEventListener('click', (e)=>{
     const txt = prompt('Add a note explaining this transaction:');
     if (txt && txt.trim()){
       STATE.notes[id] = txt.trim();
-      saveState(); // <--- FIX: persist note
-      renderLedger(); renderAnomalies();
+      saveState();
+      const filteredTxs = getFilteredTransactions();
+      renderLedger(filteredTxs);
+      renderAnomalies(detectAnomalies(filteredTxs));
     }
     return;
   }
@@ -2087,7 +2111,6 @@ document.getElementById('catModalApply').addEventListener('click', ()=>{
   const applyFuture = document.getElementById('scopeFuture').checked;
 
   if (!applyExisting && !applyFuture) {
-    // Apply only to the current transaction
     const tx = STATE.transactions.find(t=>t.id===modalCurrentTxId);
     if (tx) {
       STATE.categoryOverrides[tx.id] = modalSelectedCat;
@@ -2123,15 +2146,22 @@ document.getElementById('catModalClose').addEventListener('click', ()=>catModal.
 catModal.addEventListener('click', (e)=>{ if (e.target===catModal) catModal.classList.remove('active'); });
 
 /* ANOMALIES */
-function renderAnomalies(){
-  ANOMALIES = detectAnomalies(STATE.transactions);
-  ANOMALIES.forEach(a=> a.tx.isAnomaly = true);
-  STATE.anomalyById = Object.fromEntries(ANOMALIES.map(a=>[a.tx.id,a]));
-  document.getElementById('anomalyBadge').textContent = ANOMALIES.length;
+function renderAnomalies(anomalies) {
+  // If called without argument, compute from filtered txs
+  if (anomalies === undefined) {
+    const filteredTxs = getFilteredTransactions();
+    anomalies = detectAnomalies(filteredTxs);
+  }
+
+  // Mark anomaly rows
+  anomalies.forEach(a=> a.tx.isAnomaly = true);
+  const anomalyById = {};
+  anomalies.forEach(a=> anomalyById[a.tx.id] = a);
+  STATE.anomalyById = anomalyById;
 
   const list = document.getElementById('anomalyList');
   const empty = document.getElementById('anomalyEmpty');
-  if (ANOMALIES.length === 0){
+  if (anomalies.length === 0){
     list.innerHTML = '';
     empty.style.display = 'block';
     return;
@@ -2139,7 +2169,7 @@ function renderAnomalies(){
   empty.style.display = 'none';
 
   const sevColor = {high:'#e85a5a', medium:'#f2a93b', low:'#8b93a0'};
-  list.innerHTML = ANOMALIES.map(a=>{
+  list.innerHTML = anomalies.map(a=>{
     const t = a.tx;
     const note = STATE.notes[t.id];
     return `
@@ -2172,24 +2202,28 @@ document.getElementById('anomalyList').addEventListener('click', (e)=>{
     const textarea = document.querySelector(`textarea[data-id="${id}"]`);
     if (textarea && textarea.value.trim()){
       STATE.notes[id] = textarea.value.trim();
-      saveState(); // <--- FIX: persist note
-      renderAnomalies();
-      renderLedger();
+      saveState();
+      const filteredTxs = getFilteredTransactions();
+      renderAnomalies(detectAnomalies(filteredTxs));
+      renderLedger(filteredTxs);
     }
   }
   if (editBtn){
     const card = editBtn.closest('.anomaly-card');
     const id = card.dataset.id;
     delete STATE.notes[id];
-    saveState(); // <--- FIX: persist deletion
-    renderAnomalies();
+    saveState();
+    const filteredTxs = getFilteredTransactions();
+    renderAnomalies(detectAnomalies(filteredTxs));
+    renderLedger(filteredTxs);
   }
   if (dismissBtn){
     const id = dismissBtn.dataset.id;
     STATE.notes[id] = '(marked as not an anomaly)';
-    saveState(); // <--- FIX: persist dismissal
-    renderAnomalies();
-    renderLedger();
+    saveState();
+    const filteredTxs = getFilteredTransactions();
+    renderAnomalies(detectAnomalies(filteredTxs));
+    renderLedger(filteredTxs);
   }
 });
 
@@ -2357,7 +2391,6 @@ document.getElementById('resetBtn').addEventListener('click', ()=>{
   location.reload();
 });
 
-// Date filter buttons
 document.getElementById('applyDateFilter').addEventListener('click', applyDateFilter);
 document.getElementById('clearDateFilter').addEventListener('click', clearDateFilter);
 
