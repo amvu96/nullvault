@@ -10,6 +10,7 @@ const CAT_MAP = window.LEDGER_CAT_MAP;
 const { fmtDate, fmtMoney, fmtMonthKey, fmtMonthLabel, guessCategory, escapeHtml, normMerchant } = window.LEDGER_HELPERS;
 const { detectAnomalies, detectRecurring, computeStats, computeCategoryBreakdown, computeMonthlyFlow, computeBalanceSeries, generateInsights } = window.LEDGER_ANALYTICS;
 const { handleFiles } = window.LEDGER_INGEST;
+const saveState = window.LEDGER_SAVE;
 
 let ANOMALIES = [];
 let RECURRING = [];
@@ -38,6 +39,7 @@ dropzone.addEventListener('drop', (e)=>{
 document.getElementById('addMoreBtn').addEventListener('click', ()=>fileInput.click());
 document.getElementById('resetBtn').addEventListener('click', ()=>{
   if (!confirm('Clear all loaded statements and notes? This cannot be undone.')) return;
+  localStorage.removeItem('ledger_state');
   location.reload();
 });
 
@@ -91,6 +93,7 @@ function renderAll(){
   renderAccounts();
   document.getElementById('ledgerBadge').textContent = STATE.transactions.length;
   document.getElementById('anomalyBadge').textContent = ANOMALIES.length;
+  saveState(); // persist after any UI change (notes, overrides)
 }
 
 /* ---------------------------------------------------------------------
@@ -474,11 +477,13 @@ const catModal = document.getElementById('catModal');
 let modalSelectedCat = null;
 let modalMerchantTxs = [];
 let modalMKey = '';
+let modalCurrentTxId = null; // for "this transaction only" when both scopes unchecked
 
 function openCategoryModal(txId){
   const tx = STATE.transactions.find(t=>t.id===txId);
   if (!tx) return;
 
+  modalCurrentTxId = txId;
   modalMKey = merchantKey(tx);
   modalMerchantTxs = STATE.transactions.filter(t=> merchantKey(t) === modalMKey);
   modalSelectedCat = STATE.merchantOverrides[modalMKey] || tx.category;
@@ -523,13 +528,25 @@ function updateScopeCounts(){
 function updateApplyButton(){
   const btn = document.getElementById('catModalApply');
   const cat = CAT_MAP[modalSelectedCat];
+  const existing = document.getElementById('scopeExisting').checked;
+  const future = document.getElementById('scopeFuture').checked;
+
   if (!cat){
     btn.disabled = true;
     btn.textContent = 'Choose a category above';
     return;
   }
   btn.disabled = false;
-  btn.textContent = `Apply "${cat.label}" to ${document.getElementById('scopeExisting').checked ? 'this merchant' : 'future transactions'}`;
+
+  if (!existing && !future) {
+    btn.textContent = `Apply "${cat.label}" to this transaction only`;
+  } else if (existing && future) {
+    btn.textContent = `Apply "${cat.label}" to existing & future`;
+  } else if (existing) {
+    btn.textContent = `Apply "${cat.label}" to existing transactions`;
+  } else { // future only
+    btn.textContent = `Apply "${cat.label}" to future transactions`;
+  }
 }
 
 function renderModalTxList(){
@@ -537,7 +554,8 @@ function renderModalTxList(){
   const sorted = modalMerchantTxs.slice().sort((a,b)=>b.date-a.date);
   list.innerHTML = sorted.map(t=>{
     const cat = CAT_MAP[t.category] || CAT_MAP.other;
-    return `<div class="modal-tx-row">
+    const isCurrent = (t.id === modalCurrentTxId);
+    return `<div class="modal-tx-row" style="${isCurrent?'background:rgba(74,222,128,0.05);border-left:2px solid var(--credit);':''}">
       <div class="modal-tx-date">${fmtDate(t.date)}</div>
       <div class="modal-tx-desc">${escapeHtml(t.description)}</div>
       <div class="modal-tx-cat">${cat.icon}</div>
@@ -553,14 +571,22 @@ document.getElementById('catModalApply').addEventListener('click', ()=>{
   if (!modalSelectedCat) return;
   const applyExisting = document.getElementById('scopeExisting').checked;
   const applyFuture = document.getElementById('scopeFuture').checked;
-  if (!applyExisting && !applyFuture) return;
+  if (!applyExisting && !applyFuture) {
+    // Apply only to the current transaction
+    const tx = STATE.transactions.find(t=>t.id===modalCurrentTxId);
+    if (tx) {
+      STATE.categoryOverrides[tx.id] = modalSelectedCat;
+      tx.category = modalSelectedCat;
+      // Do NOT change merchantOverride
+    }
+    catModal.classList.remove('active');
+    renderAll();
+    return;
+  }
 
   if (applyFuture){
-    // Standing rule: guessCategory() checks this first, so any transaction
-    // parsed from a future statement with a matching merchant key picks it up.
     STATE.merchantOverrides[modalMKey] = modalSelectedCat;
   } else {
-    // User wants existing only — don't leave a standing rule behind.
     delete STATE.merchantOverrides[modalMKey];
   }
 
@@ -570,10 +596,7 @@ document.getElementById('catModalApply').addEventListener('click', ()=>{
       t.category = modalSelectedCat;
     });
   } else if (applyFuture){
-    // Future-only: re-resolve category for existing rows so ones without a
-    // per-transaction override still reflect the new merchant rule going
-    // forward, without touching any per-transaction manual overrides the
-    // user set separately.
+    // Future-only: re-resolve category for existing rows without per-tx override
     STATE.transactions.forEach(t=>{
       if (merchantKey(t) === modalMKey) t.category = guessCategory(t);
     });
@@ -738,6 +761,12 @@ function renderAccounts(){
       <div class="acct-bal" style="font-size:12px;color:var(--ink-faint);">${s.count} rows</div>
     </div>
   `).join('');
+}
+
+/* ---- Auto-restore from localStorage ---- */
+if (loadState() && STATE.transactions.length) {
+  // We have saved data, launch directly
+  launchApp();
 }
 
 })();
