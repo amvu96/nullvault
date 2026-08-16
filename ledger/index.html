@@ -409,6 +409,24 @@ footer.app-footer{
 .modal-tx-amt{font-family:var(--mono);white-space:nowrap;font-weight:500;}
 .modal-tx-cat{font-size:10.5px;color:var(--ink-faint);white-space:nowrap;}
 
+/* Date filter bar */
+.date-filter-bar{
+  display:flex;flex-wrap:wrap;align-items:center;gap:10px;
+  background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  padding:12px 16px;margin-bottom:16px;
+}
+.date-filter-bar label{
+  font-size:12px;color:var(--ink-faint);font-weight:500;
+}
+.date-filter-bar input[type="date"]{
+  background:var(--panel-2);border:1px solid var(--line);border-radius:6px;
+  padding:6px 10px;color:var(--ink);font-size:13px;font-family:var(--mono);
+}
+.date-filter-bar input[type="date"]:focus{outline:none;border-color:var(--ink-faint);}
+.date-filter-bar .filter-info{
+  font-size:12px;color:var(--ink-dim);margin-left:auto;
+}
+
 /* === Mobile improvements === */
 @media (max-width: 640px) {
   .topbar {
@@ -513,6 +531,13 @@ footer.app-footer{
 
   /* Ensure the ledger wrapper scrolls */
   .ledger-container { overflow-x: auto; }
+
+  /* Date filter bar stacks on mobile */
+  .date-filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .date-filter-bar .filter-info { margin-left: 0; }
 }
 
 /* Extra small screens (phones < 400px) */
@@ -583,6 +608,17 @@ footer.app-footer{
 
   <!-- OVERVIEW -->
   <div class="panel-view active" id="view-overview">
+    <!-- Date filter bar -->
+    <div class="date-filter-bar">
+      <label>From</label>
+      <input type="date" id="startDate">
+      <label>To</label>
+      <input type="date" id="endDate">
+      <button class="btn btn-primary btn-sm" id="applyDateFilter">Apply</button>
+      <button class="btn btn-ghost btn-sm" id="clearDateFilter">Clear</button>
+      <span class="filter-info" id="dateFilterInfo"></span>
+    </div>
+
     <div class="grid-2" style="margin-bottom:16px;">
       <div class="card">
         <div class="card-head">
@@ -747,7 +783,7 @@ footer.app-footer{
 
 <script>
 /* =========================================================================
-   LEDGER — Full application (app + ui + persistence)
+   LEDGER — Full application (app + ui + persistence) with date filter
    ========================================================================= */
 (function(){
 "use strict";
@@ -763,7 +799,8 @@ const STATE = {
   merchantOverrides: {},
   view: 'overview',
   sort: {key:'date', dir:'desc'},
-  filters: {search:'', category:'', account:'', type:''}
+  filters: {search:'', category:'', account:'', type:''},
+  dateFilter: { start: null, end: null } // stored as Date objects or null
 };
 
 const ROMANIAN_MONTHS = {
@@ -1452,6 +1489,10 @@ function saveState() {
     view: STATE.view,
     sort: STATE.sort,
     filters: STATE.filters,
+    dateFilter: {
+      start: STATE.dateFilter.start ? STATE.dateFilter.start.toISOString() : null,
+      end: STATE.dateFilter.end ? STATE.dateFilter.end.toISOString() : null
+    },
     version: '1.0'
   };
   try {
@@ -1465,7 +1506,10 @@ function loadState() {
     if (!raw) return false;
     const data = JSON.parse(raw);
     if (!data.version) return false;
-    STATE.transactions = data.transactions || [];
+    STATE.transactions = (data.transactions || []).map(t => ({
+      ...t,
+      date: t.date ? new Date(t.date) : null
+    }));
     STATE.sources = data.sources || [];
     STATE.notes = data.notes || {};
     STATE.categoryOverrides = data.categoryOverrides || {};
@@ -1473,11 +1517,64 @@ function loadState() {
     STATE.view = data.view || 'overview';
     STATE.sort = data.sort || {key:'date', dir:'desc'};
     STATE.filters = data.filters || {search:'', category:'', account:'', type:''};
+    if (data.dateFilter) {
+      STATE.dateFilter.start = data.dateFilter.start ? new Date(data.dateFilter.start) : null;
+      STATE.dateFilter.end = data.dateFilter.end ? new Date(data.dateFilter.end) : null;
+    }
     ID_SEQ = STATE.transactions.length + 1;
     return true;
   } catch (e) {
     return false;
   }
+}
+
+/* ---------------------------------------------------------------------
+   DATE FILTERING
+--------------------------------------------------------------------- */
+function getFilteredTransactions() {
+  const start = STATE.dateFilter.start;
+  const end = STATE.dateFilter.end;
+  if (!start && !end) return STATE.transactions;
+  return STATE.transactions.filter(t => {
+    if (!t.date) return false;
+    if (start && t.date < start) return false;
+    if (end) {
+      // set end to end of day
+      const endOfDay = new Date(end);
+      endOfDay.setHours(23,59,59,999);
+      if (t.date > endOfDay) return false;
+    }
+    return true;
+  });
+}
+
+function updateDateFilterInfo() {
+  const el = document.getElementById('dateFilterInfo');
+  if (STATE.dateFilter.start || STATE.dateFilter.end) {
+    const startStr = STATE.dateFilter.start ? fmtDate(STATE.dateFilter.start) : '∞';
+    const endStr = STATE.dateFilter.end ? fmtDate(STATE.dateFilter.end) : '∞';
+    el.textContent = `Filter: ${startStr} → ${endStr}`;
+  } else {
+    el.textContent = '';
+  }
+}
+
+function applyDateFilter() {
+  const startInput = document.getElementById('startDate');
+  const endInput = document.getElementById('endDate');
+  STATE.dateFilter.start = startInput.value ? new Date(startInput.value + 'T00:00:00') : null;
+  STATE.dateFilter.end = endInput.value ? new Date(endInput.value + 'T00:00:00') : null;
+  saveState();
+  renderAll();
+}
+
+function clearDateFilter() {
+  document.getElementById('startDate').value = '';
+  document.getElementById('endDate').value = '';
+  STATE.dateFilter.start = null;
+  STATE.dateFilter.end = null;
+  saveState();
+  renderAll();
 }
 
 /* ---------------------------------------------------------------------
@@ -1501,6 +1598,14 @@ function launchApp(){
   document.getElementById('topbarSub').textContent = STATE.sources.length + ' STATEMENT' + (STATE.sources.length>1?'S':'') + ' LOADED';
   document.getElementById('txCountPill').textContent = STATE.transactions.length + ' transactions';
 
+  // Set date filter inputs from saved state
+  if (STATE.dateFilter.start) {
+    document.getElementById('startDate').value = STATE.dateFilter.start.toISOString().split('T')[0];
+  }
+  if (STATE.dateFilter.end) {
+    document.getElementById('endDate').value = STATE.dateFilter.end.toISOString().split('T')[0];
+  }
+
   populateFilterOptions();
   renderAll();
 }
@@ -1523,14 +1628,16 @@ function populateFilterOptions(){
 }
 
 function renderAll(){
-  renderTape();
-  renderOverview();
+  const filtered = getFilteredTransactions();
+  renderTape(filtered);
+  renderOverview(filtered);
   renderLedger();
   renderAnomalies();
   renderSubscriptions();
   renderAccounts();
   document.getElementById('ledgerBadge').textContent = STATE.transactions.length;
   document.getElementById('anomalyBadge').textContent = ANOMALIES.length;
+  updateDateFilterInfo();
   saveState();
 }
 
@@ -1547,8 +1654,8 @@ document.getElementById('tabs').addEventListener('click', (e)=>{
 });
 
 /* TAPE */
-function renderTape(){
-  const stats = computeStats(STATE.transactions);
+function renderTape(txs){
+  const stats = computeStats(txs);
   const tape = document.getElementById('tape');
   const period = stats.minDate && stats.maxDate
     ? `${fmtDate(stats.minDate)} → ${fmtDate(stats.maxDate)}`
@@ -1589,11 +1696,11 @@ function renderTape(){
 }
 
 /* OVERVIEW */
-function renderOverview(){
-  const catBreakdown = computeCategoryBreakdown(STATE.transactions);
-  const monthlyFlow = computeMonthlyFlow(STATE.transactions);
-  const stats = computeStats(STATE.transactions);
-  const insights = generateInsights(STATE.transactions, stats, catBreakdown, ANOMALIES, RECURRING);
+function renderOverview(txs){
+  const catBreakdown = computeCategoryBreakdown(txs);
+  const monthlyFlow = computeMonthlyFlow(txs);
+  const stats = computeStats(txs);
+  const insights = generateInsights(txs, stats, catBreakdown, ANOMALIES, RECURRING);
 
   const catEl = document.getElementById('catBreakdown');
   if (catBreakdown.length === 0){
@@ -1619,7 +1726,7 @@ function renderOverview(){
   `).join('') : '<div class="empty-state"><p>Not enough data yet for insights.</p></div>';
 
   drawFlowChart(monthlyFlow);
-  drawBalanceChart();
+  drawBalanceChart(txs);
 }
 
 function setupCanvas(canvas){
@@ -1687,17 +1794,17 @@ function drawFlowChart(monthlyFlow){
   }
 }
 
-function drawBalanceChart(){
+function drawBalanceChart(txs){
   const canvas = document.getElementById('balChart');
   if (!canvas) return;
   const {ctx, w, h} = setupCanvas(canvas);
   ctx.clearRect(0,0,w,h);
 
-  const accounts = [...new Set(STATE.transactions.map(t=>t.account))];
+  const accounts = [...new Set(txs.map(t=>t.account))];
   const primaryAccount = accounts.sort((a,b)=>
-    STATE.transactions.filter(t=>t.account===b).length - STATE.transactions.filter(t=>t.account===a).length
+    txs.filter(t=>t.account===b).length - txs.filter(t=>t.account===a).length
   )[0];
-  const series = computeBalanceSeries(STATE.transactions, primaryAccount);
+  const series = computeBalanceSeries(txs, primaryAccount);
 
   if (series.length < 2){
     ctx.fillStyle = '#565e69'; ctx.font='12px Inter'; ctx.fillText('Not enough balance data', 10, 20);
@@ -2246,17 +2353,21 @@ document.getElementById('resetBtn').addEventListener('click', ()=>{
   location.reload();
 });
 
+// Date filter buttons
+document.getElementById('applyDateFilter').addEventListener('click', applyDateFilter);
+document.getElementById('clearDateFilter').addEventListener('click', clearDateFilter);
+
 window.addEventListener('resize', debounce(()=>{
   if (STATE.transactions.length){
-    drawFlowChart(computeMonthlyFlow(STATE.transactions));
-    drawBalanceChart();
+    const filtered = getFilteredTransactions();
+    drawFlowChart(computeMonthlyFlow(filtered));
+    drawBalanceChart(filtered);
   }
 }, 200));
 function debounce(fn, ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
 
 /* ---- Auto-restore from localStorage ---- */
 if (loadState() && STATE.transactions.length) {
-  // We have saved data, launch directly
   launchApp();
 }
 
