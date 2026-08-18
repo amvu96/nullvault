@@ -357,9 +357,10 @@ textarea.note-input:focus{outline:none;border-color:var(--amber);}
   width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;
   font-family:var(--mono);font-weight:700;font-size:11px;flex-shrink:0;
 }
-.acct-name{font-weight:600;font-size:13px;}
-.acct-meta{font-size:11px;color:var(--ink-faint);font-family:var(--mono);}
-.acct-bal{font-family:var(--mono);font-weight:700;font-size:14.5px;margin-left:auto;text-align:right;}
+.acct-info{flex:1;min-width:0;}
+.acct-name{font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.acct-meta{font-size:11px;color:var(--ink-faint);font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.acct-bal{font-family:var(--mono);font-weight:700;font-size:14.5px;margin-left:auto;text-align:right;flex-shrink:0;white-space:nowrap;}
 
 footer.app-footer{
   text-align:center;padding:30px 0 10px;color:var(--ink-faint);font-size:11px;font-family:var(--mono);
@@ -604,9 +605,11 @@ footer.app-footer{
   .anomaly-amt { font-size: 14px; }
 
   /* Account rows */
-  .acct-row { padding: 8px 10px; }
+  .acct-row { padding: 8px 10px; gap: 8px; }
+  .acct-icon { width: 28px; height: 28px; font-size: 10px; }
   .acct-name { font-size: 12px; }
-  .acct-bal { font-size: 13px; }
+  .acct-meta { font-size: 10px; }
+  .acct-bal { font-size: 12.5px; }
 
   /* Grids become single column */
   .grid-2, .grid-3 { grid-template-columns: 1fr; }
@@ -1498,38 +1501,69 @@ function computeCategoryBreakdown(txs){
     .sort((a,b)=>b.amt-a.amt);
 }
 
-function computeBudgetProgress(){
+function computeBudgetProgress(txs){
   const budgetKeys = Object.keys(STATE.budgets).filter(k=>STATE.budgets[k] > 0);
-  if (budgetKeys.length === 0) return [];
+  if (budgetKeys.length === 0) return {progress: [], periodLabel: '', isProrated: false};
 
+  const hasDateFilter = !!(STATE.dateFilter.start || STATE.dateFilter.end);
   const now = new Date();
-  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth()+1, 1));
 
-  const monthTxs = STATE.transactions.filter(t=>
-    t.date && t.date >= monthStart && t.date < monthEnd &&
-    t.amount < 0 && t.kind !== 'savings' && t.kind !== 'transfer_p2p'
-  );
+  let rangeStart, rangeEnd, periodLabel, isProrated;
+
+  if (hasDateFilter){
+    // Respect the active date filter so the budget bars match whatever period
+    // is currently shown in the category breakdown below them.
+    rangeStart = STATE.dateFilter.start || null;
+    rangeEnd = STATE.dateFilter.end || null;
+    const startStr = rangeStart ? fmtDate(rangeStart) : '…';
+    const endStr = rangeEnd ? fmtDate(rangeEnd) : '…';
+    periodLabel = `${startStr} → ${endStr}`;
+    isProrated = false; // budgets are monthly targets; a custom range isn't compared against pace
+  } else {
+    rangeStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    rangeEnd = null; // open-ended: filtered below by "up to now" logic via monthEnd
+    periodLabel = now.toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+    isProrated = true;
+  }
+
+  const monthEndExclusive = hasDateFilter
+    ? null
+    : new Date(now.getFullYear(), now.getMonth()+1, 1);
+
+  const scopedTxs = (txs || STATE.transactions).filter(t=>{
+    if (!t.date) return false;
+    if (t.amount >= 0 || t.kind === 'savings' || t.kind === 'transfer_p2p') return false;
+    if (rangeStart && t.date < rangeStart) return false;
+    if (hasDateFilter && rangeEnd){
+      const endOfDay = new Date(rangeEnd);
+      endOfDay.setHours(23,59,59,999);
+      if (t.date > endOfDay) return false;
+    }
+    if (!hasDateFilter && t.date >= monthEndExclusive) return false;
+    return true;
+  });
 
   const spentByCat = {};
-  monthTxs.forEach(t=>{
+  scopedTxs.forEach(t=>{
     spentByCat[t.category] = (spentByCat[t.category]||0) + Math.abs(t.amount);
   });
 
-  const daysInMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth()+1, 0)).getUTCDate();
-  const dayOfMonth = now.getUTCDate();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+  const dayOfMonth = now.getDate();
   const monthProgress = dayOfMonth / daysInMonth;
 
-  return budgetKeys.map(key=>{
+  const progress = budgetKeys.map(key=>{
     const budget = STATE.budgets[key];
     const spent = spentByCat[key] || 0;
     const pct = Math.min(100, (spent / budget) * 100);
     const meta = CAT_MAP[key] || CAT_MAP.other;
     let status = 'ok';
     if (spent >= budget) status = 'over';
-    else if (pct / 100 > monthProgress + 0.15) status = 'ahead'; // spending faster than time elapsed
+    else if (isProrated && pct / 100 > monthProgress + 0.15) status = 'ahead'; // spending faster than time elapsed
     return {key, meta, budget, spent, pct, remaining: budget - spent, status};
   }).sort((a,b)=> (b.spent/b.budget) - (a.spent/a.budget));
+
+  return {progress, periodLabel, isProrated};
 }
 
 function computeMonthlyFlow(txs){
@@ -1914,7 +1948,7 @@ function renderOverview(txs){
   const recurring = detectRecurring(txs);
   const insights = generateInsights(txs, stats, catBreakdown, anomalies, recurring);
 
-  renderBudgetProgress();
+  renderBudgetProgress(txs);
 
   const catEl = document.getElementById('catBreakdown');
   if (catBreakdown.length === 0){
@@ -1944,17 +1978,22 @@ function renderOverview(txs){
 }
 
 /* BUDGETS */
-function renderBudgetProgress(){
+function renderBudgetProgress(txs){
   const el = document.getElementById('budgetProgress');
-  const progress = computeBudgetProgress();
+  const {progress, periodLabel, isProrated} = computeBudgetProgress(txs);
+
+  const catPeriodEl = document.getElementById('catPeriodLabel');
+  const hasDateFilter = !!(STATE.dateFilter.start || STATE.dateFilter.end);
+  const basePeriodText = hasDateFilter
+    ? `${STATE.dateFilter.start ? fmtDate(STATE.dateFilter.start) : '…'} → ${STATE.dateFilter.end ? fmtDate(STATE.dateFilter.end) : '…'}`
+    : 'All time';
 
   if (progress.length === 0){
     el.innerHTML = '';
+    if (catPeriodEl) catPeriodEl.textContent = basePeriodText;
     return;
   }
 
-  const now = new Date();
-  const monthLabel = now.toLocaleDateString('en-GB',{month:'long',year:'numeric'});
   const statusText = {ok:'on track', ahead:'ahead of pace', over:'over budget'};
 
   el.innerHTML = `<div class="budget-progress">` + progress.map(b=>`
@@ -1968,12 +2007,12 @@ function renderBudgetProgress(){
     </div>
   `).join('') + `</div>`;
 
-  // Update the period label to make clear budgets track the current month regardless of the date filter
-  const periodLabel = document.getElementById('catPeriodLabel');
-  if (periodLabel && !STATE.dateFilter.start && !STATE.dateFilter.end){
-    periodLabel.textContent = 'All time · budgets track ' + monthLabel;
-  } else if (periodLabel){
-    periodLabel.textContent = 'Filtered period · budgets track ' + monthLabel;
+  // Budgets now use exactly the same period as the category breakdown below them,
+  // so a single label covers both — no more "two numbers, two scopes" confusion.
+  if (catPeriodEl){
+    catPeriodEl.textContent = hasDateFilter
+      ? `${basePeriodText} · budgets prorated to this range`
+      : `${basePeriodText} · budgets track ${periodLabel}`;
   }
 }
 
@@ -2649,7 +2688,7 @@ function renderAccounts(){
     const color = a.format==='ING' ? '#f2a93b' : a.format==='Revolut' ? '#5b9dd9' : '#8b93a0';
     return `<div class="acct-row">
       <div class="acct-icon" style="background:${color}22;color:${color};border:1px solid ${color}44;">${initials}</div>
-      <div>
+      <div class="acct-info">
         <div class="acct-name">${escapeHtml(a.name)}</div>
         <div class="acct-meta">${a.txs.length} transactions</div>
       </div>
@@ -2663,7 +2702,7 @@ function renderAccounts(){
       <div class="acct-icon" style="background:#26313522;color:#8b93a0;border:1px solid var(--line);">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>
       </div>
-      <div>
+      <div class="acct-info">
         <div class="acct-name">${escapeHtml(s.name)}</div>
         <div class="acct-meta">detected as ${s.format}</div>
       </div>
