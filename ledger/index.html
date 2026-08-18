@@ -466,6 +466,7 @@ footer.app-footer{
   cursor:default;
 }
 .period-popover.open{display:block;animation:popIn .15s ease;}
+.period-popover-backdrop{display:none;}
 @keyframes popIn{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:translateY(0);}}
 @keyframes popInUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
 .period-popover-field{display:flex;flex-direction:column;gap:5px;margin-bottom:10px;}
@@ -512,8 +513,8 @@ footer.app-footer{
     z-index: 70;
   }
   .period-popover.open { animation: popInUp .18s ease; }
-  .period-popover.open::before{
-    content:'';position:fixed;top:0;left:0;right:0;bottom:0;
+  .period-popover-backdrop.open{
+    display:block;position:fixed;top:0;left:0;right:0;bottom:0;
     background:rgba(0,0,0,0.5);z-index:69;
   }
 
@@ -1765,26 +1766,6 @@ function renderTape(txs, anomalies){
       <div class="tape-label">Period</div>
       <div class="tape-value" style="font-size:15px;">${period}</div>
       <div class="tape-sub">${stats.count} transaction${stats.count===1?'':'s'}</div>
-      <div class="period-popover" id="periodPopover" onclick="event.stopPropagation()">
-        <div class="period-popover-field">
-          <label for="periodStart">From</label>
-          <input type="date" id="periodStart" value="${startVal}">
-        </div>
-        <div class="period-popover-field">
-          <label for="periodEnd">To</label>
-          <input type="date" id="periodEnd" value="${endVal}">
-        </div>
-        <div class="period-popover-presets">
-          <span class="period-preset-chip" data-preset="30">Last 30 days</span>
-          <span class="period-preset-chip" data-preset="90">Last 90 days</span>
-          <span class="period-preset-chip" data-preset="month">This month</span>
-          <span class="period-preset-chip" data-preset="year">This year</span>
-        </div>
-        <div class="period-popover-actions">
-          <button class="btn btn-ghost btn-sm" id="periodClearBtn">Clear</button>
-          <button class="btn btn-primary btn-sm" id="periodApplyBtn">Apply</button>
-        </div>
-      </div>
     </div>
     <div class="tape-cell">
       <div class="tape-label">Income</div>
@@ -1811,6 +1792,27 @@ function renderTape(txs, anomalies){
       <div class="tape-value amber">${anomalies.length}</div>
       <div class="tape-sub">${anomalies.filter(a=>a.severity==='high').length} high priority</div>
     </div>
+    <div class="period-popover-backdrop" id="periodBackdrop"></div>
+    <div class="period-popover" id="periodPopover">
+      <div class="period-popover-field">
+        <label for="periodStart">From</label>
+        <input type="date" id="periodStart" value="${startVal}">
+      </div>
+      <div class="period-popover-field">
+        <label for="periodEnd">To</label>
+        <input type="date" id="periodEnd" value="${endVal}">
+      </div>
+      <div class="period-popover-presets">
+        <span class="period-preset-chip" data-preset="30">Last 30 days</span>
+        <span class="period-preset-chip" data-preset="90">Last 90 days</span>
+        <span class="period-preset-chip" data-preset="month">This month</span>
+        <span class="period-preset-chip" data-preset="year">This year</span>
+      </div>
+      <div class="period-popover-actions">
+        <button class="btn btn-ghost btn-sm" id="periodClearBtn">Clear</button>
+        <button class="btn btn-primary btn-sm" id="periodApplyBtn">Apply</button>
+      </div>
+    </div>
   `;
 
   wirePeriodPopover();
@@ -1820,35 +1822,50 @@ function renderTape(txs, anomalies){
 function wirePeriodPopover(){
   const cell = document.getElementById('periodCell');
   const popover = document.getElementById('periodPopover');
+  const backdrop = document.getElementById('periodBackdrop');
   if (!cell || !popover) return;
 
+  function closePopover(){
+    popover.classList.remove('open');
+    if (backdrop) backdrop.classList.remove('open');
+  }
+  function openPopover(){
+    popover.classList.add('open');
+    if (backdrop) backdrop.classList.add('open');
+  }
+
+  // Prevent clicks inside the popover from bubbling up to document (which would close it).
+  popover.addEventListener('click', (e)=>{ e.stopPropagation(); });
+
   cell.addEventListener('click', ()=>{
-    popover.classList.toggle('open');
+    if (popover.classList.contains('open')) closePopover();
+    else openPopover();
   });
 
-  document.getElementById('periodApplyBtn').addEventListener('click', (e)=>{
-    e.stopPropagation();
+  if (backdrop){
+    backdrop.addEventListener('click', closePopover);
+  }
+
+  document.getElementById('periodApplyBtn').addEventListener('click', ()=>{
     const startVal = document.getElementById('periodStart').value;
     const endVal = document.getElementById('periodEnd').value;
     STATE.dateFilter.start = startVal ? new Date(startVal + 'T00:00:00') : null;
     STATE.dateFilter.end = endVal ? new Date(endVal + 'T00:00:00') : null;
-    popover.classList.remove('open');
+    closePopover();
     saveState();
     renderAll();
   });
 
-  document.getElementById('periodClearBtn').addEventListener('click', (e)=>{
-    e.stopPropagation();
+  document.getElementById('periodClearBtn').addEventListener('click', ()=>{
     STATE.dateFilter.start = null;
     STATE.dateFilter.end = null;
-    popover.classList.remove('open');
+    closePopover();
     saveState();
     renderAll();
   });
 
   popover.querySelectorAll('.period-preset-chip').forEach(chip=>{
-    chip.addEventListener('click', (e)=>{
-      e.stopPropagation();
+    chip.addEventListener('click', ()=>{
       const preset = chip.dataset.preset;
       const now = new Date();
       let start, end;
@@ -1869,18 +1886,23 @@ function wirePeriodPopover(){
   });
 }
 
-// Close the period popover on outside click or Escape
+// Close the period popover on outside click or Escape.
+// Guard defensively: only ever remove the 'open' class, never block/consume the click,
+// so whatever the user actually clicked on still receives and handles the event normally.
 document.addEventListener('click', (e)=>{
   const popover = document.getElementById('periodPopover');
-  if (popover && popover.classList.contains('open') && !e.target.closest('#periodCell')){
-    popover.classList.remove('open');
-  }
+  if (!popover || !popover.classList.contains('open')) return;
+  if (e.target.closest('#periodCell') || e.target.closest('#periodPopover')) return;
+  popover.classList.remove('open');
+  const backdrop = document.getElementById('periodBackdrop');
+  if (backdrop) backdrop.classList.remove('open');
 });
 document.addEventListener('keydown', (e)=>{
-  if (e.key === 'Escape'){
-    const popover = document.getElementById('periodPopover');
-    if (popover) popover.classList.remove('open');
-  }
+  if (e.key !== 'Escape') return;
+  const popover = document.getElementById('periodPopover');
+  if (popover) popover.classList.remove('open');
+  const backdrop = document.getElementById('periodBackdrop');
+  if (backdrop) backdrop.classList.remove('open');
 });
 
 /* OVERVIEW */
