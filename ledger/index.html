@@ -162,12 +162,13 @@ input[type=file]{display:none;}
   background:var(--panel);border:1px solid var(--line);border-radius:14px;
   padding:20px 24px;margin-bottom:20px;
   display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0;
-  position:relative;overflow:hidden;
+  position:relative;
 }
 .tape::before{
   content:'';position:absolute;top:0;left:0;right:0;height:2px;
   background:repeating-linear-gradient(90deg,var(--credit) 0 8px,transparent 8px 14px);
   opacity:0.5;
+  border-radius:14px 14px 0 0;
 }
 .tape-cell{padding:6px 20px;border-right:1px solid var(--line-soft);}
 .tape-cell:last-child{border-right:none;}
@@ -243,6 +244,9 @@ select, .filter-select{
   padding:9px 12px;color:var(--ink);font-size:13px;font-family:var(--sans);
 }
 select:focus{outline:none;}
+
+.export-group{display:flex;gap:6px;margin-left:auto;}
+.export-group .btn{display:flex;align-items:center;gap:6px;}
 
 .ledger{width:100%;border-collapse:collapse;font-size:13px;}
 .ledger thead th{
@@ -413,24 +417,77 @@ footer.app-footer{
 .modal-tx-amt{font-family:var(--mono);white-space:nowrap;font-weight:500;}
 .modal-tx-cat{font-size:10.5px;color:var(--ink-faint);white-space:nowrap;}
 
-/* Date filter bar — lives in the top bar */
-.topbar-datefilter{
-  display:flex;flex-wrap:wrap;align-items:center;gap:8px;
-  padding-top:10px;border-top:1px solid var(--line-soft);
+/* budget editor */
+.budget-editor-list{max-height:340px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;}
+.budget-editor-row{
+  display:flex;align-items:center;gap:10px;padding:8px 2px;
+  border-bottom:1px solid var(--line-soft);
 }
-.topbar-datefilter label{
-  font-size:12px;color:var(--ink-faint);font-weight:500;
+.budget-editor-row:last-child{border-bottom:none;}
+.budget-editor-label{display:flex;align-items:center;gap:8px;flex:1;font-size:13px;min-width:0;}
+.budget-editor-row input[type=number]{
+  width:100px;background:var(--panel-2);border:1px solid var(--line);border-radius:6px;
+  padding:7px 9px;color:var(--ink);font-size:13px;font-family:var(--mono);text-align:right;
 }
-.topbar-datefilter input[type="date"]{
-  background:var(--panel-2);border:1px solid var(--line);border-radius:6px;
-  padding:6px 10px;color:var(--ink);font-size:13px;font-family:var(--mono);
-  color-scheme:dark;
-  max-width:140px;
+.budget-editor-row input[type=number]:focus{outline:none;border-color:var(--ink-faint);}
+.budget-editor-clear{
+  color:var(--ink-faint);font-size:11px;cursor:pointer;flex-shrink:0;padding:2px 4px;
 }
-.topbar-datefilter input[type="date"]:focus{outline:none;border-color:var(--ink-faint);}
-.topbar-datefilter .filter-info{
-  font-size:12px;color:var(--ink-dim);
+.budget-editor-clear:hover{color:var(--red);}
+
+/* budget progress on Overview */
+.budget-progress{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--line-soft);}
+.budget-row-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:5px;}
+.budget-row-name{font-size:12.5px;display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.budget-row-amt{font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);white-space:nowrap;flex-shrink:0;}
+.budget-row-amt b{color:var(--ink-dim);font-weight:600;}
+.budget-track{height:6px;background:var(--line-soft);border-radius:3px;overflow:hidden;}
+.budget-fill{height:100%;border-radius:3px;transition:width .4s ease;}
+.budget-fill.ok{background:var(--credit);}
+.budget-fill.ahead{background:var(--amber);}
+.budget-fill.over{background:var(--red);}
+.budget-status{font-size:10px;font-family:var(--mono);margin-top:3px;}
+.budget-status.ok{color:var(--credit);}
+.budget-status.ahead{color:var(--amber);}
+.budget-status.over{color:var(--red);}
+
+/* Period picker — anchored popover triggered from the Period tape-cell */
+.tape-cell.period-cell{cursor:pointer;position:relative;user-select:none;}
+.tape-cell.period-cell:hover .tape-value{color:var(--credit);}
+.tape-cell.period-cell .tape-value{transition:color .15s ease;}
+.period-cell.filtered .tape-label::after{
+  content:'●';color:var(--credit);font-size:6px;margin-left:6px;vertical-align:middle;
 }
+
+.period-popover{
+  display:none;position:absolute;top:calc(100% + 10px);left:0;z-index:60;
+  background:var(--panel);border:1px solid var(--line);border-radius:12px;
+  padding:16px;width:280px;box-shadow:0 12px 32px rgba(0,0,0,0.45);
+  cursor:default;
+}
+.period-popover.open{display:block;animation:popIn .15s ease;}
+@keyframes popIn{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:translateY(0);}}
+@keyframes popInUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+.period-popover-field{display:flex;flex-direction:column;gap:5px;margin-bottom:10px;}
+.period-popover-field label{
+  font-family:var(--mono);font-size:10px;color:var(--ink-faint);
+  text-transform:uppercase;letter-spacing:0.06em;
+}
+.period-popover-field input[type="date"]{
+  background:var(--panel-2);border:1px solid var(--line);border-radius:8px;
+  padding:9px 10px;color:var(--ink);font-size:13px;font-family:var(--mono);
+  color-scheme:dark;width:100%;
+}
+.period-popover-field input[type="date"]:focus{outline:none;border-color:var(--credit-dim);}
+.period-popover-presets{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
+.period-preset-chip{
+  font-family:var(--mono);font-size:10.5px;color:var(--ink-dim);
+  border:1px solid var(--line);padding:4px 9px;border-radius:20px;cursor:pointer;
+  transition:all .1s ease;
+}
+.period-preset-chip:hover{border-color:var(--credit-dim);color:var(--credit);}
+.period-popover-actions{display:flex;gap:8px;}
+.period-popover-actions .btn{flex:1;}
 
 /* === Mobile improvements === */
 @media (max-width: 640px) {
@@ -445,11 +502,20 @@ footer.app-footer{
   .topbar-actions .pill { font-size: 9px; padding: 3px 8px; }
   .btn-sm { font-size: 11px; padding: 4px 10px; }
 
-  /* Date filter stacks and inputs go full width */
-  .topbar-datefilter { gap: 6px; }
-  .topbar-datefilter label { flex-basis: 100%; margin-bottom: -2px; }
-  .topbar-datefilter input[type="date"] { flex: 1 1 auto; max-width: none; min-width: 0; }
-  .topbar-datefilter .filter-info { flex-basis: 100%; }
+  /* Period popover becomes a bottom sheet on mobile, with a dim backdrop */
+  .period-popover {
+    position: fixed;
+    top: auto; bottom: 0; left: 0; right: 0;
+    width: auto;
+    border-radius: 16px 16px 0 0;
+    padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px));
+    z-index: 70;
+  }
+  .period-popover.open { animation: popInUp .18s ease; }
+  .period-popover.open::before{
+    content:'';position:fixed;top:0;left:0;right:0;bottom:0;
+    background:rgba(0,0,0,0.5);z-index:69;
+  }
 
   .landing { padding: 40px 16px; }
   .landing h1 { font-size: 28px; }
@@ -514,6 +580,8 @@ footer.app-footer{
   }
   .search-box { min-width: unset; }
   select, .filter-select { font-size: 12px; padding: 6px 8px; }
+  .export-group { margin-left: 0; }
+  .export-group .btn { flex: 1; justify-content: center; }
 
   /* Modal full-width */
   .modal-backdrop .modal {
@@ -526,6 +594,8 @@ footer.app-footer{
   .modal-wide { width: 94vw; }
   .cat-option { font-size: 11px; padding: 5px 8px; }
   .modal-tx-row { font-size: 11px; padding: 6px 8px; }
+  .budget-editor-row input[type=number] { width: 80px; font-size: 12px; }
+  .budget-editor-label { font-size: 12px; }
 
   /* Anomaly cards */
   .anomaly-card { padding: 12px; }
@@ -552,8 +622,6 @@ footer.app-footer{
   .landing h1 { font-size: 24px; }
   .tape-cell { min-width: 90px; }
   .tape-value { font-size: 15px; }
-  .topbar-datefilter { justify-content: center; }
-  .topbar-datefilter input[type="date"] { flex: 1 1 100%; }
 }
 </style>
 </head>
@@ -573,15 +641,6 @@ footer.app-footer{
       <button class="btn btn-sm" id="addMoreBtn">+ Add statement</button>
       <button class="btn btn-sm btn-ghost" id="resetBtn">Reset</button>
     </div>
-  </div>
-  <div class="topbar-datefilter" id="topbarDateFilter" style="display:none;">
-    <label for="startDate">From</label>
-    <input type="date" id="startDate">
-    <label for="endDate">To</label>
-    <input type="date" id="endDate">
-    <button class="btn btn-primary btn-sm" id="applyDateFilter">Apply</button>
-    <button class="btn btn-ghost btn-sm" id="clearDateFilter">Clear</button>
-    <span class="filter-info" id="dateFilterInfo"></span>
   </div>
 </div>
 
@@ -641,7 +700,9 @@ footer.app-footer{
             <div class="card-title">Spending by category</div>
             <div class="card-title-sub" id="catPeriodLabel">All time</div>
           </div>
+          <button class="btn btn-sm btn-ghost" id="editBudgetsBtn" title="Set monthly budgets per category">Budgets</button>
         </div>
+        <div id="budgetProgress"></div>
         <div id="catBreakdown"></div>
       </div>
     </div>
@@ -681,6 +742,16 @@ footer.app-footer{
         <option value="anomaly">Anomalies only</option>
         <option value="noted">Has note</option>
       </select>
+      <div class="export-group">
+        <button class="btn btn-sm btn-ghost" id="exportCsvBtn" title="Download filtered transactions as CSV">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+          CSV
+        </button>
+        <button class="btn btn-sm btn-ghost" id="exportJsonBtn" title="Download filtered transactions as JSON">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+          JSON
+        </button>
+      </div>
     </div>
     <div class="ledger-container" style="overflow-x:auto;">
       <table class="ledger">
@@ -787,6 +858,24 @@ footer.app-footer{
   </div>
 </div>
 
+<!-- Budget editor modal -->
+<div class="modal-backdrop" id="budgetModal">
+  <div class="modal modal-wide">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title">Monthly budgets</div>
+        <div class="modal-sub">Set a target per category — tracked against the current calendar month</div>
+      </div>
+      <div class="close-x" id="budgetModalClose">✕</div>
+    </div>
+
+    <div class="modal-section-label">Category targets (RON)</div>
+    <div id="budgetEditorList" class="budget-editor-list"></div>
+
+    <button class="btn btn-primary" id="budgetModalSave" style="width:100%;margin-top:14px;">Save budgets</button>
+  </div>
+</div>
+
 <script>
 /* =========================================================================
    LEDGER — Full application with date filter affecting all views
@@ -803,6 +892,7 @@ const STATE = {
   notes: {},
   categoryOverrides: {},
   merchantOverrides: {},
+  budgets: {}, // { categoryKey: monthlyAmountInRON }
   view: 'overview',
   sort: {key:'date', dir:'desc'},
   filters: {search:'', category:'', account:'', type:''},
@@ -1407,6 +1497,40 @@ function computeCategoryBreakdown(txs){
     .sort((a,b)=>b.amt-a.amt);
 }
 
+function computeBudgetProgress(){
+  const budgetKeys = Object.keys(STATE.budgets).filter(k=>STATE.budgets[k] > 0);
+  if (budgetKeys.length === 0) return [];
+
+  const now = new Date();
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth()+1, 1));
+
+  const monthTxs = STATE.transactions.filter(t=>
+    t.date && t.date >= monthStart && t.date < monthEnd &&
+    t.amount < 0 && t.kind !== 'savings' && t.kind !== 'transfer_p2p'
+  );
+
+  const spentByCat = {};
+  monthTxs.forEach(t=>{
+    spentByCat[t.category] = (spentByCat[t.category]||0) + Math.abs(t.amount);
+  });
+
+  const daysInMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth()+1, 0)).getUTCDate();
+  const dayOfMonth = now.getUTCDate();
+  const monthProgress = dayOfMonth / daysInMonth;
+
+  return budgetKeys.map(key=>{
+    const budget = STATE.budgets[key];
+    const spent = spentByCat[key] || 0;
+    const pct = Math.min(100, (spent / budget) * 100);
+    const meta = CAT_MAP[key] || CAT_MAP.other;
+    let status = 'ok';
+    if (spent >= budget) status = 'over';
+    else if (pct / 100 > monthProgress + 0.15) status = 'ahead'; // spending faster than time elapsed
+    return {key, meta, budget, spent, pct, remaining: budget - spent, status};
+  }).sort((a,b)=> (b.spent/b.budget) - (a.spent/a.budget));
+}
+
 function computeMonthlyFlow(txs){
   const months = {};
   txs.forEach(t=>{
@@ -1492,6 +1616,7 @@ function saveState() {
     notes: STATE.notes,
     categoryOverrides: STATE.categoryOverrides,
     merchantOverrides: STATE.merchantOverrides,
+    budgets: STATE.budgets,
     view: STATE.view,
     sort: STATE.sort,
     filters: STATE.filters,
@@ -1520,6 +1645,7 @@ function loadState() {
     STATE.notes = data.notes || {};
     STATE.categoryOverrides = data.categoryOverrides || {};
     STATE.merchantOverrides = data.merchantOverrides || {};
+    STATE.budgets = data.budgets || {};
     STATE.view = data.view || 'overview';
     STATE.sort = data.sort || {key:'date', dir:'desc'};
     STATE.filters = data.filters || {search:'', category:'', account:'', type:''};
@@ -1553,35 +1679,6 @@ function getFilteredTransactions() {
   });
 }
 
-function updateDateFilterInfo() {
-  const el = document.getElementById('dateFilterInfo');
-  if (STATE.dateFilter.start || STATE.dateFilter.end) {
-    const startStr = STATE.dateFilter.start ? fmtDate(STATE.dateFilter.start) : '∞';
-    const endStr = STATE.dateFilter.end ? fmtDate(STATE.dateFilter.end) : '∞';
-    el.textContent = `Filter: ${startStr} → ${endStr}`;
-  } else {
-    el.textContent = '';
-  }
-}
-
-function applyDateFilter() {
-  const startInput = document.getElementById('startDate');
-  const endInput = document.getElementById('endDate');
-  STATE.dateFilter.start = startInput.value ? new Date(startInput.value + 'T00:00:00') : null;
-  STATE.dateFilter.end = endInput.value ? new Date(endInput.value + 'T00:00:00') : null;
-  saveState();
-  renderAll();
-}
-
-function clearDateFilter() {
-  document.getElementById('startDate').value = '';
-  document.getElementById('endDate').value = '';
-  STATE.dateFilter.start = null;
-  STATE.dateFilter.end = null;
-  saveState();
-  renderAll();
-}
-
 /* ---------------------------------------------------------------------
    UI RENDERING
 --------------------------------------------------------------------- */
@@ -1600,16 +1697,8 @@ function launchApp(){
   document.getElementById('landing').style.display = 'none';
   document.getElementById('app').classList.add('active');
   document.getElementById('topActions').style.display = 'flex';
-  document.getElementById('topbarDateFilter').style.display = 'flex';
   document.getElementById('topbarSub').textContent = STATE.sources.length + ' STATEMENT' + (STATE.sources.length>1?'S':'') + ' LOADED';
   document.getElementById('txCountPill').textContent = STATE.transactions.length + ' transactions';
-
-  if (STATE.dateFilter.start) {
-    document.getElementById('startDate').value = STATE.dateFilter.start.toISOString().split('T')[0];
-  }
-  if (STATE.dateFilter.end) {
-    document.getElementById('endDate').value = STATE.dateFilter.end.toISOString().split('T')[0];
-  }
 
   populateFilterOptions();
   renderAll();
@@ -1645,7 +1734,6 @@ function renderAll(){
 
   document.getElementById('ledgerBadge').textContent = filteredTxs.length;
   document.getElementById('anomalyBadge').textContent = filteredAnomalies.length;
-  updateDateFilterInfo();
   saveState();
 }
 
@@ -1668,12 +1756,35 @@ function renderTape(txs, anomalies){
   const period = stats.minDate && stats.maxDate
     ? `${fmtDate(stats.minDate)} → ${fmtDate(stats.maxDate)}`
     : '—';
+  const isFiltered = !!(STATE.dateFilter.start || STATE.dateFilter.end);
+  const startVal = STATE.dateFilter.start ? STATE.dateFilter.start.toISOString().split('T')[0] : '';
+  const endVal = STATE.dateFilter.end ? STATE.dateFilter.end.toISOString().split('T')[0] : '';
 
   tape.innerHTML = `
-    <div class="tape-cell">
+    <div class="tape-cell period-cell${isFiltered?' filtered':''}" id="periodCell">
       <div class="tape-label">Period</div>
       <div class="tape-value" style="font-size:15px;">${period}</div>
-      <div class="tape-sub">${stats.count} transactions</div>
+      <div class="tape-sub">${stats.count} transaction${stats.count===1?'':'s'}</div>
+      <div class="period-popover" id="periodPopover" onclick="event.stopPropagation()">
+        <div class="period-popover-field">
+          <label for="periodStart">From</label>
+          <input type="date" id="periodStart" value="${startVal}">
+        </div>
+        <div class="period-popover-field">
+          <label for="periodEnd">To</label>
+          <input type="date" id="periodEnd" value="${endVal}">
+        </div>
+        <div class="period-popover-presets">
+          <span class="period-preset-chip" data-preset="30">Last 30 days</span>
+          <span class="period-preset-chip" data-preset="90">Last 90 days</span>
+          <span class="period-preset-chip" data-preset="month">This month</span>
+          <span class="period-preset-chip" data-preset="year">This year</span>
+        </div>
+        <div class="period-popover-actions">
+          <button class="btn btn-ghost btn-sm" id="periodClearBtn">Clear</button>
+          <button class="btn btn-primary btn-sm" id="periodApplyBtn">Apply</button>
+        </div>
+      </div>
     </div>
     <div class="tape-cell">
       <div class="tape-label">Income</div>
@@ -1701,7 +1812,76 @@ function renderTape(txs, anomalies){
       <div class="tape-sub">${anomalies.filter(a=>a.severity==='high').length} high priority</div>
     </div>
   `;
+
+  wirePeriodPopover();
 }
+
+/* PERIOD POPOVER (date filter, anchored to the Period tape-cell) */
+function wirePeriodPopover(){
+  const cell = document.getElementById('periodCell');
+  const popover = document.getElementById('periodPopover');
+  if (!cell || !popover) return;
+
+  cell.addEventListener('click', ()=>{
+    popover.classList.toggle('open');
+  });
+
+  document.getElementById('periodApplyBtn').addEventListener('click', (e)=>{
+    e.stopPropagation();
+    const startVal = document.getElementById('periodStart').value;
+    const endVal = document.getElementById('periodEnd').value;
+    STATE.dateFilter.start = startVal ? new Date(startVal + 'T00:00:00') : null;
+    STATE.dateFilter.end = endVal ? new Date(endVal + 'T00:00:00') : null;
+    popover.classList.remove('open');
+    saveState();
+    renderAll();
+  });
+
+  document.getElementById('periodClearBtn').addEventListener('click', (e)=>{
+    e.stopPropagation();
+    STATE.dateFilter.start = null;
+    STATE.dateFilter.end = null;
+    popover.classList.remove('open');
+    saveState();
+    renderAll();
+  });
+
+  popover.querySelectorAll('.period-preset-chip').forEach(chip=>{
+    chip.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const preset = chip.dataset.preset;
+      const now = new Date();
+      let start, end;
+      if (preset === '30'){
+        end = new Date(now); start = new Date(now); start.setDate(start.getDate()-30);
+      } else if (preset === '90'){
+        end = new Date(now); start = new Date(now); start.setDate(start.getDate()-90);
+      } else if (preset === 'month'){
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        end = new Date(now);
+      } else if (preset === 'year'){
+        start = new Date(now.getFullYear(), 0, 1);
+        end = new Date(now);
+      }
+      document.getElementById('periodStart').value = start.toISOString().split('T')[0];
+      document.getElementById('periodEnd').value = end.toISOString().split('T')[0];
+    });
+  });
+}
+
+// Close the period popover on outside click or Escape
+document.addEventListener('click', (e)=>{
+  const popover = document.getElementById('periodPopover');
+  if (popover && popover.classList.contains('open') && !e.target.closest('#periodCell')){
+    popover.classList.remove('open');
+  }
+});
+document.addEventListener('keydown', (e)=>{
+  if (e.key === 'Escape'){
+    const popover = document.getElementById('periodPopover');
+    if (popover) popover.classList.remove('open');
+  }
+});
 
 /* OVERVIEW */
 function renderOverview(txs){
@@ -1711,6 +1891,8 @@ function renderOverview(txs){
   const anomalies = detectAnomalies(txs);
   const recurring = detectRecurring(txs);
   const insights = generateInsights(txs, stats, catBreakdown, anomalies, recurring);
+
+  renderBudgetProgress();
 
   const catEl = document.getElementById('catBreakdown');
   if (catBreakdown.length === 0){
@@ -1738,6 +1920,79 @@ function renderOverview(txs){
   drawFlowChart(monthlyFlow);
   drawBalanceChart(txs);
 }
+
+/* BUDGETS */
+function renderBudgetProgress(){
+  const el = document.getElementById('budgetProgress');
+  const progress = computeBudgetProgress();
+
+  if (progress.length === 0){
+    el.innerHTML = '';
+    return;
+  }
+
+  const now = new Date();
+  const monthLabel = now.toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+  const statusText = {ok:'on track', ahead:'ahead of pace', over:'over budget'};
+
+  el.innerHTML = `<div class="budget-progress">` + progress.map(b=>`
+    <div>
+      <div class="budget-row-top">
+        <div class="budget-row-name">${b.meta.icon} ${b.meta.label}</div>
+        <div class="budget-row-amt"><b>${fmtMoney(b.spent,'RON')}</b> / ${fmtMoney(b.budget,'RON')}</div>
+      </div>
+      <div class="budget-track"><div class="budget-fill ${b.status}" style="width:${b.pct}%"></div></div>
+      <div class="budget-status ${b.status}">${b.status==='over' ? 'over by ' + fmtMoney(Math.abs(b.remaining),'RON') : statusText[b.status] + ' · ' + fmtMoney(b.remaining,'RON') + ' left'}</div>
+    </div>
+  `).join('') + `</div>`;
+
+  // Update the period label to make clear budgets track the current month regardless of the date filter
+  const periodLabel = document.getElementById('catPeriodLabel');
+  if (periodLabel && !STATE.dateFilter.start && !STATE.dateFilter.end){
+    periodLabel.textContent = 'All time · budgets track ' + monthLabel;
+  } else if (periodLabel){
+    periodLabel.textContent = 'Filtered period · budgets track ' + monthLabel;
+  }
+}
+
+function openBudgetModal(){
+  const list = document.getElementById('budgetEditorList');
+  list.innerHTML = CATEGORIES.map(c=>`
+    <div class="budget-editor-row" data-cat="${c.key}">
+      <div class="budget-editor-label">${c.icon} ${c.label}</div>
+      <span class="budget-editor-clear" data-action="clear-budget" data-cat="${c.key}" title="Clear budget">✕</span>
+      <input type="number" min="0" step="10" placeholder="—" value="${STATE.budgets[c.key] || ''}" data-cat="${c.key}">
+    </div>
+  `).join('');
+  document.getElementById('budgetModal').classList.add('active');
+}
+
+document.getElementById('editBudgetsBtn').addEventListener('click', openBudgetModal);
+document.getElementById('budgetModalClose').addEventListener('click', ()=>budgetModal.classList.remove('active'));
+budgetModal.addEventListener('click', (e)=>{ if (e.target===budgetModal) budgetModal.classList.remove('active'); });
+
+document.getElementById('budgetEditorList').addEventListener('click', (e)=>{
+  const clearBtn = e.target.closest('[data-action="clear-budget"]');
+  if (!clearBtn) return;
+  const key = clearBtn.dataset.cat;
+  const input = document.querySelector(`#budgetEditorList input[data-cat="${key}"]`);
+  if (input) input.value = '';
+});
+
+document.getElementById('budgetModalSave').addEventListener('click', ()=>{
+  const inputs = document.querySelectorAll('#budgetEditorList input[type=number]');
+  const newBudgets = {};
+  inputs.forEach(inp=>{
+    const val = parseFloat(inp.value);
+    if (!isNaN(val) && val > 0){
+      newBudgets[inp.dataset.cat] = val;
+    }
+  });
+  STATE.budgets = newBudgets;
+  saveState();
+  budgetModal.classList.remove('active');
+  renderAll();
+});
 
 function setupCanvas(canvas){
   const dpr = window.devicePixelRatio || 1;
@@ -1946,6 +2201,88 @@ function renderLedger(filteredTxs){
     </tr>`;
   }).join('');
 }
+
+/* ---------------------------------------------------------------------
+   EXPORT
+--------------------------------------------------------------------- */
+function csvEscape(val){
+  const s = val==null ? '' : String(val);
+  if (/[",\n]/.test(s)) return '"' + s.replace(/"/g,'""') + '"';
+  return s;
+}
+
+function buildExportRows(){
+  // Uses the same filtered + sorted list currently shown in the Ledger tab
+  const filteredTxs = getFilteredTransactions();
+  return getFilteredSortedTx(filteredTxs);
+}
+
+function exportAsCsv(){
+  const rows = buildExportRows();
+  const header = ['Date','Description','Merchant','Category','Account','Amount','Currency','Balance','Source','Note'];
+  const lines = [header.map(csvEscape).join(',')];
+  rows.forEach(t=>{
+    const cat = CAT_MAP[t.category] || CAT_MAP.other;
+    lines.push([
+      t.date ? t.date.toISOString().split('T')[0] : '',
+      t.description || '',
+      t.merchant || '',
+      cat.label,
+      t.account || '',
+      t.amount,
+      t.currency || 'RON',
+      t.balance != null ? t.balance : '',
+      t.source || '',
+      STATE.notes[t.id] || ''
+    ].map(csvEscape).join(','));
+  });
+  downloadBlob(lines.join('\n'), 'text/csv;charset=utf-8', buildExportFilename('csv'));
+}
+
+function exportAsJson(){
+  const rows = buildExportRows();
+  const data = rows.map(t=>({
+    date: t.date ? t.date.toISOString().split('T')[0] : null,
+    description: t.description || '',
+    merchant: t.merchant || '',
+    category: t.category,
+    categoryLabel: (CAT_MAP[t.category]||CAT_MAP.other).label,
+    account: t.account || '',
+    amount: t.amount,
+    currency: t.currency || 'RON',
+    balance: t.balance != null ? t.balance : null,
+    source: t.source || '',
+    note: STATE.notes[t.id] || null
+  }));
+  downloadBlob(JSON.stringify(data, null, 2), 'application/json', buildExportFilename('json'));
+}
+
+function buildExportFilename(ext){
+  const parts = ['ledger'];
+  if (STATE.dateFilter.start || STATE.dateFilter.end){
+    const s = STATE.dateFilter.start ? STATE.dateFilter.start.toISOString().split('T')[0] : 'start';
+    const e = STATE.dateFilter.end ? STATE.dateFilter.end.toISOString().split('T')[0] : 'end';
+    parts.push(s, e);
+  } else {
+    parts.push(new Date().toISOString().split('T')[0]);
+  }
+  return parts.join('_') + '.' + ext;
+}
+
+function downloadBlob(content, mimeType, filename){
+  const blob = new Blob([content], {type: mimeType});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+}
+
+document.getElementById('exportCsvBtn').addEventListener('click', exportAsCsv);
+document.getElementById('exportJsonBtn').addEventListener('click', exportAsJson);
 
 // filter/sort wiring (these now call renderAll which uses filtered txs)
 document.getElementById('searchInput').addEventListener('input', (e)=>{
@@ -2397,9 +2734,6 @@ document.getElementById('resetBtn').addEventListener('click', ()=>{
   localStorage.removeItem('ledger_state');
   location.reload();
 });
-
-document.getElementById('applyDateFilter').addEventListener('click', applyDateFilter);
-document.getElementById('clearDateFilter').addEventListener('click', clearDateFilter);
 
 window.addEventListener('resize', debounce(()=>{
   if (STATE.transactions.length){
