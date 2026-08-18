@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -208,6 +209,7 @@ input[type=file]{display:none;}
 
 .card{
   background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;
+  min-width:0;
 }
 .card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
 .card-title{font-size:14px;font-weight:700;letter-spacing:-0.01em;}
@@ -352,6 +354,7 @@ textarea.note-input:focus{outline:none;border-color:var(--amber);}
 .acct-row{
   display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:10px;
   border:1px solid var(--line);margin-bottom:8px;background:var(--panel-2);
+  width:100%;min-width:0;overflow:hidden;
 }
 .acct-icon{
   width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;
@@ -605,11 +608,14 @@ footer.app-footer{
   .anomaly-amt { font-size: 14px; }
 
   /* Account rows */
-  .acct-row { padding: 8px 10px; gap: 8px; }
+  .acct-row { padding: 8px 10px; gap: 8px; align-items: flex-start; }
   .acct-icon { width: 28px; height: 28px; font-size: 10px; }
-  .acct-name { font-size: 12px; }
-  .acct-meta { font-size: 10px; }
-  .acct-bal { font-size: 12.5px; }
+  .acct-name { font-size: 12px; white-space: normal; overflow-wrap: anywhere; }
+  .acct-meta { font-size: 10px; white-space: normal; overflow-wrap: anywhere; }
+  .acct-bal {
+    font-size: 12.5px; margin-left: 8px; max-width: 42%;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 1;
+  }
 
   /* Grids become single column */
   .grid-2, .grid-3 { grid-template-columns: 1fr; }
@@ -643,6 +649,8 @@ footer.app-footer{
     <div class="topbar-actions" id="topActions" style="display:none;">
       <div class="pill"><span class="dot"></span><span id="txCountPill">0 transactions</span></div>
       <button class="btn btn-sm" id="addMoreBtn">+ Add statement</button>
+      <button class="btn btn-sm btn-ghost" id="backupBtn">Backup</button>
+      <button class="btn btn-sm btn-ghost" id="restoreBtn">Restore</button>
       <button class="btn btn-sm btn-ghost" id="resetBtn">Reset</button>
     </div>
   </div>
@@ -656,12 +664,14 @@ footer.app-footer{
 
   <div class="dropzone" id="dropzone">
     <input type="file" id="fileInput" multiple accept=".csv,.txt">
+    <input type="file" id="restoreInput" accept=".json,application/json">
     <div class="dz-icon">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#8b93a0" stroke-width="1.6"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
     </div>
     <div class="dz-title">Drop statement files here</div>
     <div class="dz-sub">or click to browse — CSV exports from your bank</div>
     <button class="btn btn-primary" id="browseBtn" type="button">Choose files</button>
+    <button class="btn btn-sm btn-ghost" id="restoreLandingBtn" type="button" style="margin-top:10px;">Restore backup</button>
     <div class="dz-formats">
       <span class="format-chip">ING Bank RO</span>
       <span class="format-chip">Revolut</span>
@@ -1052,11 +1062,36 @@ function csvSplitLine(line){
 }
 let ID_SEQ = 1;
 function nextId(){ return 'tx_' + (ID_SEQ++); }
+let TX_SIGNATURES = new Set();
 
 function escapeHtml(s){
   const d = document.createElement('div');
   d.textContent = s;
   return d.innerHTML;
+}
+function normSigText(v){
+  return String(v || '').trim().toUpperCase().replace(/\s+/g,' ');
+}
+function sigNumber(v){
+  return Number.isFinite(v) ? Number(v).toFixed(2) : '';
+}
+function txSignature(tx){
+  const dateSig = tx.date instanceof Date && !isNaN(tx.date.getTime())
+    ? tx.date.toISOString().slice(0,19)
+    : '';
+  return [
+    dateSig,
+    sigNumber(tx.amount),
+    sigNumber(tx.balance),
+    normSigText(tx.currency),
+    normSigText(tx.account),
+    normSigText(tx.kind),
+    normSigText(tx.merchant),
+    normSigText(tx.description)
+  ].join('|');
+}
+function rebuildTxSignatures(){
+  TX_SIGNATURES = new Set(STATE.transactions.map(txSignature));
 }
 function normMerchant(t){
   return (t.merchant || t.description || '').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,20);
@@ -1644,8 +1679,8 @@ function generateInsights(txs, stats, catBreakdown, anomalies, recurring){
 /* ============================================================
    PERSISTENCE (localStorage)
    ============================================================ */
-function saveState() {
-  const data = {
+function buildStateSnapshot() {
+  return {
     transactions: STATE.transactions,
     sources: STATE.sources,
     notes: STATE.notes,
@@ -1661,9 +1696,40 @@ function saveState() {
     },
     version: '1.0'
   };
+}
+
+function applyStateSnapshot(data) {
+  if (!data || typeof data !== 'object' || !data.version) {
+    throw new Error('Invalid Ledger state payload.');
+  }
+  STATE.transactions = (Array.isArray(data.transactions) ? data.transactions : []).map(t => {
+    const parsedDate = t && t.date ? new Date(t.date) : null;
+    return {
+      ...t,
+      date: parsedDate && !isNaN(parsedDate.getTime()) ? parsedDate : null
+    };
+  });
+  STATE.sources = Array.isArray(data.sources) ? data.sources : [];
+  STATE.notes = data.notes && typeof data.notes === 'object' ? data.notes : {};
+  STATE.categoryOverrides = data.categoryOverrides && typeof data.categoryOverrides === 'object' ? data.categoryOverrides : {};
+  STATE.merchantOverrides = data.merchantOverrides && typeof data.merchantOverrides === 'object' ? data.merchantOverrides : {};
+  STATE.budgets = data.budgets && typeof data.budgets === 'object' ? data.budgets : {};
+  STATE.view = data.view || 'overview';
+  STATE.sort = data.sort || {key:'date', dir:'desc'};
+  STATE.filters = data.filters || {search:'', category:'', account:'', type:''};
+  STATE.dateFilter.start = data.dateFilter && data.dateFilter.start ? new Date(data.dateFilter.start) : null;
+  STATE.dateFilter.end = data.dateFilter && data.dateFilter.end ? new Date(data.dateFilter.end) : null;
+  ID_SEQ = STATE.transactions.length + 1;
+  rebuildTxSignatures();
+}
+
+function saveState() {
+  const data = buildStateSnapshot();
   try {
     localStorage.setItem('ledger_state', JSON.stringify(data));
-  } catch (e) { /* ignore */ }
+  } catch (e) {
+    console.error('Failed to save Ledger state:', e);
+  }
 }
 
 function loadState() {
@@ -1671,27 +1737,136 @@ function loadState() {
     const raw = localStorage.getItem('ledger_state');
     if (!raw) return false;
     const data = JSON.parse(raw);
-    if (!data.version) return false;
-    STATE.transactions = (data.transactions || []).map(t => ({
-      ...t,
-      date: t.date ? new Date(t.date) : null
-    }));
-    STATE.sources = data.sources || [];
-    STATE.notes = data.notes || {};
-    STATE.categoryOverrides = data.categoryOverrides || {};
-    STATE.merchantOverrides = data.merchantOverrides || {};
-    STATE.budgets = data.budgets || {};
-    STATE.view = data.view || 'overview';
-    STATE.sort = data.sort || {key:'date', dir:'desc'};
-    STATE.filters = data.filters || {search:'', category:'', account:'', type:''};
-    if (data.dateFilter) {
-      STATE.dateFilter.start = data.dateFilter.start ? new Date(data.dateFilter.start) : null;
-      STATE.dateFilter.end = data.dateFilter.end ? new Date(data.dateFilter.end) : null;
-    }
-    ID_SEQ = STATE.transactions.length + 1;
+    applyStateSnapshot(data);
     return true;
   } catch (e) {
+    console.error('Failed to load Ledger state:', e);
     return false;
+  }
+}
+
+/* ============================================================
+   ENCRYPTED BACKUP / RESTORE
+   ============================================================ */
+const BACKUP_KDF_ITERATIONS = 250000;
+const BACKUP_FORMAT_VERSION = 1;
+
+function bytesToBase64(bytes){
+  let binary = '';
+  for (let i=0;i<bytes.length;i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+function base64ToBytes(base64){
+  const binary = atob(base64);
+  const out = new Uint8Array(binary.length);
+  for (let i=0;i<binary.length;i++) out[i] = binary.charCodeAt(i);
+  return out;
+}
+async function deriveBackupKey(passphrase, salt){
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(passphrase),
+    'PBKDF2',
+    false,
+    ['deriveKey']
+  );
+  return crypto.subtle.deriveKey(
+    {name:'PBKDF2', salt, iterations:BACKUP_KDF_ITERATIONS, hash:'SHA-256'},
+    keyMaterial,
+    {name:'AES-GCM', length:256},
+    false,
+    ['encrypt','decrypt']
+  );
+}
+async function encryptBackup(snapshot, passphrase){
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await deriveBackupKey(passphrase, salt);
+  const plaintext = new TextEncoder().encode(JSON.stringify(snapshot));
+  const encrypted = await crypto.subtle.encrypt({name:'AES-GCM', iv}, key, plaintext);
+  return {
+    type: 'ledger-encrypted-backup',
+    version: BACKUP_FORMAT_VERSION,
+    kdf: 'PBKDF2-SHA256',
+    iterations: BACKUP_KDF_ITERATIONS,
+    cipher: 'AES-256-GCM',
+    salt: bytesToBase64(salt),
+    iv: bytesToBase64(iv),
+    payload: bytesToBase64(new Uint8Array(encrypted)),
+    createdAt: new Date().toISOString()
+  };
+}
+async function decryptBackup(backupObj, passphrase){
+  const salt = base64ToBytes(backupObj.salt || '');
+  const iv = base64ToBytes(backupObj.iv || '');
+  const payload = base64ToBytes(backupObj.payload || '');
+  const key = await deriveBackupKey(passphrase, salt);
+  const decrypted = await crypto.subtle.decrypt({name:'AES-GCM', iv}, key, payload);
+  const json = new TextDecoder().decode(decrypted);
+  return JSON.parse(json);
+}
+function backupFilename(){
+  const d = new Date();
+  const pad = (n)=>String(n).padStart(2,'0');
+  return `ledger_backup_${d.getUTCFullYear()}${pad(d.getUTCMonth()+1)}${pad(d.getUTCDate())}_${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}.json`;
+}
+async function exportEncryptedBackup(){
+  if (!STATE.transactions.length){
+    alert('Load at least one statement before creating a backup.');
+    return;
+  }
+  const passphrase = prompt('Enter a backup passphrase (required to restore):');
+  if (passphrase == null) return;
+  if (!passphrase.trim()){
+    alert('Backup cancelled: passphrase cannot be empty.');
+    return;
+  }
+  try {
+    const backup = await encryptBackup(buildStateSnapshot(), passphrase);
+    downloadBlob(JSON.stringify(backup, null, 2), 'application/json', backupFilename());
+  } catch (err) {
+    console.error('Backup export failed:', err);
+    alert('Backup failed. Please try again.');
+  }
+}
+async function restoreFromBackupFile(file){
+  const text = await readFile(file);
+  if (!text){
+    alert('Could not read backup file.');
+    return;
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch (err) {
+    console.error('Backup parse failed:', err);
+    alert('Invalid backup JSON file.');
+    return;
+  }
+
+  if (!confirm('Restore this backup and replace your current in-browser data?')) return;
+
+  try {
+    let snapshot;
+    if (parsed && parsed.type === 'ledger-encrypted-backup'){
+      const passphrase = prompt('Enter the backup passphrase:');
+      if (passphrase == null) return;
+      snapshot = await decryptBackup(parsed, passphrase);
+    } else {
+      snapshot = parsed; // legacy plain state format
+    }
+    applyStateSnapshot(snapshot);
+    saveState();
+    if (STATE.transactions.length){
+      launchApp();
+    } else {
+      location.reload();
+    }
+    alert('Backup restored successfully.');
+  } catch (err) {
+    console.error('Backup restore failed:', err);
+    alert('Restore failed. The passphrase may be wrong or the backup is corrupted.');
   }
 }
 
@@ -2704,7 +2879,7 @@ function renderAccounts(){
       </div>
       <div class="acct-info">
         <div class="acct-name">${escapeHtml(s.name)}</div>
-        <div class="acct-meta">detected as ${s.format}</div>
+        <div class="acct-meta">detected as ${s.format}${s.duplicates ? ` · ${s.duplicates} duplicate${s.duplicates===1?'':'s'} skipped` : ''}</div>
       </div>
       <div class="acct-bal" style="font-size:12px;color:var(--ink-faint);">${s.count} rows</div>
     </div>
@@ -2744,9 +2919,26 @@ async function handleFiles(fileList){
         row.querySelector('.fmeta').outerHTML = '<div class="status-err">0 transactions found</div>';
         errors.push(`${file.name}: recognized as "${result.format}" format but found no transactions. The file may use an unsupported layout.`);
       } else {
-        row.querySelector('.fmeta').outerHTML = `<div class="status-ok">${result.format} · ${result.txs.length} transactions</div>`;
-        STATE.transactions.push(...result.txs);
-        STATE.sources.push({name:file.name, format:result.format, count:result.txs.length});
+        const newTxs = [];
+        let duplicateCount = 0;
+        for (const tx of result.txs){
+          const sig = txSignature(tx);
+          if (TX_SIGNATURES.has(sig)){
+            duplicateCount++;
+            continue;
+          }
+          TX_SIGNATURES.add(sig);
+          newTxs.push(tx);
+        }
+
+        const importedCount = newTxs.length;
+        if (importedCount === 0){
+          row.querySelector('.fmeta').outerHTML = `<div class="status-ok">${result.format} · 0 new · ${duplicateCount} duplicates skipped</div>`;
+        } else {
+          row.querySelector('.fmeta').outerHTML = `<div class="status-ok">${result.format} · ${importedCount} imported${duplicateCount ? ` · ${duplicateCount} duplicates skipped` : ''}</div>`;
+          STATE.transactions.push(...newTxs);
+          STATE.sources.push({name:file.name, format:result.format, count:importedCount, duplicates:duplicateCount});
+        }
       }
     } catch(err){
       row.querySelector('.fmeta').outerHTML = '<div class="status-err">parse error</div>';
@@ -2773,9 +2965,12 @@ async function handleFiles(fileList){
 --------------------------------------------------------------------- */
 const dropzone = document.getElementById('dropzone');
 const fileInput = document.getElementById('fileInput');
+const restoreInput = document.getElementById('restoreInput');
 const browseBtn = document.getElementById('browseBtn');
+const restoreLandingBtn = document.getElementById('restoreLandingBtn');
 
 browseBtn.addEventListener('click', ()=>fileInput.click());
+restoreLandingBtn.addEventListener('click', ()=>restoreInput.click());
 dropzone.addEventListener('click', (e)=>{ if (e.target===dropzone || dropzone.contains(e.target)) { if(e.target.tagName!=='BUTTON') fileInput.click(); } });
 fileInput.addEventListener('change', (e)=> handleFiles(e.target.files));
 
@@ -2790,6 +2985,14 @@ dropzone.addEventListener('drop', (e)=>{
 });
 
 document.getElementById('addMoreBtn').addEventListener('click', ()=>fileInput.click());
+document.getElementById('backupBtn').addEventListener('click', ()=>{ exportEncryptedBackup(); });
+document.getElementById('restoreBtn').addEventListener('click', ()=>restoreInput.click());
+restoreInput.addEventListener('change', async (e)=>{
+  const file = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  await restoreFromBackupFile(file);
+});
 document.getElementById('resetBtn').addEventListener('click', ()=>{
   if (!confirm('Clear all loaded statements and notes? This cannot be undone.')) return;
   localStorage.removeItem('ledger_state');
