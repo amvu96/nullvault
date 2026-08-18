@@ -370,6 +370,7 @@ textarea.note-input:focus{outline:none;border-color:var(--amber);}
 
 .simple-list{display:flex;flex-direction:column;gap:8px;}
 .recent-scroll{max-height:184px;overflow-y:auto;padding-right:4px;}
+.overview-wallet-scroll{max-height:184px;overflow-y:auto;padding-right:4px;}
 .simple-row{
   display:flex;justify-content:space-between;align-items:flex-start;gap:10px;
   padding:10px 0;border-bottom:1px solid var(--line-soft);
@@ -815,7 +816,7 @@ footer.app-footer{
           </div>
           <button class="btn btn-sm btn-ghost" id="gotoWalletsBtn">Wallets</button>
         </div>
-        <div id="overviewWalletList" class="simple-list"></div>
+        <div id="overviewWalletList" class="simple-list overview-wallet-scroll"></div>
       </div>
     </div>
   </div>
@@ -1446,6 +1447,20 @@ function quantile(sortedOrArr, q){
   const base = Math.floor(pos), rest = pos-base;
   return arr[base+1]!==undefined ? arr[base] + rest*(arr[base+1]-arr[base]) : arr[base];
 }
+function txCategoryKey(tx){
+  return tx.category || guessCategory(tx);
+}
+function isP2POutTx(tx){
+  const cat = txCategoryKey(tx);
+  return tx.amount < 0 && cat === 'transfer_out';
+}
+function isP2PInTx(tx){
+  const cat = txCategoryKey(tx);
+  return tx.amount > 0 && cat === 'transfer_in';
+}
+function isP2PTx(tx){
+  return isP2POutTx(tx) || isP2PInTx(tx);
+}
 
 /* ---------------------------------------------------------------------
    PARSERS
@@ -1855,9 +1870,9 @@ function detectRecurring(txs){
 
 function computeStats(txs){
   const income = txs.filter(t=>t.amount>0 && (t.kind==='income')).reduce((s,t)=>s+t.amount,0);
-  const spending = txs.filter(t=>t.amount<0 && t.kind!=='savings' && t.kind!=='transfer_p2p' && t.kind!=='adjustment').reduce((s,t)=>s+Math.abs(t.amount),0);
-  const transfersOut = txs.filter(t=>t.amount<0 && t.kind==='transfer_p2p').reduce((s,t)=>s+Math.abs(t.amount),0);
-  const transfersIn = txs.filter(t=>t.amount>0 && t.kind==='transfer_p2p').reduce((s,t)=>s+t.amount,0);
+  const spending = txs.filter(t=>t.amount<0 && t.kind!=='savings' && !isP2PTx(t) && t.kind!=='adjustment').reduce((s,t)=>s+Math.abs(t.amount),0);
+  const transfersOut = txs.filter(t=>isP2POutTx(t)).reduce((s,t)=>s+Math.abs(t.amount),0);
+  const transfersIn = txs.filter(t=>isP2PInTx(t)).reduce((s,t)=>s+t.amount,0);
   const savingsMoved = txs.filter(t=>t.kind==='savings' && t.amount<0).reduce((s,t)=>s+Math.abs(t.amount),0);
   const net = txs.reduce((s,t)=>s+t.amount,0);
 
@@ -1869,7 +1884,7 @@ function computeStats(txs){
 }
 
 function computeCategoryBreakdown(txs){
-  const spend = txs.filter(t=>t.amount<0 && t.kind!=='savings' && t.kind!=='transfer_p2p' && t.kind!=='adjustment');
+  const spend = txs.filter(t=>t.amount<0 && t.kind!=='savings' && !isP2PTx(t) && t.kind!=='adjustment');
   const byCat = {};
   spend.forEach(t=>{
     byCat[t.category] = (byCat[t.category]||0) + Math.abs(t.amount);
@@ -1911,7 +1926,7 @@ function computeBudgetProgress(txs){
 
   const scopedTxs = (txs || STATE.transactions).filter(t=>{
     if (!t.date) return false;
-    if (t.amount >= 0 || t.kind === 'savings' || t.kind === 'transfer_p2p') return false;
+    if (t.amount >= 0 || t.kind === 'savings' || isP2PTx(t)) return false;
     if (rangeStart && t.date < rangeStart) return false;
     if (hasDateFilter && rangeEnd){
       const endOfDay = new Date(rangeEnd);
@@ -1951,7 +1966,7 @@ function computeMonthlyFlow(txs){
     const key = fmtMonthKey(t.date);
     months[key] = months[key] || {income:0, spending:0};
     if (t.amount>0 && (t.kind==='income')) months[key].income += t.amount;
-    else if (t.amount<0 && t.kind!=='savings' && t.kind!=='transfer_p2p') months[key].spending += Math.abs(t.amount);
+    else if (t.amount<0 && t.kind!=='savings' && !isP2PTx(t)) months[key].spending += Math.abs(t.amount);
   });
   const keys = Object.keys(months).sort();
   return keys.map(k=>({key:k, label:fmtMonthLabel(k), ...months[k]}));
@@ -1996,7 +2011,7 @@ function generateInsights(txs, stats, catBreakdown, anomalies, recurring){
     insights.push({icon:'⚠️', html:`<span class="a">${highAnomalies.length} high-priority anomal${highAnomalies.length===1?'y':'ies'}</span> flagged — including possible duplicate charges. Check the Anomalies tab.`});
   }
 
-  const p2pOut = txs.filter(t=>t.kind==='transfer_p2p' && t.amount<0);
+  const p2pOut = txs.filter(t=>isP2POutTx(t));
   if (p2pOut.length >= 5){
     const uniqueRecipients = new Set(p2pOut.map(t=>normMerchant(t))).size;
     insights.push({icon:'👥', html:`<b>${p2pOut.length}</b> peer-to-peer payments sent to <b>${uniqueRecipients}</b> different people, totaling ${fmtMoney(p2pOut.reduce((s,t)=>s+Math.abs(t.amount),0),'RON')}.`});
