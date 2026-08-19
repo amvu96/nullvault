@@ -80,7 +80,7 @@
 
 *,*::before,*::after{ box-sizing:border-box; }
 html{ scroll-behavior:smooth; }
-html,body{ height:100%; overflow-x:hidden; overflow-anchor:none; }
+html,body{ min-height:100%; overflow-x:hidden; overflow-anchor:none; }
 body{ max-width:100vw; }
 body{
   margin:0;
@@ -830,7 +830,7 @@ function parseHash(){
 function navigate(path){
   if(location.hash === "#" + path) {
     render();
-    requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0 })));
+    window.scrollTo({ top: 0, left: 0 });
     return;
   }
   location.hash = path;
@@ -838,16 +838,7 @@ function navigate(path){
 window.addEventListener("hashchange", () => {
   state.route = parseHash();
   render();
-  // Deferred to the next frame: setting location.hash triggers the
-  // browser's own native scroll behavior for same-document navigation
-  // (it treats the fragment like a same-page anchor jump), which can
-  // run after this handler and override an immediate scrollTo(0) call,
-  // especially when the page was scrolled down before navigating. Two
-  // rAFs (one to let layout settle after the DOM swap, one to run after
-  // any native scroll adjustment) makes the reset reliably win.
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0 }));
-  });
+  window.scrollTo({ top: 0, left: 0 });
 });
 
 /* ====================================================================
@@ -1634,6 +1625,18 @@ window.addEventListener("appinstalled", () => {
    picks up the real branding/catalog. A top-level catch ensures even
    a truly unexpected error can't leave a blank page silently.
    ==================================================================== */
+
+// Take scroll position fully out of the browser's hands for same-document
+// (hash) navigation. By default, browsers try to restore/preserve scroll
+// position across history entries, and that native behavior can run
+// after our own code and silently override an explicit scrollTo(0) —
+// which is what caused app pages to sometimes open mid-scroll instead
+// of at the top. With this set to "manual", nothing but our own code
+// ever touches scroll position on navigation.
+if("scrollRestoration" in history){
+  history.scrollRestoration = "manual";
+}
+
 function safeRender(){
   try {
     render();
