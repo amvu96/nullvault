@@ -268,5 +268,44 @@
       "Simple text-in, audio-out API"
     ],
     "featured": false
+  },
+  {
+    "id": "ledger",
+    "name": "Ledger",
+    "icon": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%23161b22'/%3E%3Crect x='26' y='20' width='48' height='60' rx='4' fill='none' stroke='%23FFB84A' stroke-width='5'/%3E%3Cline x1='34' y1='36' x2='66' y2='36' stroke='%23FFB84A' stroke-width='4'/%3E%3Cline x1='34' y1='50' x2='58' y2='50' stroke='%23FFB84A' stroke-width='4'/%3E%3Cline x1='34' y1='64' x2='62' y2='64' stroke='%23FFB84A' stroke-width='4'/%3E%3C/svg%3E",
+    "developer": "NullVault",
+    "shortDescription": "A simple, private expense tracker with monthly budgets and category breakdowns.",
+    "fullDescription": "Ledger keeps personal finance tracking straightforward: log expenses, assign categories, set monthly budgets, and see where money actually goes with clean visual breakdowns. All data stays on-device by default, with no ads, no bank-linking requirements, and no subscription paywall hiding basic features.",
+    "version": "1.0.0",
+    "category": "Finance",
+    "tags": [
+      "budget",
+      "expenses",
+      "finance",
+      "tracker"
+    ],
+    "screenshots": [
+      "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=800&q=80"
+    ],
+    "downloadUrl": "https://nullvault.eu/tools/ledger",
+    "type": "PWA",
+    "appUrl": "https://nullvault.eu/tools/ledger",
+    "rating": 4.5,
+    "ratingCount": 0,
+    "releaseDate": "2026-08-20",
+    "lastUpdated": "2026-08-20",
+    "platforms": [
+      "Web",
+      "Android",
+      "iOS",
+      "Desktop"
+    ],
+    "features": [
+      "Monthly budget tracking by category",
+      "Local-first, no bank linking required",
+      "Visual spending breakdowns",
+      "No ads, no subscription paywall"
+    ],
+    "featured": false
   }
 ]
