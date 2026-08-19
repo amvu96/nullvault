@@ -295,7 +295,8 @@
     "releaseDate": "2026-08-20",
     "lastUpdated": "2026-08-20",
     "platforms": [
-      "Android"
+      "Android", 
+"Web" 
     ],
     "features": [
       "Monthly budget tracking by category",
