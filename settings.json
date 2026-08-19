@@ -8,21 +8,11 @@
   },
 
   "contact": {
-    "_comment": "This is a static site, so it CANNOT send email by itself. Point 'endpoint' at a Formspree URL (https://formspree.io/f/xxxxxxx), a Web3Forms URL (https://api.web3forms.com/submit), or your own Firebase Cloud Function URL. Leave endpoint as null to keep the form's full validation/loading/success UI while simulating the network call locally.",
+    "_comment": "This is a static site, so it CANNOT send email by itself. Point 'endpoint' at a Formspree URL (https://formspree.io/f/xxxxxxx), a Web3Forms URL (https://api.web3forms.com/submit), or your own Cloud Function URL. Leave endpoint as null to keep the form's full validation/loading/success UI while simulating the network call locally.",
     "endpoint": null,
     "extraFields": {
       "_comment": "Extra fields merged into every submission, e.g. a Web3Forms access_key.",
       "access_key": ""
     }
-  },
-
-  "firebase": {
-    "_comment": "Copy this object from Firebase Console -> Project Settings -> General -> Your apps -> SDK setup. These are public, client-safe values, not secrets -- real security comes from Firestore Security Rules and Google Sign-In's OAuth flow, not from hiding this object.",
-    "apiKey": "YOUR_API_KEY",
-    "authDomain": "YOUR_PROJECT.firebaseapp.com",
-    "projectId": "YOUR_PROJECT_ID",
-    "storageBucket": "YOUR_PROJECT.appspot.com",
-    "messagingSenderId": "YOUR_SENDER_ID",
-    "appId": "YOUR_APP_ID"
   }
 }
