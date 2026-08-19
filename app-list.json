@@ -287,18 +287,15 @@
     "screenshots": [
       "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=800&q=80"
     ],
-    "downloadUrl": "https://nullvault.eu/tools/ledger",
-    "type": "PWA",
-    "appUrl": "https://nullvault.eu/tools/ledger",
+    "downloadUrl": "https://budget.nullvault.eu/nullvault-ledger.apk",
+    "type": "TWA",
+    "appUrl": "https://budget.nullvault.eu",
     "rating": 4.5,
     "ratingCount": 0,
     "releaseDate": "2026-08-20",
     "lastUpdated": "2026-08-20",
     "platforms": [
-      "Web",
-      "Android",
-      "iOS",
-      "Desktop"
+      "Android"
     ],
     "features": [
       "Monthly budget tracking by category",
