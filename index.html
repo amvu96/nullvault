@@ -182,6 +182,14 @@ img{ max-width:100%; display:block; }
 .main-nav a:hover{ color:var(--text); background:var(--bg-hover); }
 .main-nav a.active{ color:var(--accent); }
 
+.header-spacer{ flex:1 1 auto; }
+
+/* ----------------------------------------------------------------------
+   Search bar — disabled for now (catalog is small enough that browsing
+   the Apps page covers it). The .search-wrap rules are kept here,
+   commented out, so re-enabling later is just uncommenting these plus
+   restoring the <form class="search-wrap"> markup in renderHeader().
+----------------------------------------------------------------------
 .search-wrap{
   position:relative; flex:1 1 auto; max-width:360px; min-width:160px;
 }
@@ -198,6 +206,7 @@ img{ max-width:100%; display:block; }
   position:absolute; left:11px; top:50%; transform:translateY(-50%);
   width:14px; height:14px; color:var(--text-faint); pointer-events:none;
 }
+---------------------------------------------------------------------- */
 
 .header-actions{ display:flex; align-items:center; gap:10px; flex-shrink:0; margin-left:16px; }
 
@@ -904,10 +913,7 @@ function renderHeader(){
         ${navLink("/categories", "Categories", "categories")}
         ${navLink("/contact", "Contact", "contact")}
       </nav>
-      <form class="search-wrap" id="header-search-form" role="search">
-        ${icon("search")}
-        <input type="search" id="header-search-input" placeholder="Search apps..." value="${escapeHtml(state.search)}" aria-label="Search apps">
-      </form>
+      <div class="header-spacer"></div>
       <div class="header-actions">
         <button class="mobile-menu-btn" id="mobile-menu-toggle" aria-label="Open menu">${ICON.menu}</button>
       </div>
@@ -1306,7 +1312,10 @@ function bindGlobalEvents(){
     el.addEventListener("click", () => navigate(el.getAttribute("data-nav")));
   });
 
-  // Header search
+  // Header search — currently disabled (see the commented-out .search-wrap
+  // CSS above and the removed <form> in renderHeader()). This binding is
+  // left in place and no-ops safely via the `if(searchInput)` guard below,
+  // so re-enabling search later needs no JS changes.
   const searchForm = document.getElementById("header-search-form");
   const searchInput = document.getElementById("header-search-input");
   if(searchInput){
