@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>NullVault — App Distribution</title>
+<title>NullVault</title>
 <meta name="description" content="A private distribution vault for PWA and TWA applications.">
 <meta name="theme-color" content="#0A0E12">
 
@@ -28,15 +28,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-
-<!-- ============================================================
-     FIREBASE SDKs (CDN, modular v9+ syntax)
-     ============================================================ -->
-<script type="module">
-  // Firebase is initialized further down in the main <script type="module">
-  // block, right after the CONFIGURATION section. It's imported there
-  // to keep all app logic in a single module graph.
-</script>
 
 <style>
 /* ==================================================================
@@ -68,7 +59,7 @@
   --violet-dim:    #4B3D9E;
   --violet-glow:   rgba(123,97,255,0.18);
 
-  --amber:         #FFB84A;   /* ratings */
+  --amber:         #FFB84A;   /* accent for badges/highlights */
   --amber-dim:     #8F6B2A;
 
   --danger:        #FF5C7A;
@@ -239,14 +230,6 @@ img{ max-width:100%; display:block; }
 .btn[disabled]{ opacity:0.45; cursor:not-allowed; }
 .btn svg{ width:15px; height:15px; flex-shrink:0; }
 
-.avatar-btn{
-  width:36px; height:36px; border-radius:50%; overflow:hidden;
-  border:1.5px solid var(--border-bright); cursor:pointer; background:var(--bg-panel);
-  flex-shrink:0; padding:0;
-}
-.avatar-btn img{ width:100%; height:100%; object-fit:cover; }
-.avatar-btn:hover{ border-color:var(--accent); }
-
 .mobile-menu-btn{ display:none; background:transparent; border:0; color:var(--text); padding:8px; cursor:pointer; }
 .mobile-menu-btn svg{ width:22px; height:22px; }
 
@@ -395,9 +378,6 @@ img{ max-width:100%; display:block; }
   display:flex; align-items:center; justify-content:space-between;
   padding-top:10px; border-top:1px solid var(--border);
 }
-.rating-inline{ display:flex; align-items:center; gap:5px; font-family:var(--font-mono); font-size:12.5px; color:var(--amber); }
-.rating-inline svg{ width:13px; height:13px; }
-.rating-inline .count{ color:var(--text-faint); }
 .category-chip{
   font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint);
   text-transform:uppercase; letter-spacing:0.05em;
@@ -476,8 +456,6 @@ img{ max-width:100%; display:block; }
 .app-detail-meta-row{
   display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:16px;
 }
-.app-detail-meta-row .rating-inline{ font-size:14px; }
-.app-detail-meta-row .rating-inline svg{ width:15px; height:15px; }
 .app-detail-actions{ display:flex; gap:10px; flex-wrap:wrap; }
 
 .stat-strip{
@@ -513,26 +491,6 @@ img{ max-width:100%; display:block; }
   font-family:var(--font-mono); font-size:12px; padding:6px 12px; border-radius:999px;
   border:1px solid var(--border-bright); color:var(--text-dim);
 }
-
-/* ---------- Rating widget ---------- */
-.rate-box{
-  background:var(--bg-panel); border:1px solid var(--border); border-radius:var(--radius-lg);
-  padding:22px; margin:32px 0;
-}
-.rate-box-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; gap:10px; }
-.star-input{ display:flex; gap:4px; }
-.star-input button{
-  background:transparent; border:0; cursor:pointer; padding:2px; color:var(--border-bright);
-  transition:color .1s ease, transform .1s ease;
-}
-.star-input button svg{ width:26px; height:26px; }
-.star-input button:hover, .star-input button.hovered{ transform:scale(1.1); }
-.star-input.filled button.on, .star-input button.on{ color:var(--amber); }
-.rate-status{ font-family:var(--font-mono); font-size:12px; color:var(--text-faint); margin-top:10px; }
-.rate-login-prompt{
-  display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
-}
-.rate-login-prompt p{ color:var(--text-dim); font-size:13.5px; }
 
 /* ---------- Toasts ---------- */
 .toast-stack{
@@ -589,35 +547,6 @@ img{ max-width:100%; display:block; }
 }
 .form-success-box svg{ width:32px; height:32px; color:var(--accent); margin-bottom:10px; }
 
-/* ---------- Account page ---------- */
-.account-header{
-  display:flex; align-items:center; gap:18px; padding:40px 0 32px; border-bottom:1px solid var(--border);
-  flex-wrap:wrap;
-}
-.account-avatar{ width:76px; height:76px; border-radius:50%; border:2px solid var(--accent-dim); object-fit:cover; }
-.account-header h1{ font-family:var(--font-sans); font-size:22px; }
-.account-header .email{ color:var(--text-dim); font-size:13.5px; margin-top:2px; }
-
-.my-ratings-list{ display:flex; flex-direction:column; gap:1px; background:var(--border); border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden; margin-top:16px; }
-.my-rating-row{
-  background:var(--bg-panel); padding:14px 16px; display:flex; align-items:center; gap:14px; cursor:pointer;
-  transition:background .12s;
-}
-.my-rating-row:hover{ background:var(--bg-hover); }
-.my-rating-row img{ width:36px; height:36px; border-radius:8px; flex-shrink:0; }
-.my-rating-row .name{ font-size:13.5px; font-weight:600; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.my-rating-row .stars{ display:flex; gap:2px; color:var(--amber); flex-shrink:0; }
-.my-rating-row .stars svg{ width:13px; height:13px; }
-
-/* ---------- Login gate panel ---------- */
-.login-panel{
-  background:var(--bg-panel); border:1px solid var(--border); border-radius:var(--radius-lg);
-  padding:48px 24px; text-align:center; max-width:400px; margin:60px auto;
-}
-.login-panel .vault-icon{ width:44px; height:44px; color:var(--accent); margin:0 auto 18px; }
-.login-panel h2{ font-family:var(--font-sans); font-size:18px; margin-bottom:8px; }
-.login-panel p{ color:var(--text-dim); font-size:13.5px; margin-bottom:22px; }
-
 /* ---------- Install banner (beforeinstallprompt for the store PWA itself) ---------- */
 .install-banner{
   display:none; align-items:center; gap:12px; background:var(--bg-panel);
@@ -673,11 +602,11 @@ img{ max-width:100%; display:block; }
      ╚═══╝  ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝
 
    =====================  CONFIGURATION  =============================
-   NullVault now reads its configuration from two plain JSON files that
-   sit next to index.html, so you can edit the store WITHOUT touching
-   any code:
+   NullVault reads its configuration from two plain JSON files that sit
+   next to index.html, so you can edit the store WITHOUT touching any
+   code:
 
-     settings.json   -> store branding, contact endpoint, Firebase config
+     settings.json   -> store branding, contact endpoint
      app-list.json   -> the entire app catalog (add/remove apps here)
 
    Both are loaded by loadConfiguration() below, at boot, over fetch().
@@ -696,45 +625,6 @@ let STORE_CONFIG = {
   contactEndpoint: null,
   contactEndpointExtraFields: {},
 };
-
-// Fallback used only if settings.json can't be fetched.
-let FIREBASE_CONFIG = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID",
-};
-
-/* ----------------------------------------------------------------------
-   EXAMPLE FIRESTORE SECURITY RULES
-   Paste into Firebase Console → Firestore Database → Rules.
-   These rules:
-     - let ANYONE read ratings (needed to show averages publicly)
-     - only let a SIGNED-IN user write a rating doc whose ID == their uid
-     - validate the rating shape (1-5 numeric star value)
-     - never let a user write into another user's rating doc
-
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /apps/{appId}/ratings/{userId} {
-      allow read: if true;
-      allow create, update: if request.auth != null
-                             && request.auth.uid == userId
-                             && request.resource.data.rating is int
-                             && request.resource.data.rating >= 1
-                             && request.resource.data.rating <= 5
-                             && request.resource.data.userId == request.auth.uid;
-      allow delete: if request.auth != null && request.auth.uid == userId;
-    }
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
----------------------------------------------------------------------- */
 
 // Fallback used only if app-list.json can't be fetched — kept small on
 // purpose since the real catalog now lives in app-list.json.
@@ -801,10 +691,6 @@ async function loadSettings(){
           : {},
       };
     }
-    if(settings.firebase){
-      const { _comment, ...fb } = settings.firebase;
-      FIREBASE_CONFIG = { ...FIREBASE_CONFIG, ...fb };
-    }
   } catch(e){
     // settings.json missing, malformed, or unreachable (e.g. opened via
     // file:// where fetch of local files is blocked). Built-in defaults
@@ -827,63 +713,13 @@ async function loadAppList(){
 }
 
 /* ====================================================================
-   FIREBASE INIT
-   NOTE: This is loaded via dynamic import() rather than a static
-   top-level `import`. Static imports are hoisted and run before any
-   other module code — if the Firebase CDN request fails (offline, an
-   ad-blocker, a restrictive network, or a stale/placeholder config
-   causing a load-time error), a static import throws and SILENTLY
-   KILLS THE ENTIRE MODULE, including the render() call at the bottom
-   of this file, leaving a blank page with no visible error. Dynamic
-   import() runs inside our own try/catch, so a Firebase failure only
-   ever disables auth/ratings — it can never blank the whole store.
-   ==================================================================== */
-let firebaseApp, auth, db, googleProvider;
-let firebaseReady = false;
-let firebaseFns = {}; // populated with the Firestore helper functions once loaded
-
-async function initFirebase(){
-  try {
-    const [{ initializeApp }, authMod, storeMod] = await Promise.all([
-      import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"),
-      import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js"),
-      import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"),
-    ]);
-    const { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } = authMod;
-    const { getFirestore, doc, setDoc, getDoc, collection, getDocs, onSnapshot } = storeMod;
-    firebaseFns = { signInWithPopup, signOut, onAuthStateChanged, doc, setDoc, getDoc, collection, getDocs, onSnapshot };
-
-    firebaseApp = initializeApp(FIREBASE_CONFIG);
-    auth = getAuth(firebaseApp);
-    db = getFirestore(firebaseApp);
-    googleProvider = new GoogleAuthProvider();
-    setPersistence(auth, browserLocalPersistence).catch(() => {});
-    firebaseReady = true;
-
-    firebaseFns.onAuthStateChanged(auth, (user) => {
-      state.user = user;
-      render();
-    });
-  } catch (e) {
-    // Firebase CDN unreachable, blocked, or still using placeholder
-    // config values. The app remains fully browsable — only
-    // auth/ratings degrade gracefully (see guardAuthAction()).
-    firebaseReady = false;
-    console.warn("[VAULT] Firebase not available yet:", e.message);
-  }
-}
-
-/* ====================================================================
    GLOBAL STATE
    ==================================================================== */
 const state = {
-  user: null,             // Firebase user object, or null
   route: { name: "home", params: {} },
   search: "",
-  filters: { category: "all", type: "all", minRating: 0 },
-  sort: "popularity",
-  ratingsCache: new Map(), // appId -> { average, count, mine }
-  myRatingsCache: null,    // array of { appId, rating, timestamp } for current user
+  filters: { category: "all", type: "all" },
+  sort: "featured",
   deferredInstallPrompt: null,
   mobileNavOpen: false,
 };
@@ -893,8 +729,6 @@ const state = {
    ==================================================================== */
 const ICON = {
   search: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`,
-  star: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`,
-  starOutline: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`,
   arrowRight: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>`,
   chevronLeft: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>`,
   menu: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>`,
@@ -904,9 +738,7 @@ const ICON = {
   check: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>`,
   checkCircle: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`,
   vault: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="3" x2="12" y2="7"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="3" y1="12" x2="7" y2="12"/><line x1="17" y1="12" x2="21" y2="12"/></svg>`,
-  google: `<svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>`,
   info: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`,
-  logout: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`,
 };
 function icon(name, cls=""){ return `<span class="icon ${cls}" style="display:inline-flex">${ICON[name]||""}</span>`; }
 
@@ -923,17 +755,6 @@ function formatDate(iso){
 }
 function debounce(fn, ms){
   let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
-}
-function starRow(rating, size=""){
-  const full = Math.round(rating);
-  let out = "";
-  for(let i=1;i<=5;i++){ out += icon(i<=full ? "star" : "starOutline"); }
-  return `<span class="stars-row ${size}">${out}</span>`;
-}
-function getEffectiveRating(app){
-  const cached = state.ratingsCache.get(app.id);
-  if(cached) return { average: cached.average, count: cached.count };
-  return { average: app.rating, count: app.ratingCount };
 }
 function showToast(message, type="success", timeout=4200){
   const stack = document.getElementById("toast-stack");
@@ -957,7 +778,7 @@ const CATEGORY_ICONS = {
 /* ====================================================================
    ROUTER
    Hash-based client-side routing. No framework, no reload.
-   Routes: #/  #/apps  #/categories  #/app/{id}  #/account  #/contact
+   Routes: #/  #/apps  #/categories  #/app/{id}  #/contact
    ==================================================================== */
 function parseHash(){
   const hash = location.hash.replace(/^#\/?/, "");
@@ -970,7 +791,6 @@ function parseHash(){
   if(parts[0] === "categories" && !parts[1]) return { name:"categories", params:{}, query };
   if(parts[0] === "categories" && parts[1]) return { name:"apps", params:{}, query: new URLSearchParams([...query, ["category", decodeURIComponent(parts[1])]]) };
   if(parts[0] === "app" && parts[1]) return { name:"app-detail", params:{ id: decodeURIComponent(parts[1]) }, query };
-  if(parts[0] === "account") return { name:"account", params:{}, query };
   if(parts[0] === "contact") return { name:"contact", params:{}, query };
   return { name:"not-found", params:{}, query };
 }
@@ -979,105 +799,6 @@ function navigate(path){
   location.hash = path;
 }
 window.addEventListener("hashchange", () => { state.route = parseHash(); window.scrollTo({top:0}); render(); });
-
-/* ====================================================================
-   AUTH
-   ==================================================================== */
-function guardAuthAction(actionLabel="do this"){
-  if(!firebaseReady){
-    showToast(`Firebase isn't configured yet, so you can't ${actionLabel}. Add your project config in FIREBASE_CONFIG.`, "error");
-    return false;
-  }
-  return true;
-}
-async function handleSignIn(){
-  if(!guardAuthAction("sign in")) return;
-  try{
-    await firebaseFns.signInWithPopup(auth, googleProvider);
-    showToast("Signed in.");
-  } catch(e){
-    if(e.code !== "auth/popup-closed-by-user") showToast("Sign-in failed: " + e.message, "error");
-  }
-}
-async function handleSignOut(){
-  try{
-    await firebaseFns.signOut(auth);
-    state.myRatingsCache = null;
-    showToast("Signed out.");
-    if(state.route.name === "account") navigate("/");
-  } catch(e){
-    showToast("Sign-out failed: " + e.message, "error");
-  }
-}
-// Note: the auth-state listener itself is attached inside initFirebase(),
-// right after auth is created — see the FIREBASE INIT block above.
-
-/* ====================================================================
-   FIRESTORE — RATINGS
-   apps/{appId}/ratings/{userId}  ->  { userId, rating, timestamp }
-   ==================================================================== */
-async function fetchRatingsFor(appId){
-  if(!firebaseReady) return null;
-  if(state.ratingsCache.has(appId)) return state.ratingsCache.get(appId);
-  try{
-    const { collection, getDocs } = firebaseFns;
-    const snap = await getDocs(collection(db, "apps", appId, "ratings"));
-    let sum = 0, count = 0, mine = null;
-    snap.forEach(d => {
-      const data = d.data();
-      sum += data.rating; count++;
-      if(state.user && d.id === state.user.uid) mine = data.rating;
-    });
-    const fallback = APP_CATALOG.find(a => a.id === appId);
-    const result = count > 0
-      ? { average: sum / count, count, mine }
-      : { average: fallback?.rating ?? 0, count: fallback?.ratingCount ?? 0, mine };
-    state.ratingsCache.set(appId, result);
-    return result;
-  } catch(e){
-    console.warn("[VAULT] Could not fetch ratings for", appId, e.message);
-    return null;
-  }
-}
-async function submitRating(appId, ratingValue){
-  if(!guardAuthAction("rate this app")) return false;
-  if(!state.user){ return false; }
-  try{
-    const { doc, setDoc } = firebaseFns;
-    await setDoc(doc(db, "apps", appId, "ratings", state.user.uid), {
-      userId: state.user.uid,
-      rating: ratingValue,
-      timestamp: Date.now(),
-    });
-    state.ratingsCache.delete(appId); // force refetch of the average
-    state.myRatingsCache = null;
-    showToast("Rating saved.");
-    return true;
-  } catch(e){
-    showToast("Couldn't save your rating: " + e.message, "error");
-    return false;
-  }
-}
-async function fetchMyRatings(){
-  if(!firebaseReady || !state.user) return [];
-  if(state.myRatingsCache) return state.myRatingsCache;
-  const results = [];
-  const { doc, getDoc } = firebaseFns;
-  // Firestore has no cheap "collection group where userId==me" without
-  // an index, so for a catalog this size we just check each app's doc
-  // directly — simplest correct approach at this scale.
-  await Promise.all(APP_CATALOG.map(async (app) => {
-    try{
-      const snap = await getDoc(doc(db, "apps", app.id, "ratings", state.user.uid));
-      if(snap.exists()){
-        results.push({ appId: app.id, appName: app.name, appIcon: app.icon, ...snap.data() });
-      }
-    } catch {}
-  }));
-  results.sort((a,b) => (b.timestamp||0) - (a.timestamp||0));
-  state.myRatingsCache = results;
-  return results;
-}
 
 /* ====================================================================
    FILTER / SEARCH / SORT
@@ -1093,15 +814,13 @@ function getFilteredApps(){
     if(!matchesSearch(app, search)) return false;
     if(filters.category !== "all" && app.category !== filters.category) return false;
     if(filters.type !== "all" && app.type !== filters.type) return false;
-    if(filters.minRating > 0 && app.rating < filters.minRating) return false;
     return true;
   });
   switch(sort){
-    case "rating": list.sort((a,b) => b.rating - a.rating); break;
     case "newest": list.sort((a,b) => new Date(b.releaseDate) - new Date(a.releaseDate)); break;
     case "name": list.sort((a,b) => a.name.localeCompare(b.name)); break;
-    case "popularity":
-    default: list.sort((a,b) => b.ratingCount - a.ratingCount); break;
+    case "featured":
+    default: list.sort((a,b) => (b.featured?1:0) - (a.featured?1:0)); break;
   }
   return list;
 }
@@ -1135,7 +854,7 @@ function renderHeader(){
         <svg class="brand-mark" viewBox="0 0 100 100"><rect width="100" height="100" rx="18" fill="#0A0E12" stroke="#232E38"/><path d="M50 20 L75 35 L75 65 L50 80 L25 65 L25 35 Z" fill="none" stroke="#4AFFB0" stroke-width="4"/><circle cx="50" cy="50" r="10" fill="#4AFFB0"/></svg>
         <span>
           <span class="brand-name-full">${escapeHtml(STORE_CONFIG.name)}</span>
-          <small>APP DISTRIBUTION</small>
+          <small>NullVault</small>
         </span>
       </a>
       <nav class="main-nav" aria-label="Primary">
@@ -1150,22 +869,10 @@ function renderHeader(){
         <input type="search" id="header-search-input" placeholder="Search apps..." value="${escapeHtml(state.search)}" aria-label="Search apps">
       </form>
       <div class="header-actions">
-        ${state.user ? `
-          <button class="avatar-btn" id="header-avatar-btn" aria-label="Account">
-            <img src="${state.user.photoURL || fallbackAvatar(state.user.displayName)}" alt="">
-          </button>
-        ` : `
-          <button class="btn btn-secondary" id="header-signin-btn">${icon("google")} Sign in</button>
-        `}
         <button class="mobile-menu-btn" id="mobile-menu-toggle" aria-label="Open menu">${ICON.menu}</button>
       </div>
     </div>
   </header>`;
-}
-
-function fallbackAvatar(name){
-  const initial = (name||"U").charAt(0).toUpperCase();
-  return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#1A232B"/><text x="50" y="63" font-family="monospace" font-size="42" fill="#4AFFB0" text-anchor="middle">${initial}</text></svg>`)}`;
 }
 
 function renderMobileDrawer(){
@@ -1179,7 +886,6 @@ function renderMobileDrawer(){
       <a href="#/apps" class="${r==="apps"?"active":""}" style="color:${r==="apps"?"var(--accent)":""}">Apps</a>
       <a href="#/categories" class="${r==="categories"?"active":""}" style="color:${r==="categories"?"var(--accent)":""}">Categories</a>
       <a href="#/contact" class="${r==="contact"?"active":""}" style="color:${r==="contact"?"var(--accent)":""}">Contact</a>
-      ${state.user ? `<a href="#/account">Account</a>` : ""}
     </div>
   </div>`;
 }
@@ -1198,10 +904,6 @@ function renderFooter(){
             <h5>Browse</h5>
             <a href="#/apps">All apps</a>
             <a href="#/categories">Categories</a>
-          </div>
-          <div class="footer-col">
-            <h5>Account</h5>
-            <a href="#/account">My account</a>
             <a href="#/contact">Contact</a>
           </div>
         </div>
@@ -1213,7 +915,6 @@ function renderFooter(){
 
 /* ---------- App card ---------- */
 function appCard(app){
-  const { average, count } = getEffectiveRating(app);
   return `
   <button class="app-card" data-nav="/app/${encodeURIComponent(app.id)}" aria-label="View ${escapeHtml(app.name)}">
     <div class="app-card-top">
@@ -1228,8 +929,8 @@ function appCard(app){
     </div>
     <p class="app-card-desc">${escapeHtml(app.shortDescription)}</p>
     <div class="app-card-bottom">
-      <span class="rating-inline">${icon("star")} ${average.toFixed(1)} <span class="count">(${count})</span></span>
       <span class="category-chip">${escapeHtml(app.category)}</span>
+      <span class="type-badge ${app.type.toLowerCase()}" style="margin-left:auto;"><span class="led ${app.type.toLowerCase()}"></span>${app.type}</span>
     </div>
   </button>`;
 }
@@ -1247,7 +948,6 @@ function emptyState(title, body, icon_="search"){
 /* ---------- HOME PAGE ---------- */
 function pageHome(){
   const featured = APP_CATALOG.filter(a => a.featured);
-  const popular = [...APP_CATALOG].sort((a,b)=>b.ratingCount-a.ratingCount).slice(0,6);
   const recent = [...APP_CATALOG].sort((a,b)=>new Date(b.releaseDate)-new Date(a.releaseDate)).slice(0,6);
   const cats = categories();
 
@@ -1256,7 +956,7 @@ function pageHome(){
     <div class="container hero-inner">
       <div class="eyebrow">${icon("vault")} ACCESS: PUBLIC CATALOG</div>
       <h1>Your own apps.<br>One <span class="accent-text">vault</span>, properly indexed.</h1>
-      <p class="lead">${escapeHtml(STORE_CONFIG.tagline)}. Browse, install as a PWA, or grab the TWA build for Android — everything catalogued, rated, and searchable in one place.</p>
+      <p class="lead">${escapeHtml(STORE_CONFIG.tagline)}. Browse, install as a PWA, or grab the TWA build for Android — everything catalogued and searchable in one place.</p>
       <div style="display:flex;gap:12px;flex-wrap:wrap;">
         <button class="btn btn-primary btn-lg" data-nav="/apps">Browse all apps ${icon("arrowRight")}</button>
         <button class="btn btn-secondary btn-lg" data-nav="/categories">View categories</button>
@@ -1277,14 +977,6 @@ function pageHome(){
         <a href="#/apps" class="see-all">See all ${icon("arrowRight")}</a>
       </div>
       <div class="app-grid">${featured.map(appCard).join("")}</div>
-    </section>
-
-    <section class="section">
-      <div class="section-head">
-        <h2>Popular right now</h2>
-        <a href="#/apps" class="see-all">See all ${icon("arrowRight")}</a>
-      </div>
-      <div class="app-grid rail">${popular.map(appCard).join("")}</div>
     </section>
 
     <section class="section">
@@ -1345,16 +1037,8 @@ function pageApps(){
         ${cats.map(c => `<option value="${escapeHtml(c.name)}" ${filters.category===c.name?"selected":""}>${escapeHtml(c.name)}</option>`).join("")}
       </select>
 
-      <select id="rating-filter" aria-label="Filter by minimum rating">
-        <option value="0" ${filters.minRating===0?"selected":""}>Any rating</option>
-        <option value="4.5" ${filters.minRating===4.5?"selected":""}>4.5+ stars</option>
-        <option value="4" ${filters.minRating===4?"selected":""}>4.0+ stars</option>
-        <option value="3" ${filters.minRating===3?"selected":""}>3.0+ stars</option>
-      </select>
-
       <select id="sort-select" aria-label="Sort apps">
-        <option value="popularity" ${sort==="popularity"?"selected":""}>Sort: Popularity</option>
-        <option value="rating" ${sort==="rating"?"selected":""}>Sort: Rating</option>
+        <option value="featured" ${sort==="featured"?"selected":""}>Sort: Featured</option>
         <option value="newest" ${sort==="newest"?"selected":""}>Sort: Newest</option>
         <option value="name" ${sort==="name"?"selected":""}>Sort: Name (A–Z)</option>
       </select>
@@ -1399,7 +1083,6 @@ function pageAppDetail(id){
     return `<div class="container">${emptyState("App not found", "This listing may have been removed or the link is incorrect.", "info")}
       <div style="text-align:center;"><button class="btn btn-secondary" data-nav="/apps">Back to catalog</button></div></div>`;
   }
-  const { average, count } = getEffectiveRating(app);
 
   const primaryAction = app.type === "PWA"
     ? `
@@ -1420,7 +1103,6 @@ function pageAppDetail(id){
         <h1>${escapeHtml(app.name)}</h1>
         <div class="app-detail-dev">by ${escapeHtml(app.developer)}</div>
         <div class="app-detail-meta-row">
-          <span class="rating-inline">${icon("star")} ${average.toFixed(1)} <span class="count">(${count} rating${count===1?"":"s"})</span></span>
           <span class="type-badge ${app.type.toLowerCase()}"><span class="led ${app.type.toLowerCase()}"></span>${app.type}</span>
           <span class="category-chip">${escapeHtml(app.category)}</span>
         </div>
@@ -1464,85 +1146,6 @@ function pageAppDetail(id){
         ${app.platforms.map(p => `<span class="platform-chip">${escapeHtml(p)}</span>`).join("")}
       </div>
     </div>
-
-    <div id="rate-box-mount"></div>
-  </div>`;
-}
-
-/* ---------- Rating widget (mounted after page render, needs async Firestore read) ---------- */
-function renderRateBox(app, ratingsInfo){
-  const mine = ratingsInfo?.mine ?? null;
-  if(!state.user){
-    return `
-    <div class="rate-box">
-      <div class="rate-login-prompt">
-        <div>
-          <div class="eyebrow" style="margin-bottom:6px;">RATE THIS APP</div>
-          <p>Sign in with Google to leave a rating.</p>
-        </div>
-        <button class="btn btn-secondary" id="rate-signin-btn">${icon("google")} Sign in</button>
-      </div>
-    </div>`;
-  }
-  return `
-  <div class="rate-box">
-    <div class="rate-box-head">
-      <div class="eyebrow">${mine ? "YOUR RATING" : "RATE THIS APP"}</div>
-    </div>
-    <div class="star-input" id="star-input" data-app-id="${escapeHtml(app.id)}" data-current="${mine||0}">
-      ${[1,2,3,4,5].map(n => `<button type="button" data-star="${n}" class="${mine && n<=mine ? "on":""}" aria-label="${n} star${n===1?"":"s"}">${ICON.star}</button>`).join("")}
-    </div>
-    <div class="rate-status" id="rate-status">${mine ? `You rated this ${mine} star${mine===1?"":"s"}. Tap to change it.` : "Tap a star to rate."}</div>
-  </div>`;
-}
-
-/* ---------- ACCOUNT PAGE ---------- */
-function pageAccount(){
-  if(!state.user){
-    return `<div class="container">
-      <div class="login-panel">
-        <div class="vault-icon">${ICON.vault}</div>
-        <h2>Access restricted</h2>
-        <p>Sign in with Google to view your account and rating history.</p>
-        <button class="btn btn-primary btn-block" id="account-signin-btn">${icon("google")} Sign in with Google</button>
-      </div>
-    </div>`;
-  }
-  const u = state.user;
-  return `
-  <div class="container">
-    <div class="account-header">
-      <img class="account-avatar" src="${u.photoURL || fallbackAvatar(u.displayName)}" alt="">
-      <div>
-        <h1>${escapeHtml(u.displayName || "Vault user")}</h1>
-        <div class="email mono">${escapeHtml(u.email || "")}</div>
-      </div>
-      <div style="margin-left:auto;">
-        <button class="btn btn-secondary" id="account-signout-btn">${icon("logout")} Sign out</button>
-      </div>
-    </div>
-
-    <div class="detail-section">
-      <h2>My ratings</h2>
-      <div id="my-ratings-mount">
-        <div class="skeleton" style="height:60px;margin-bottom:1px;"></div>
-        <div class="skeleton" style="height:60px;"></div>
-      </div>
-    </div>
-  </div>`;
-}
-function renderMyRatingsList(ratings){
-  if(ratings.length === 0){
-    return emptyState("No ratings yet", "Apps you rate will show up here.", "star");
-  }
-  return `<div class="my-ratings-list">
-    ${ratings.map(r => `
-      <div class="my-rating-row" data-nav="/app/${encodeURIComponent(r.appId)}">
-        <img src="${r.appIcon}" alt="">
-        <span class="name">${escapeHtml(r.appName)}</span>
-        <span class="stars">${[1,2,3,4,5].map(n => icon(n<=r.rating ? "star":"starOutline")).join("")}</span>
-      </div>
-    `).join("")}
   </div>`;
 }
 
@@ -1596,26 +1199,6 @@ function renderContactSuccess(){
   </div>`;
 }
 
-/* ---------- Login-required modal ---------- */
-function showLoginModal(){
-  const scrim = document.createElement("div");
-  scrim.className = "modal-scrim";
-  scrim.innerHTML = `
-    <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="login-modal-title">
-      <h3 id="login-modal-title">Sign in required</h3>
-      <p>You need to be signed in with Google to rate applications.</p>
-      <div class="modal-actions">
-        <button class="btn btn-ghost" id="login-modal-cancel">Cancel</button>
-        <button class="btn btn-primary" id="login-modal-signin">${icon("google")} Sign in</button>
-      </div>
-    </div>`;
-  document.body.appendChild(scrim);
-  const close = () => scrim.remove();
-  scrim.addEventListener("click", (e) => { if(e.target === scrim) close(); });
-  scrim.querySelector("#login-modal-cancel").addEventListener("click", close);
-  scrim.querySelector("#login-modal-signin").addEventListener("click", async () => { close(); await handleSignIn(); });
-}
-
 /* ---------- Contact form validation + submission ---------- */
 function validateContactForm(data){
   const errors = {};
@@ -1664,7 +1247,6 @@ function render(){
     }
     case "categories": pageHtml = pageCategories(); break;
     case "app-detail": pageHtml = pageAppDetail(r.params.id); break;
-    case "account": pageHtml = pageAccount(); break;
     case "contact": pageHtml = pageContact(); break;
     default: pageHtml = `<div class="container">${emptyState("Page not found", "That route doesn't exist.", "info")}<div style="text-align:center;"><button class="btn btn-secondary" data-nav="/">Go home</button></div></div>`;
   }
@@ -1693,9 +1275,7 @@ function bindGlobalEvents(){
     searchForm.addEventListener("submit", (e) => { e.preventDefault(); state.search = searchInput.value; if(state.route.name!=="apps") navigate("/apps"); else render(); });
   }
 
-  // Sign in / avatar / mobile menu
-  document.getElementById("header-signin-btn")?.addEventListener("click", handleSignIn);
-  document.getElementById("header-avatar-btn")?.addEventListener("click", () => navigate("/account"));
+  // Mobile menu
   document.getElementById("mobile-menu-toggle")?.addEventListener("click", () => { state.mobileNavOpen = true; render(); });
   document.getElementById("mobile-drawer-close")?.addEventListener("click", () => { state.mobileNavOpen = false; render(); });
   document.getElementById("mobile-drawer-scrim")?.addEventListener("click", () => { state.mobileNavOpen = false; render(); });
@@ -1705,7 +1285,6 @@ function bindGlobalEvents(){
 function bindPageEvents(route){
   if(route.name === "apps") bindAppsPageEvents();
   if(route.name === "app-detail") bindAppDetailEvents(route.params.id);
-  if(route.name === "account") bindAccountEvents();
   if(route.name === "contact") bindContactEvents();
 }
 
@@ -1714,7 +1293,6 @@ function bindAppsPageEvents(){
     btn.addEventListener("click", () => { state.filters.type = btn.getAttribute("data-filter-type"); render(); });
   });
   document.getElementById("category-filter")?.addEventListener("change", (e) => { state.filters.category = e.target.value; render(); });
-  document.getElementById("rating-filter")?.addEventListener("change", (e) => { state.filters.minRating = parseFloat(e.target.value); render(); });
   document.getElementById("sort-select")?.addEventListener("change", (e) => { state.sort = e.target.value; render(); });
 }
 
@@ -1746,64 +1324,10 @@ function bindAppDetailEvents(appId){
         if(choice.outcome === "accepted") showToast("Installed.");
         updateInstallBannerVisibility();
       } else {
-        statusMsg.innerHTML = `<div class="rate-status" style="margin-top:10px;">Your browser didn't offer an install prompt for this app from here. Opening it directly — look for an "Install" icon in the address bar, or your browser's menu, once it loads.</div>`;
+        statusMsg.innerHTML = `<div style="font-family:var(--font-mono);font-size:12px;color:var(--text-faint);margin-top:10px;">Your browser didn't offer an install prompt for this app from here. Opening it directly — look for an "Install" icon in the address bar, or your browser's menu, once it loads.</div>`;
         window.open(app.appUrl, "_blank", "noopener,noreferrer");
       }
     });
-  }
-
-  // --- Ratings: async fetch then mount ---
-  const mount = document.getElementById("rate-box-mount");
-  if(mount){
-    mount.innerHTML = `<div class="skeleton" style="height:110px;"></div>`;
-    fetchRatingsFor(app.id).then(info => {
-      state.ratingsCache.set(app.id, info || { average: app.rating, count: app.ratingCount, mine: null });
-      // refresh the rating shown in the header meta row too
-      const ratingEl = document.querySelector(".rating-inline");
-      const eff = getEffectiveRating(app);
-      if(ratingEl) ratingEl.innerHTML = `${icon("star")} ${eff.average.toFixed(1)} <span class="count">(${eff.count} rating${eff.count===1?"":"s"})</span>`;
-      mount.innerHTML = renderRateBox(app, info);
-      bindRateBoxEvents(app);
-    });
-  }
-}
-
-function bindRateBoxEvents(app){
-  document.getElementById("rate-signin-btn")?.addEventListener("click", handleSignIn);
-  const starInput = document.getElementById("star-input");
-  if(!starInput) return;
-  const buttons = [...starInput.querySelectorAll("button[data-star]")];
-  const statusEl = document.getElementById("rate-status");
-
-  const paintHover = (n) => buttons.forEach(b => b.classList.toggle("hovered", parseInt(b.dataset.star) <= n));
-  buttons.forEach(b => {
-    b.addEventListener("mouseenter", () => paintHover(parseInt(b.dataset.star)));
-    b.addEventListener("mouseleave", () => paintHover(0));
-    b.addEventListener("click", async () => {
-      if(!state.user){ showLoginModal(); return; }
-      const val = parseInt(b.dataset.star);
-      statusEl.textContent = "Saving...";
-      const ok = await submitRating(app.id, val);
-      if(ok){
-        buttons.forEach(btn => btn.classList.toggle("on", parseInt(btn.dataset.star) <= val));
-        statusEl.textContent = `You rated this ${val} star${val===1?"":"s"}. Tap to change it.`;
-        // refresh average shown up top
-        const info = await fetchRatingsFor(app.id);
-        const ratingEl = document.querySelector(".rating-inline");
-        if(ratingEl && info) ratingEl.innerHTML = `${icon("star")} ${info.average.toFixed(1)} <span class="count">(${info.count} rating${info.count===1?"":"s"})</span>`;
-      } else {
-        statusEl.textContent = "Couldn't save your rating. Try again.";
-      }
-    });
-  });
-}
-
-function bindAccountEvents(){
-  document.getElementById("account-signin-btn")?.addEventListener("click", handleSignIn);
-  document.getElementById("account-signout-btn")?.addEventListener("click", handleSignOut);
-  const mount = document.getElementById("my-ratings-mount");
-  if(mount && state.user){
-    fetchMyRatings().then(ratings => { mount.innerHTML = renderMyRatingsList(ratings); bindGlobalEvents(); });
   }
 }
 
@@ -1863,7 +1387,7 @@ function updateInstallBannerVisibility(){
 // and icon <link> tags themselves point at the static files below and
 // don't need to change at runtime — only the visible title/meta do.
 function applyManifestAndMeta(){
-  document.title = `${STORE_CONFIG.name} — App Distribution`;
+  document.title = STORE_CONFIG.name;
   const desc = document.querySelector('meta[name="description"]');
   if(desc) desc.setAttribute("content", `${STORE_CONFIG.tagline}.`);
 }
@@ -1897,23 +1421,12 @@ window.addEventListener("appinstalled", () => {
 
 /* ====================================================================
    BOOT
-   Render the UI immediately and unconditionally first — the store must
-   be fully browsable with zero network dependencies. Firebase is then
-   initialized in the background; when/if it becomes ready, its own
-   onAuthStateChanged listener (inside initFirebase) triggers a re-render
-   to reflect signed-in state. A top-level catch ensures that even a
-   truly unexpected error can't leave a blank page silently.
-   ==================================================================== */
-/* ====================================================================
-   BOOT
    Render the UI immediately with built-in fallback data first — the
    store must be visible with zero network dependencies, even offline
    or on a file:// preview. settings.json and app-list.json are then
    fetched in the background; once they resolve, a second render()
-   picks up the real branding/catalog. Firebase loads in parallel and
-   independently — none of these three can block or break another.
-   A top-level catch ensures even a truly unexpected error can't leave
-   a blank page silently.
+   picks up the real branding/catalog. A top-level catch ensures even
+   a truly unexpected error can't leave a blank page silently.
    ==================================================================== */
 function safeRender(){
   try {
@@ -1936,7 +1449,6 @@ loadConfiguration().then(() => {
   safeRender();           // re-render with the real settings.json / app-list.json data
 });
 
-initFirebase(); // fire-and-forget; never blocks or breaks initial render
 registerServiceWorker();
 
 </script>
