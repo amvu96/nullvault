@@ -1,2531 +1,1945 @@
- 
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>AppVault Store</title>
-  <meta name="description" content="Discover and install PWA and TWA applications.">
-  <meta name="theme-color" content="#0f172a">
-
-  <!--
-  ============================================================
-  PWA MANIFEST & SERVICE WORKER LIMITATION
-  ============================================================
-  A fully installable PWA typically requires two additional files:
-  
-  1. manifest.json
-  2. sw.js (service worker)
-
-  Since this is a single index.html, the manifest and service worker
-  cannot be embedded inline. You should add the following files in the
-  same directory to make the store itself installable and offline-capable.
-
-  --- manifest.json (example) ---
-  {
-    "name": "AppVault Store",
-    "short_name": "AppVault",
-    "start_url": "./index.html",
-    "display": "standalone",
-    "background_color": "#ffffff",
-    "theme_color": "#0f172a",
-    "icons": [
-      {
-        "src": "icon-192.png",
-        "sizes": "192x192",
-        "type": "image/png"
-      },
-      {
-        "src": "icon-512.png",
-        "sizes": "512x512",
-        "type": "image/png"
-      }
-    ]
-  }
-
-  --- sw.js (example) ---
-  const CACHE_NAME = 'appvault-cache-v1';
-  const urlsToCache = ['./index.html'];
-  self.addEventListener('install', event => {
-    event.waitUntil(
-      caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))
-    );
-  });
-  self.addEventListener('fetch', event => {
-    event.respondWith(
-      caches.match(event.request).then(response => response || fetch(event.request))
-    );
-  });
-
-  Uncomment the manifest link and service worker registration below
-  after you create those files.
-  -->
-
-  <!-- Uncomment when manifest.json is available -->
-  <!-- <link rel="manifest" href="manifest.json"> -->
-
-  <!-- ============================================================
-       CONFIGURATION SECTION
-       Replace these placeholder values with your own.
-       ============================================================ -->
-  <script>
-    // ===== STORE CONFIGURATION =====
-    window.CONFIG = {
-      // Firebase web configuration (replace with your project's config)
-      firebaseConfig: {
-        apiKey: "YOUR_API_KEY",
-        authDomain: "YOUR_PROJECT.firebaseapp.com",
-        projectId: "YOUR_PROJECT_ID",
-        storageBucket: "YOUR_PROJECT.appspot.com",
-        messagingSenderId: "YOUR_SENDER_ID",
-        appId: "YOUR_APP_ID"
-      },
-      // Store branding
-      storeName: "AppVault Store",
-      storeLogo: "🛍️", // emoji or text logo
-      storeTagline: "Discover & install the best PWA and TWA apps",
-      // Contact form endpoint (e.g. "https://formspree.io/f/yourFormId")
-      // Leave empty to show a configuration error when submitting.
-      contactEndpoint: "",
-      // Enable/disable Firebase (set to false if you want to demo UI only)
-      useFirebase: true
-    };
-
-    // ===== APPLICATION CATALOG =====
-    // Add a new app by adding another object to this array.
-    // Required fields: id, name, developer, shortDescription, fullDescription,
-    // version, category, screenshots, appType, rating, ratingCount,
-    // releaseDate, updatedDate, platforms, tags, iconColor1, iconColor2
-    // Optional: downloadUrl (TWA), appUrl (PWA), featured
-    window.APP_CATALOG = [
-      {
-        id: "notes-pwa",
-        name: "Notes PWA",
-        developer: "Acme Apps",
-        shortDescription: "Simple and fast note taking, offline first.",
-        fullDescription: "A beautiful note-taking app that works offline. Organize your thoughts with markdown support, sync across devices, and never lose a note. Perfect for students, writers, and anyone who loves simplicity.",
-        version: "2.1.0",
-        category: "Productivity",
-        screenshots: [
-          "https://picsum.photos/seed/notes1/400/300",
-          "https://picsum.photos/seed/notes2/400/300",
-          "https://picsum.photos/seed/notes3/400/300"
-        ],
-        appType: "PWA",
-        appUrl: "https://example.com/notes",
-        rating: 4.5,
-        ratingCount: 124,
-        releaseDate: "2023-05-15",
-        updatedDate: "2026-01-20",
-        platforms: ["Android", "iOS", "Web"],
-        featured: true,
-        tags: ["notes", "productivity", "offline", "markdown"],
-        iconColor1: "#FF6B6B",
-        iconColor2: "#FF8E53"
-      },
-      {
-        id: "taskflow",
-        name: "TaskFlow",
-        developer: "Zenith Labs",
-        shortDescription: "Kanban boards for modern teams.",
-        fullDescription: "TaskFlow is a project management tool with a beautiful Kanban interface. Collaborate in real time, track progress, and meet deadlines. PWA installation gives you a native app feel on any device.",
-        version: "1.8.3",
-        category: "Productivity",
-        screenshots: [
-          "https://picsum.photos/seed/taskflow1/400/300",
-          "https://picsum.photos/seed/taskflow2/400/300",
-          "https://picsum.photos/seed/taskflow3/400/300"
-        ],
-        appType: "PWA",
-        appUrl: "https://example.com/taskflow",
-        rating: 4.2,
-        ratingCount: 89,
-        releaseDate: "2022-11-02",
-        updatedDate: "2026-02-10",
-        platforms: ["Web", "Android", "iOS"],
-        featured: false,
-        tags: ["kanban", "project-management", "team", "collaboration"],
-        iconColor1: "#4ECDC4",
-        iconColor2: "#556270"
-      },
-      {
-        id: "meditation-twa",
-        name: "Zen Meditation",
-        developer: "CalmTech",
-        shortDescription: "Guided meditations and sleep stories.",
-        fullDescription: "Find peace with Zen Meditation. Hundreds of guided sessions, breathing exercises, and sleep stories. The TWA version provides a full Android experience through Google Play.",
-        version: "3.0.1",
-        category: "Health & Fitness",
-        screenshots: [
-          "https://picsum.photos/seed/zen1/400/300",
-          "https://picsum.photos/seed/zen2/400/300",
-          "https://picsum.photos/seed/zen3/400/300"
-        ],
-        appType: "TWA",
-        downloadUrl: "https://play.google.com/store/apps/details?id=com.example.zen",
-        rating: 4.8,
-        ratingCount: 245,
-        releaseDate: "2022-01-10",
-        updatedDate: "2026-03-05",
-        platforms: ["Android"],
-        featured: true,
-        tags: ["meditation", "health", "wellness", "sleep"],
-        iconColor1: "#A18CD1",
-        iconColor2: "#FBC2EB"
-      },
-      {
-        id: "budget-tracker",
-        name: "Budget Tracker",
-        developer: "MoneyWise",
-        shortDescription: "Track expenses and reach financial goals.",
-        fullDescription: "Take control of your finances with Budget Tracker. Set budgets, categorize expenses, and get insights with beautiful charts. Available as a TWA on Google Play.",
-        version: "5.2.0",
-        category: "Finance",
-        screenshots: [
-          "https://picsum.photos/seed/budget1/400/300",
-          "https://picsum.photos/seed/budget2/400/300",
-          "https://picsum.photos/seed/budget3/400/300"
-        ],
-        appType: "TWA",
-        downloadUrl: "https://play.google.com/store/apps/details?id=com.example.budget",
-        rating: 4.4,
-        ratingCount: 178,
-        releaseDate: "2021-08-20",
-        updatedDate: "2026-01-15",
-        platforms: ["Android"],
-        featured: false,
-        tags: ["finance", "budget", "expenses", "money"],
-        iconColor1: "#43E97B",
-        iconColor2: "#38F9D7"
-      },
-      {
-        id: "photo-editor",
-        name: "Pixel Photo Editor",
-        developer: "Creative Suite",
-        shortDescription: "Professional photo editing in your browser.",
-        fullDescription: "Edit photos with powerful tools: filters, layers, adjustments, and more. Pixel Photo Editor works offline and saves your projects locally. A must-have for photographers on the go.",
-        version: "2.7.5",
-        category: "Photography",
-        screenshots: [
-          "https://picsum.photos/seed/photo1/400/300",
-          "https://picsum.photos/seed/photo2/400/300",
-          "https://picsum.photos/seed/photo3/400/300"
-        ],
-        appType: "PWA",
-        appUrl: "https://example.com/pixel-editor",
-        rating: 4.6,
-        ratingCount: 312,
-        releaseDate: "2022-04-12",
-        updatedDate: "2026-02-28",
-        platforms: ["Web", "Android", "iOS"],
-        featured: true,
-        tags: ["photo", "editor", "creative", "offline"],
-        iconColor1: "#FA709A",
-        iconColor2: "#FEE140"
-      },
-      {
-        id: "recipe-box",
-        name: "Recipe Box",
-        developer: "HomeCook",
-        shortDescription: "Save, organize, and share your favorite recipes.",
-        fullDescription: "Recipe Box is your digital cookbook. Import recipes from the web, create shopping lists, and plan meals. The PWA version works on any device and syncs your data.",
-        version: "1.5.2",
-        category: "Food & Drink",
-        screenshots: [
-          "https://picsum.photos/seed/recipe1/400/300",
-          "https://picsum.photos/seed/recipe2/400/300",
-          "https://picsum.photos/seed/recipe3/400/300"
-        ],
-        appType: "PWA",
-        appUrl: "https://example.com/recipe-box",
-        rating: 4.3,
-        ratingCount: 67,
-        releaseDate: "2023-09-01",
-        updatedDate: "2026-02-14",
-        platforms: ["Web", "Android", "iOS"],
-        featured: false,
-        tags: ["recipes", "cooking", "meal-planning", "food"],
-        iconColor1: "#F6D365",
-        iconColor2: "#FDA085"
-      }
-    ];
-  </script>
-
-  <!-- Firebase SDKs (loaded via CDN) -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
-    import { getFirestore, collection, doc, getDocs, getDoc, setDoc, query, where, collectionGroup, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
-
-    const CONFIG = window.CONFIG;
-    const APP_CATALOG = window.APP_CATALOG;
-
-    // ============================================================
-    // FIREBASE SECURITY RULES (for Firestore)
-    // ============================================================
-    /*
-      rules_version = '2';
-      service cloud.firestore {
-        match /databases/{database}/documents {
-          // Users can read ratings for any app
-          match /apps/{appId}/ratings/{userId} {
-            allow read: if true;
-            // Only the authenticated user can create/update their own rating
-            allow create, update: if request.auth != null && request.auth.uid == userId;
-            // Optionally prevent delete or allow delete of own rating
-            allow delete: if request.auth != null && request.auth.uid == userId;
-          }
-          // Collection group query for user ratings requires an index
-          // Create composite index on collectionGroup 'ratings' with fields userId, timestamp
-        }
-      }
-    */
-
-    // ============================================================
-    // GLOBAL STATE
-    // ============================================================
-    let currentUser = null;
-    let deferredPrompt = null;
-    const ratingsCache = {}; // appId -> { average, count, userRating }
-
-    // ============================================================
-    // FIREBASE INITIALIZATION
-    // ============================================================
-    let app = null;
-    let auth = null;
-    let db = null;
-    let googleProvider = null;
-
-    function initFirebase() {
-      if (!CONFIG.useFirebase) return;
-      const cfg = CONFIG.firebaseConfig;
-      // Check if placeholder is present
-      if (cfg.apiKey && cfg.apiKey.includes("YOUR_")) {
-        console.warn("Firebase configuration is placeholder. Auth and ratings will be disabled.");
-        return;
-      }
-      try {
-        app = initializeApp(cfg);
-        auth = getAuth(app);
-        db = getFirestore(app);
-        googleProvider = new GoogleAuthProvider();
-        // Set up auth state listener
-        onAuthStateChanged(auth, (user) => {
-          currentUser = user;
-          updateAuthUI();
-          // Re-render current view to reflect auth state
-          router();
-        });
-      } catch (e) {
-        console.error("Firebase initialization error:", e);
-      }
-    }
-
-    // ============================================================
-    // UTILITY FUNCTIONS
-    // ============================================================
-    function escapeHTML(str) {
-      const div = document.createElement('div');
-      div.textContent = str;
-      return div.innerHTML;
-    }
-
-    function formatDate(dateString) {
-      const options = { year: 'numeric', month: 'short', day: 'numeric' };
-      return new Date(dateString + 'T00:00:00').toLocaleDateString(undefined, options);
-    }
-
-    function createAppIcon(app, size = 80) {
-      const initials = app.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
-      const svg = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-          <defs>
-            <linearGradient id="grad-${app.id}" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="${app.iconColor1}" />
-              <stop offset="100%" stop-color="${app.iconColor2}" />
-            </linearGradient>
-          </defs>
-          <rect width="100%" height="100%" rx="20%" fill="url(#grad-${app.id})" />
-          <text x="50%" y="50%" dy=".35em" text-anchor="middle" font-family="Arial, sans-serif" font-weight="bold" font-size="${size * 0.4}px" fill="#ffffff">${initials}</text>
-        </svg>
-      `;
-      return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-    }
-
-    function getAppById(id) {
-      return APP_CATALOG.find(a => a.id === id);
-    }
-
-    function getAppActionButton(app, context = 'card') {
-      if (app.appType === 'TWA') {
-        return `<a href="${escapeHTML(app.downloadUrl || '#')}" class="btn btn-primary btn-sm" target="_blank" rel="noopener">Download</a>`;
-      } else {
-        if (context === 'card') {
-          return `<a href="#/app/${app.id}" class="btn btn-secondary btn-sm">Open</a>`;
-        } else {
-          // Detail page will handle install and open separately
-          return '';
-        }
-      }
-    }
-
-    function starRatingHTML(rating, count = null, interactive = false, selected = 0) {
-      const fullStars = Math.floor(rating);
-      const halfStar = rating - fullStars >= 0.5 ? 1 : 0;
-      const emptyStars = 5 - fullStars - halfStar;
-      let stars = '';
-      for (let i = 1; i <= 5; i++) {
-        if (interactive) {
-          stars += `<button class="star-btn ${i <= selected ? 'active' : ''}" data-rating="${i}" aria-label="${i} star">★</button>`;
-        } else {
-          let cls = 'star';
-          if (i <= fullStars) cls += ' filled';
-          else if (i === fullStars + 1 && halfStar) cls += ' half';
-          else cls += ' empty';
-          stars += `<span class="${cls}">★</span>`;
-        }
-      }
-      let countHtml = count !== null ? `<span class="rating-count">${escapeHTML(String(count))}</span>` : '';
-      return `<div class="star-rating" role="img" aria-label="Rating: ${rating} out of 5">${stars}${countHtml}</div>`;
-    }
-
-    function showToast(message, type = 'info', duration = 3000) {
-      const container = document.getElementById('toast-container');
-      const toast = document.createElement('div');
-      toast.className = `toast toast-${type}`;
-      toast.textContent = message;
-      container.appendChild(toast);
-      setTimeout(() => {
-        toast.classList.add('out');
-        setTimeout(() => toast.remove(), 400);
-      }, duration);
-    }
-
-    function openModal(html) {
-      closeModal();
-      const modalRoot = document.getElementById('modal-root');
-      modalRoot.innerHTML = `
-        <div class="modal-overlay" id="modal-overlay">
-          <div class="modal-dialog" role="dialog" aria-modal="true">
-            <button class="modal-close" id="modal-close" aria-label="Close dialog">×</button>
-            <div class="modal-content">${html}</div>
-          </div>
-        </div>
-      `;
-      document.getElementById('modal-close').addEventListener('click', closeModal);
-      document.getElementById('modal-overlay').addEventListener('click', (e) => {
-        if (e.target === e.currentTarget) closeModal();
-      });
-      // Focus close button
-      document.getElementById('modal-close').focus();
-      // Handle Escape
-      document.addEventListener('keydown', handleModalEscape);
-    }
-
-    function closeModal() {
-      const modalRoot = document.getElementById('modal-root');
-      modalRoot.innerHTML = '';
-      document.removeEventListener('keydown', handleModalEscape);
-    }
-
-    function handleModalEscape(e) {
-      if (e.key === 'Escape') closeModal();
-    }
-
-    // ============================================================
-    // ROUTING
-    // ============================================================
-    function parseHash() {
-      const hash = location.hash.slice(1); // remove '#'
-      const [pathPart, queryPart] = hash.split('?');
-      const path = pathPart || '/';
-      const params = new URLSearchParams(queryPart || '');
-      return { path, params };
-    }
-
-    function navigate(path, params = {}) {
-      const queryString = new URLSearchParams(params).toString();
-      location.hash = queryString ? `${path}?${queryString}` : path;
-    }
-
-    function router() {
-      const { path, params } = parseHash();
-      const main = document.getElementById('main-content');
-      const navLinks = document.querySelectorAll('.nav-link');
-      navLinks.forEach(link => {
-        link.classList.toggle('active', link.getAttribute('href') === `#${path}`);
-      });
-
-      // Close any open modal on navigation
-      closeModal();
-
-      switch (path) {
-        case '/':
-          renderHome(main);
-          break;
-        case '/apps':
-          renderApps(main, params);
-          break;
-        case '/categories':
-          renderCategories(main);
-          break;
-        case '/app':
-          const appId = params.get('id') || '';
-          renderAppDetail(main, appId);
-          break;
-        case '/account':
-          renderAccount(main);
-          break;
-        case '/contact':
-          renderContact(main);
-          break;
-        default:
-          renderNotFound(main);
-      }
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-
-    // ============================================================
-    // HEADER / NAVIGATION
-    // ============================================================
-    function updateAuthUI() {
-      const authButton = document.getElementById('auth-button');
-      if (!authButton) return;
-      if (currentUser) {
-        const avatar = currentUser.photoURL ? `<img src="${escapeHTML(currentUser.photoURL)}" alt="${escapeHTML(currentUser.displayName || 'User')}" class="avatar-img">` : `<span class="avatar-fallback">${escapeHTML((currentUser.displayName || currentUser.email || 'U')[0].toUpperCase())}</span>`;
-        authButton.innerHTML = `${avatar}<span class="auth-label">${escapeHTML(currentUser.displayName || currentUser.email || 'Account')}</span>`;
-        authButton.setAttribute('href', '#/account');
-      } else {
-        authButton.innerHTML = `<span class="auth-icon">👤</span><span class="auth-label">Sign In</span>`;
-        authButton.setAttribute('href', '#/account');
-      }
-    }
-
-    function initHeader() {
-      const header = document.getElementById('site-header');
-      header.innerHTML = `
-        <div class="header-inner">
-          <a href="#/" class="logo" aria-label="${escapeHTML(CONFIG.storeName)} home">
-            <span class="logo-icon">${CONFIG.storeLogo}</span>
-            <span class="logo-text">${escapeHTML(CONFIG.storeName)}</span>
-          </a>
-          <div class="search-bar">
-            <input type="search" id="header-search" placeholder="Search apps..." aria-label="Search apps" autocomplete="off">
-            <span class="search-icon">🔍</span>
-          </div>
-          <nav class="main-nav" aria-label="Main navigation">
-            <a href="#/" class="nav-link">Home</a>
-            <a href="#/categories" class="nav-link">Categories</a>
-            <a href="#/contact" class="nav-link">Contact</a>
-            <a href="#/account" id="auth-button" class="btn btn-secondary btn-auth">Sign In</a>
-          </nav>
-          <button class="hamburger" id="hamburger" aria-label="Toggle menu" aria-expanded="false">☰</button>
-        </div>
-        <div class="mobile-nav" id="mobile-nav" hidden>
-          <a href="#/" class="nav-link">Home</a>
-          <a href="#/categories" class="nav-link">Categories</a>
-          <a href="#/contact" class="nav-link">Contact</a>
-          <a href="#/account" class="nav-link">Account</a>
-        </div>
-      `;
-
-      // Hamburger toggle
-      document.getElementById('hamburger').addEventListener('click', () => {
-        const nav = document.getElementById('mobile-nav');
-        const expanded = document.getElementById('hamburger').getAttribute('aria-expanded') === 'true';
-        document.getElementById('hamburger').setAttribute('aria-expanded', !expanded);
-        nav.hidden = expanded;
-      });
-
-      // Header search
-      const searchInput = document.getElementById('header-search');
-      let debounceTimer;
-      searchInput.addEventListener('input', (e) => {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-          const query = e.target.value.trim();
-          const currentHash = parseHash();
-          if (currentHash.path === '/apps') {
-            const newParams = new URLSearchParams(currentHash.params);
-            if (query) newParams.set('search', query);
-            else newParams.delete('search');
-            navigate('/apps', Object.fromEntries(newParams));
-          } else {
-            const params = {};
-            if (query) params.search = query;
-            navigate('/apps', params);
-          }
-        }, 300);
-      });
-
-      // Sync header search if we navigate with search param
-      window.addEventListener('hashchange', () => {
-        const { path, params } = parseHash();
-        if (path === '/apps') {
-          const searchVal = params.get('search') || '';
-          if (document.activeElement !== searchInput) searchInput.value = searchVal;
-        } else {
-          searchInput.value = '';
-        }
-      });
-
-      updateAuthUI();
-    }
-
-    // ============================================================
-    // HOME PAGE
-    // ============================================================
-    function renderHome(container) {
-      const featured = APP_CATALOG.filter(a => a.featured).slice(0, 4);
-      const popular = [...APP_CATALOG].sort((a,b) => b.ratingCount - a.ratingCount).slice(0, 6);
-      const recent = [...APP_CATALOG].sort((a,b) => new Date(b.updatedDate) - new Date(a.updatedDate)).slice(0, 4);
-      const categories = [...new Set(APP_CATALOG.map(a => a.category))].slice(0, 6);
-
-      container.innerHTML = `
-        <section class="hero">
-          <div class="hero-content">
-            <h1>${escapeHTML(CONFIG.storeTagline)}</h1>
-            <p>Your one-stop shop for progressive web apps and trusted web activities. Install or download with confidence.</p>
-            <a href="#/apps" class="btn btn-primary btn-lg">Browse All Apps</a>
-          </div>
-        </section>
-
-        ${featured.length ? `
-        <section class="section">
-          <div class="section-header">
-            <h2>Featured Apps</h2>
-            <a href="#/apps?featured=1" class="see-all">See all</a>
-          </div>
-          <div class="app-grid">
-            ${featured.map(app => renderAppCard(app)).join('')}
-          </div>
-        </section>` : ''}
-
-        ${popular.length ? `
-        <section class="section">
-          <div class="section-header">
-            <h2>Popular Apps</h2>
-            <a href="#/apps?sort=popularity" class="see-all">See all</a>
-          </div>
-          <div class="app-grid">
-            ${popular.map(app => renderAppCard(app)).join('')}
-          </div>
-        </section>` : ''}
-
-        ${recent.length ? `
-        <section class="section">
-          <div class="section-header">
-            <h2>Recently Updated</h2>
-            <a href="#/apps?sort=newest" class="see-all">See all</a>
-          </div>
-          <div class="app-grid">
-            ${recent.map(app => renderAppCard(app)).join('')}
-          </div>
-        </section>` : ''}
-
-        ${categories.length ? `
-        <section class="section">
-          <div class="section-header">
-            <h2>Browse Categories</h2>
-            <a href="#/categories" class="see-all">All categories</a>
-          </div>
-          <div class="category-chips">
-            ${categories.map(cat => `<a href="#/apps?category=${encodeURIComponent(cat)}" class="chip">${escapeHTML(cat)}</a>`).join('')}
-          </div>
-        </section>` : ''}
-      `;
-    }
-
-    function renderAppCard(app) {
-      return `
-        <article class="app-card" data-app-id="${app.id}">
-          <a href="#/app/${app.id}" class="card-link" aria-label="${escapeHTML(app.name)}">
-            <img src="${createAppIcon(app)}" alt="${escapeHTML(app.name)} icon" class="app-icon" loading="lazy">
-            <div class="card-info">
-              <h3 class="app-name">${escapeHTML(app.name)}</h3>
-              <p class="app-developer">${escapeHTML(app.developer)}</p>
-              <p class="app-short-desc">${escapeHTML(app.shortDescription)}</p>
-              <div class="card-meta">
-                <span class="app-type-badge ${app.appType.toLowerCase()}">${app.appType}</span>
-                ${starRatingHTML(app.rating, app.ratingCount)}
-              </div>
-            </div>
-          </a>
-          <div class="card-actions">
-            ${getAppActionButton(app)}
-          </div>
-        </article>
-      `;
-    }
-
-    // ============================================================
-    // APPS LISTING (SEARCH / FILTER / SORT)
-    // ============================================================
-    function renderApps(container, params) {
-      const searchQuery = params.get('search') || '';
-      const category = params.get('category') || '';
-      const type = params.get('type') || '';
-      const minRating = params.get('rating') ? parseInt(params.get('rating')) : 0;
-      const sort = params.get('sort') || 'popularity';
-
-      let filtered = [...APP_CATALOG];
-      if (searchQuery) {
-        const q = searchQuery.toLowerCase();
-        filtered = filtered.filter(app => {
-          return app.name.toLowerCase().includes(q) ||
-            app.developer.toLowerCase().includes(q) ||
-            app.shortDescription.toLowerCase().includes(q) ||
-            app.fullDescription.toLowerCase().includes(q) ||
-            app.category.toLowerCase().includes(q) ||
-            app.tags.some(t => t.toLowerCase().includes(q));
-        });
-      }
-      if (category) {
-        filtered = filtered.filter(app => app.category === category);
-      }
-      if (type) {
-        filtered = filtered.filter(app => app.appType === type.toUpperCase());
-      }
-      if (minRating) {
-        filtered = filtered.filter(app => app.rating >= minRating);
-      }
-
-      // Sorting
-      switch (sort) {
-        case 'name':
-          filtered.sort((a,b) => a.name.localeCompare(b.name));
-          break;
-        case 'rating':
-          filtered.sort((a,b) => b.rating - a.rating);
-          break;
-        case 'newest':
-          filtered.sort((a,b) => new Date(b.updatedDate) - new Date(a.updatedDate));
-          break;
-        case 'popularity':
-        default:
-          filtered.sort((a,b) => b.ratingCount - a.ratingCount);
-      }
-
-      const categories = [...new Set(APP_CATALOG.map(a => a.category))].sort();
-
-      container.innerHTML = `
-        <div class="apps-page">
-          <div class="apps-header">
-            <h1>Browse Apps</h1>
-            <p>Discover your next favorite app.</p>
-          </div>
-
-          <div class="filters-bar">
-            <div class="filter-group">
-              <label for="filter-category">Category</label>
-              <select id="filter-category">
-                <option value="">All Categories</option>
-                ${categories.map(c => `<option value="${escapeHTML(c)}" ${category===c?'selected':''}>${escapeHTML(c)}</option>`).join('')}
-              </select>
-            </div>
-            <div class="filter-group">
-              <label for="filter-type">Type</label>
-              <select id="filter-type">
-                <option value="">All Types</option>
-                <option value="PWA" ${type==='PWA'?'selected':''}>PWA</option>
-                <option value="TWA" ${type==='TWA'?'selected':''}>TWA</option>
-              </select>
-            </div>
-            <div class="filter-group">
-              <label for="filter-rating">Rating</label>
-              <select id="filter-rating">
-                <option value="0">Any Rating</option>
-                <option value="4" ${minRating===4?'selected':''}>4★ & up</option>
-                <option value="3" ${minRating===3?'selected':''}>3★ & up</option>
-              </select>
-            </div>
-            <div class="filter-group">
-              <label for="filter-sort">Sort by</label>
-              <select id="filter-sort">
-                <option value="popularity" ${sort==='popularity'?'selected':''}>Popularity</option>
-                <option value="rating" ${sort==='rating'?'selected':''}>Rating</option>
-                <option value="newest" ${sort==='newest'?'selected':''}>Newest</option>
-                <option value="name" ${sort==='name'?'selected':''}>Name</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="results-count">${filtered.length} app${filtered.length !== 1 ? 's' : ''} found</div>
-
-          ${filtered.length ? `
-            <div class="app-grid">
-              ${filtered.map(app => renderAppCard(app)).join('')}
-            </div>
-          ` : `
-            <div class="empty-state">
-              <div class="empty-icon">🔍</div>
-              <h3>No apps found</h3>
-              <p>Try adjusting your search or filters.</p>
-            </div>
-          `}
-        </div>
-      `;
-
-      // Add event listeners to filters
-      const filterCategory = document.getElementById('filter-category');
-      const filterType = document.getElementById('filter-type');
-      const filterRating = document.getElementById('filter-rating');
-      const filterSort = document.getElementById('filter-sort');
-
-      function updateFilters() {
-        const newParams = {};
-        if (searchQuery) newParams.search = searchQuery;
-        if (filterCategory.value) newParams.category = filterCategory.value;
-        if (filterType.value) newParams.type = filterType.value;
-        if (filterRating.value !== '0') newParams.rating = filterRating.value;
-        if (filterSort.value && filterSort.value !== 'popularity') newParams.sort = filterSort.value;
-        navigate('/apps', newParams);
-      }
-
-      [filterCategory, filterType, filterRating, filterSort].forEach(el => {
-        el.addEventListener('change', updateFilters);
-      });
-    }
-
-    // ============================================================
-    // CATEGORIES PAGE
-    // ============================================================
-    function renderCategories(container) {
-      const categories = {};
-      APP_CATALOG.forEach(app => {
-        if (!categories[app.category]) categories[app.category] = [];
-        categories[app.category].push(app);
-      });
-      const categoryNames = Object.keys(categories).sort();
-
-      container.innerHTML = `
-        <div class="categories-page">
-          <h1>Categories</h1>
-          <p>Browse apps by category.</p>
-          <div class="category-grid">
-            ${categoryNames.map(cat => `
-              <a href="#/apps?category=${encodeURIComponent(cat)}" class="category-card">
-                <span class="category-icon">${getCategoryIcon(cat)}</span>
-                <h3>${escapeHTML(cat)}</h3>
-                <p>${categories[cat].length} app${categories[cat].length !== 1 ? 's' : ''}</p>
-              </a>
-            `).join('')}
-          </div>
-        </div>
-      `;
-    }
-
-    function getCategoryIcon(category) {
-      const map = {
-        'Productivity': '📊',
-        'Health & Fitness': '🧘',
-        'Finance': '💰',
-        'Photography': '📷',
-        'Food & Drink': '🍽️'
-      };
-      return map[category] || '📱';
-    }
-
-    // ============================================================
-    // APP DETAIL PAGE
-    // ============================================================
-    async function renderAppDetail(container, appId) {
-      const app = getAppById(appId);
-      if (!app) {
-        renderNotFound(container);
-        return;
-      }
-
-      container.innerHTML = `
-        <div class="app-detail">
-          <button class="back-btn" onclick="history.back()" aria-label="Go back">← Back</button>
-          <div class="detail-hero">
-            <img src="${createAppIcon(app, 120)}" alt="${escapeHTML(app.name)} icon" class="detail-icon">
-            <div class="detail-info">
-              <h1>${escapeHTML(app.name)}</h1>
-              <p class="detail-developer">by ${escapeHTML(app.developer)}</p>
-              <div class="detail-rating">
-                ${starRatingHTML(app.rating, app.ratingCount)}
-              </div>
-              <div class="detail-meta">
-                <span class="badge">${escapeHTML(app.category)}</span>
-                <span class="badge ${app.appType.toLowerCase()}">${app.appType}</span>
-                <span class="badge">v${escapeHTML(app.version)}</span>
-              </div>
-            </div>
-            <div class="detail-actions" id="detail-actions">
-              ${renderAppActions(app)}
-            </div>
-          </div>
-
-          <div class="detail-section">
-            <h2>About this app</h2>
-            <p>${escapeHTML(app.fullDescription)}</p>
-          </div>
-
-          <div class="detail-section">
-            <h2>Screenshots</h2>
-            <div class="screenshots-container">
-              ${app.screenshots.map(src => `<img src="${escapeHTML(src)}" alt="${escapeHTML(app.name)} screenshot" loading="lazy" class="screenshot">`).join('')}
-            </div>
-          </div>
-
-          <div class="detail-section">
-            <h2>Features</h2>
-            <ul class="features-list">
-              ${app.tags.map(tag => `<li>${escapeHTML(tag)}</li>`).join('')}
-            </ul>
-          </div>
-
-          <div class="detail-section">
-            <h2>Information</h2>
-            <table class="info-table">
-              <tr><th>Version</th><td>${escapeHTML(app.version)}</td></tr>
-              <tr><th>Updated</th><td>${formatDate(app.updatedDate)}</td></tr>
-              <tr><th>Released</th><td>${formatDate(app.releaseDate)}</td></tr>
-              <tr><th>Platforms</th><td>${app.platforms.join(', ')}</td></tr>
-            </table>
-          </div>
-
-          <div class="detail-section rating-section" id="rating-section">
-            <h2>Ratings & Reviews</h2>
-            <div id="rating-summary">
-              <p>Loading ratings...</p>
-            </div>
-          </div>
-        </div>
-      `;
-
-      // If Firebase is available, load ratings from Firestore
-      if (db && auth) {
-        loadRatings(appId).then(ratingData => {
-          updateRatingUI(appId, ratingData);
-        }).catch(err => {
-          console.error('Error loading ratings:', err);
-          // fallback to static rating
-          updateRatingUI(appId, { average: app.rating, count: app.ratingCount, userRating: null });
-        });
-      } else {
-        // Show static rating if Firebase not configured
-        updateRatingUI(appId, { average: app.rating, count: app.ratingCount, userRating: null });
-      }
-    }
-
-    function renderAppActions(app) {
-      if (app.appType === 'TWA') {
-        return `<a href="${escapeHTML(app.downloadUrl || '#')}" class="btn btn-primary btn-lg" target="_blank" rel="noopener">Download for Android</a>`;
-      } else {
-        // PWA
-        let installButton = '';
-        if (deferredPrompt) {
-          installButton = `<button class="btn btn-primary btn-lg" id="install-btn">Install App</button>`;
-        } else {
-          // Show instructions instead of fake button
-          installButton = `<div class="install-instructions">To install, use your browser's menu and select "Add to Home Screen" or "Install".</div>`;
-        }
-        return `
-          ${installButton}
-          <a href="${escapeHTML(app.appUrl || '#')}" class="btn btn-secondary btn-lg" target="_blank" rel="noopener">Open App</a>
-        `;
-      }
-    }
-
-    // ============================================================
-    // FIREBASE RATINGS LOGIC
-    // ============================================================
-    async function loadRatings(appId) {
-      if (!db) return { average: 0, count: 0, userRating: null };
-      // Check cache
-      if (ratingsCache[appId]) return ratingsCache[appId];
-
-      try {
-        const ratingsCol = collection(db, 'apps', appId, 'ratings');
-        const snapshot = await getDocs(ratingsCol);
-        let total = 0, count = 0, userRating = null;
-        snapshot.forEach(doc => {
-          const data = doc.data();
-          if (data.rating) {
-            total += data.rating;
-            count++;
-            if (currentUser && doc.id === currentUser.uid) {
-              userRating = data.rating;
-            }
-          }
-        });
-        const average = count > 0 ? total / count : 0;
-        const result = { average, count, userRating };
-        ratingsCache[appId] = result;
-        return result;
-      } catch (e) {
-        console.error('Error fetching ratings:', e);
-        return { average: 0, count: 0, userRating: null };
-      }
-    }
-
-    function updateRatingUI(appId, ratingData) {
-      const section = document.getElementById('rating-section');
-      if (!section) return;
-      const summary = document.getElementById('rating-summary');
-      if (!summary) return;
-
-      const app = getAppById(appId);
-      const average = ratingData.average || 0;
-      const count = ratingData.count || 0;
-      const userRating = ratingData.userRating || 0;
-
-      let html = `
-        <div class="rating-summary">
-          <div class="rating-average">
-            <span class="big-number">${average.toFixed(1)}</span>
-            ${starRatingHTML(average, count)}
-            <p>${count} rating${count !== 1 ? 's' : ''}</p>
-          </div>
-        </div>
-        <div class="user-rating">
-          ${currentUser ? `
-            <p>Your rating:</p>
-            <div class="interactive-stars" id="interactive-stars">
-              ${[1,2,3,4,5].map(i => `<button class="star-btn ${i <= userRating ? 'active' : ''}" data-rating="${i}" aria-label="${i} star">★</button>`).join('')}
-            </div>
-            <button class="btn btn-secondary btn-sm" id="clear-rating" ${userRating ? '' : 'disabled'}>Clear Rating</button>
-          ` : `
-            <div class="login-prompt">
-              <p>Sign in to rate this app.</p>
-              <button class="btn btn-primary" id="login-to-rate">Sign In</button>
-            </div>
-          `}
-        </div>
-      `;
-      summary.innerHTML = html;
-
-      if (currentUser) {
-        // Add event listeners for interactive stars
-        const stars = document.querySelectorAll('#interactive-stars .star-btn');
-        stars.forEach(star => {
-          star.addEventListener('click', async (e) => {
-            const rating = parseInt(e.target.dataset.rating);
-            if (!currentUser) return;
-            try {
-              await submitRating(appId, rating);
-              showToast('Rating submitted!', 'success');
-              // Reload ratings
-              const newRatingData = await loadRatings(appId);
-              updateRatingUI(appId, newRatingData);
-            } catch (err) {
-              console.error('Error submitting rating:', err);
-              showToast('Failed to submit rating. Check permissions.', 'error');
-            }
-          });
-        });
-        document.getElementById('clear-rating')?.addEventListener('click', async () => {
-          if (!currentUser) return;
-          try {
-            await submitRating(appId, 0); // send 0 to delete? We'll handle delete separately
-            // Actually we should delete doc if rating 0
-            const ratingDoc = doc(db, 'apps', appId, 'ratings', currentUser.uid);
-            await setDoc(ratingDoc, { userId: currentUser.uid, rating: 0, timestamp: serverTimestamp() }, { merge: false });
-            // But rating 0 doesn't count; better delete doc.
-            // We'll just delete.
-            const docRef = doc(db, 'apps', appId, 'ratings', currentUser.uid);
-            await deleteDoc(docRef);
-            showToast('Rating cleared', 'info');
-            const newRatingData = await loadRatings(appId);
-            updateRatingUI(appId, newRatingData);
-          } catch (err) {
-            console.error('Error clearing rating:', err);
-            showToast('Failed to clear rating.', 'error');
-          }
-        });
-      } else {
-        document.getElementById('login-to-rate')?.addEventListener('click', () => {
-          signIn().then(() => {
-            // Re-render after login
-            router();
-          });
-        });
-      }
-    }
-
-    async function submitRating(appId, rating) {
-      if (!currentUser || !db) throw new Error('Not signed in');
-      const docRef = doc(db, 'apps', appId, 'ratings', currentUser.uid);
-      await setDoc(docRef, {
-        userId: currentUser.uid,
-        rating: rating,
-        timestamp: serverTimestamp()
-      });
-    }
-
-    // ============================================================
-    // ACCOUNT PAGE
-    // ============================================================
-    async function renderAccount(container) {
-      if (!currentUser) {
-        container.innerHTML = `
-          <div class="account-page">
-            <h1>Sign In</h1>
-            <p>Sign in with Google to rate apps and manage your account.</p>
-            <button class="btn btn-primary btn-lg" id="google-signin">Sign In with Google</button>
-          </div>
-        `;
-        document.getElementById('google-signin')?.addEventListener('click', signIn);
-        return;
-      }
-
-      container.innerHTML = `
-        <div class="account-page">
-          <div class="profile-card">
-            ${currentUser.photoURL ? `<img src="${escapeHTML(currentUser.photoURL)}" alt="Profile" class="profile-avatar">` : `<div class="profile-avatar fallback">${escapeHTML((currentUser.displayName || currentUser.email || 'U')[0].toUpperCase())}</div>`}
-            <h2>${escapeHTML(currentUser.displayName || 'User')}</h2>
-            <p>${escapeHTML(currentUser.email || '')}</p>
-            <button class="btn btn-secondary" id="signout-btn">Sign Out</button>
-          </div>
-
-          <div class="my-ratings-section">
-            <h3>My Ratings</h3>
-            <div id="my-ratings-list">
-              <p>Loading your ratings...</p>
-            </div>
-          </div>
-        </div>
-      `;
-
-      document.getElementById('signout-btn')?.addEventListener('click', async () => {
-        try {
-          await signOut(auth);
-          showToast('Signed out successfully', 'info');
-          router();
-        } catch (e) {
-          console.error('Sign out error:', e);
-          showToast('Sign out failed', 'error');
-        }
-      });
-
-      // Load user ratings
-      try {
-        const userRatings = await getUserRatings();
-        const ratingsList = document.getElementById('my-ratings-list');
-        if (userRatings.length === 0) {
-          ratingsList.innerHTML = `<div class="empty-state"><p>You haven't rated any apps yet.</p></div>`;
-        } else {
-          ratingsList.innerHTML = userRatings.map(r => {
-            const app = getAppById(r.appId);
-            if (!app) return '';
-            return `
-              <div class="rating-item">
-                <img src="${createAppIcon(app, 40)}" alt="${escapeHTML(app.name)} icon" class="rating-app-icon">
-                <div class="rating-item-info">
-                  <a href="#/app/${app.id}">${escapeHTML(app.name)}</a>
-                  <span>${starRatingHTML(r.rating)}</span>
-                </div>
-              </div>
-            `;
-          }).join('');
-        }
-      } catch (e) {
-        console.error('Error fetching user ratings:', e);
-        document.getElementById('my-ratings-list').innerHTML = `<p>Could not load ratings. Make sure Firestore is configured.</p>`;
-      }
-    }
-
-    async function getUserRatings() {
-      if (!db || !currentUser) return [];
-      try {
-        // Requires a collection group index on 'ratings' with field 'userId'
-        const q = query(collectionGroup(db, 'ratings'), where('userId', '==', currentUser.uid));
-        const snapshot = await getDocs(q);
-        const ratings = [];
-        snapshot.forEach(doc => {
-          const data = doc.data();
-          const appId = doc.ref.parent.parent.id;
-          ratings.push({ appId, rating: data.rating });
-        });
-        return ratings;
-      } catch (e) {
-        console.error('Error in getUserRatings:', e);
-        return [];
-      }
-    }
-
-    // ============================================================
-    // CONTACT PAGE
-    // ============================================================
-    function renderContact(container) {
-      container.innerHTML = `
-        <div class="contact-page">
-          <h1>Contact Us</h1>
-          <p>Have a question or feedback? Fill out the form below.</p>
-          <form id="contact-form" novalidate>
-            <div class="form-group">
-              <label for="contact-name">Name *</label>
-              <input type="text" id="contact-name" name="name" required placeholder="Your name">
-              <div class="error-message" id="name-error"></div>
-            </div>
-            <div class="form-group">
-              <label for="contact-email">Email *</label>
-              <input type="email" id="contact-email" name="email" required placeholder="you@example.com">
-              <div class="error-message" id="email-error"></div>
-            </div>
-            <div class="form-group">
-              <label for="contact-subject">Subject *</label>
-              <input type="text" id="contact-subject" name="subject" required placeholder="Subject">
-              <div class="error-message" id="subject-error"></div>
-            </div>
-            <div class="form-group">
-              <label for="contact-message">Message *</label>
-              <textarea id="contact-message" name="message" rows="5" required placeholder="Your message"></textarea>
-              <div class="error-message" id="message-error"></div>
-            </div>
-            <button type="submit" class="btn btn-primary btn-lg" id="contact-submit">Send Message</button>
-            <div class="form-status" id="form-status" aria-live="polite"></div>
-          </form>
-        </div>
-      `;
-
-      const form = document.getElementById('contact-form');
-      form.addEventListener('submit', handleContactSubmit);
-    }
-
-    async function handleContactSubmit(e) {
-      e.preventDefault();
-      const form = e.target;
-      const name = form.name.value.trim();
-      const email = form.email.value.trim();
-      const subject = form.subject.value.trim();
-      const message = form.message.value.trim();
-
-      // Reset errors
-      document.querySelectorAll('.error-message').forEach(el => el.textContent = '');
-      const status = document.getElementById('form-status');
-      status.textContent = '';
-
-      // Validation
-      let isValid = true;
-      if (!name) {
-        document.getElementById('name-error').textContent = 'Name is required.';
-        isValid = false;
-      }
-      if (!email) {
-        document.getElementById('email-error').textContent = 'Email is required.';
-        isValid = false;
-      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        document.getElementById('email-error').textContent = 'Invalid email address.';
-        isValid = false;
-      }
-      if (!subject) {
-        document.getElementById('subject-error').textContent = 'Subject is required.';
-        isValid = false;
-      }
-      if (!message) {
-        document.getElementById('message-error').textContent = 'Message is required.';
-        isValid = false;
-      }
-      if (!isValid) return;
-
-      // Loading state
-      const submitBtn = document.getElementById('contact-submit');
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Sending...';
-      status.textContent = '';
-      status.className = 'form-status';
-
-      try {
-        if (!CONFIG.contactEndpoint) {
-          throw new Error('Contact endpoint is not configured. Please set CONFIG.contactEndpoint in the configuration section.');
-        }
-        const response = await fetch(CONFIG.contactEndpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, email, subject, message })
-        });
-        if (!response.ok) throw new Error(`HTTP error ${response.status}`);
-        status.textContent = 'Message sent successfully!';
-        status.className = 'form-status success';
-        form.reset();
-      } catch (err) {
-        status.textContent = `Failed to send message: ${err.message}`;
-        status.className = 'form-status error';
-      } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Send Message';
-      }
-    }
-
-    // ============================================================
-    // NOT FOUND PAGE
-    // ============================================================
-    function renderNotFound(container) {
-      container.innerHTML = `
-        <div class="not-found">
-          <h1>404</h1>
-          <p>Page not found.</p>
-          <a href="#/" class="btn btn-primary">Go Home</a>
-        </div>
-      `;
-    }
-
-    // ============================================================
-    // AUTH FUNCTIONS
-    // ============================================================
-    async function signIn() {
-      if (!auth || !googleProvider) {
-        showToast('Firebase auth is not configured.', 'error');
-        return;
-      }
-      try {
-        await signInWithPopup(auth, googleProvider);
-        showToast('Signed in successfully!', 'success');
-      } catch (err) {
-        console.error('Sign in error:', err);
-        showToast('Sign in failed. Please try again.', 'error');
-      }
-    }
-
-    // ============================================================
-    // PWA INSTALL HANDLING
-    // ============================================================
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
-      // If currently on an app detail page, re-render to show install button
-      const { path } = parseHash();
-      if (path === '/app') {
-        router(); // re-render to update action buttons
-      }
-    });
-
-    window.addEventListener('appinstalled', () => {
-      deferredPrompt = null;
-      showToast('App installed successfully!', 'success');
-      const { path } = parseHash();
-      if (path === '/app') router();
-    });
-
-    document.addEventListener('click', async (e) => {
-      if (e.target.id === 'install-btn') {
-        if (!deferredPrompt) {
-          showToast('Install prompt not available. Use browser menu.', 'info');
-          return;
-        }
-        deferredPrompt.prompt();
-        const choice = await deferredPrompt.userChoice;
-        if (choice.outcome === 'accepted') {
-          showToast('App installed!', 'success');
-        } else {
-          showToast('Installation dismissed.', 'info');
-        }
-        deferredPrompt = null;
-      }
-    });
-
-    // ============================================================
-    // INITIALIZATION
-    // ============================================================
-    function init() {
-      initFirebase();
-      initHeader();
-      // Register service worker (uncomment after creating sw.js)
-      // if ('serviceWorker' in navigator) {
-      //   navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW registration failed', err));
-      // }
-      router();
-      window.addEventListener('hashchange', router);
-    }
-
-    // Start the app
-    init();
-  </script>
-
-  <style>
-    /* ============================================================
-       CSS RESET & BASE
-       ============================================================ */
-    :root {
-      --primary: #0f172a;
-      --primary-hover: #1e293b;
-      --secondary: #e2e8f0;
-      --secondary-hover: #cbd5e1;
-      --accent: #3b82f6;
-      --accent-hover: #2563eb;
-      --success: #10b981;
-      --warning: #f59e0b;
-      --error: #ef4444;
-      --text: #0f172a;
-      --text-light: #475569;
-      --bg: #f8fafc;
-      --card-bg: #ffffff;
-      --border: #e2e8f0;
-      --shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
-      --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
-      --radius: 12px;
-      --radius-sm: 8px;
-      --radius-lg: 16px;
-      --transition: all 0.2s ease;
-      --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-      --max-width: 1200px;
-      --header-height: 64px;
-    }
-
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    html {
-      scroll-behavior: smooth;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    body {
-      font-family: var(--font);
-      background-color: var(--bg);
-      color: var(--text);
-      line-height: 1.5;
-      display: flex;
-      flex-direction: column;
-      min-height: 100vh;
-    }
-
-    a {
-      color: var(--accent);
-      text-decoration: none;
-      transition: var(--transition);
-    }
-
-    a:hover {
-      color: var(--accent-hover);
-    }
-
-    img {
-      max-width: 100%;
-      display: block;
-    }
-
-    button {
-      font-family: inherit;
-      cursor: pointer;
-      border: none;
-      background: none;
-      color: inherit;
-      transition: var(--transition);
-    }
-
-    input, select, textarea {
-      font-family: inherit;
-      font-size: 1rem;
-      padding: 0.6rem 1rem;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      background-color: var(--card-bg);
-      color: var(--text);
-      transition: var(--transition);
-      width: 100%;
-    }
-
-    input:focus, select:focus, textarea:focus {
-      outline: none;
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
-    }
-
-    /* ============================================================
-       HEADER
-       ============================================================ */
-    #site-header {
-      background-color: var(--card-bg);
-      border-bottom: 1px solid var(--border);
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-    }
-
-    .header-inner {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: 0 1rem;
-      height: var(--header-height);
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-    }
-
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-weight: 700;
-      font-size: 1.25rem;
-      color: var(--text);
-      text-decoration: none;
-    }
-
-    .logo-icon {
-      font-size: 1.8rem;
-    }
-
-    .logo-text {
-      white-space: nowrap;
-    }
-
-    .search-bar {
-      flex: 1;
-      max-width: 400px;
-      position: relative;
-      margin-left: auto;
-      margin-right: auto;
-    }
-
-    .search-bar input {
-      width: 100%;
-      padding-left: 2.5rem;
-      border-radius: 9999px;
-      background-color: var(--bg);
-      border: 1px solid var(--border);
-    }
-
-    .search-icon {
-      position: absolute;
-      left: 1rem;
-      top: 50%;
-      transform: translateY(-50%);
-      opacity: 0.6;
-    }
-
-    .main-nav {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .nav-link {
-      padding: 0.5rem 0.75rem;
-      border-radius: var(--radius-sm);
-      color: var(--text-light);
-      font-weight: 500;
-      white-space: nowrap;
-      text-decoration: none;
-    }
-
-    .nav-link:hover {
-      background-color: var(--secondary);
-      color: var(--text);
-    }
-
-    .nav-link.active {
-      color: var(--accent);
-      background-color: rgba(59,130,246,0.1);
-    }
-
-    .btn-auth {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      white-space: nowrap;
-    }
-
-    .avatar-img {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      object-fit: cover;
-    }
-
-    .avatar-fallback {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      background-color: var(--accent);
-      color: white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: bold;
-      font-size: 0.9rem;
-    }
-
-    .hamburger {
-      display: none;
-      font-size: 1.5rem;
-      padding: 0.5rem;
-    }
-
-    .mobile-nav {
-      display: none;
-      flex-direction: column;
-      padding: 0.5rem 1rem;
-      background-color: var(--card-bg);
-      border-top: 1px solid var(--border);
-    }
-
-    /* ============================================================
-       BUTTONS
-       ============================================================ */
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0.6rem 1.2rem;
-      border-radius: var(--radius-sm);
-      font-weight: 600;
-      text-decoration: none;
-      transition: var(--transition);
-      border: 1px solid transparent;
-      cursor: pointer;
-      font-size: 0.95rem;
-      line-height: 1.2;
-    }
-
-    .btn-primary {
-      background-color: var(--accent);
-      color: white;
-    }
-
-    .btn-primary:hover {
-      background-color: var(--accent-hover);
-      color: white;
-    }
-
-    .btn-secondary {
-      background-color: var(--secondary);
-      color: var(--text);
-    }
-
-    .btn-secondary:hover {
-      background-color: var(--secondary-hover);
-      color: var(--text);
-    }
-
-    .btn-lg {
-      padding: 0.75rem 1.5rem;
-      font-size: 1.1rem;
-    }
-
-    .btn-sm {
-      padding: 0.4rem 0.8rem;
-      font-size: 0.85rem;
-    }
-
-    /* ============================================================
-       MAIN CONTENT
-       ============================================================ */
-    #main-content {
-      flex: 1;
-      max-width: var(--max-width);
-      width: 100%;
-      margin: 0 auto;
-      padding: 1.5rem 1rem;
-    }
-
-    /* ============================================================
-       HERO
-       ============================================================ */
-    .hero {
-      background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
-      color: white;
-      border-radius: var(--radius-lg);
-      padding: 3rem 2rem;
-      margin-bottom: 2rem;
-      text-align: center;
-    }
-
-    .hero h1 {
-      font-size: 2.5rem;
-      margin-bottom: 0.5rem;
-    }
-
-    .hero p {
-      font-size: 1.2rem;
-      opacity: 0.9;
-      max-width: 600px;
-      margin: 0 auto 1.5rem;
-    }
-
-    .hero .btn {
-      background-color: white;
-      color: var(--primary);
-      font-weight: 700;
-    }
-
-    .hero .btn:hover {
-      background-color: var(--secondary);
-    }
-
-    /* ============================================================
-       SECTIONS
-       ============================================================ */
-    .section {
-      margin-bottom: 2.5rem;
-    }
-
-    .section-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 1rem;
-    }
-
-    .section-header h2 {
-      font-size: 1.5rem;
-    }
-
-    .see-all {
-      color: var(--accent);
-      font-weight: 500;
-      text-decoration: none;
-    }
-
-    /* ============================================================
-       APP GRID & CARDS
-       ============================================================ */
-    .app-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-      gap: 1.25rem;
-    }
-
-    .app-card {
-      background-color: var(--card-bg);
-      border-radius: var(--radius);
-      overflow: hidden;
-      box-shadow: var(--shadow);
-      transition: var(--transition);
-      display: flex;
-      flex-direction: column;
-      border: 1px solid var(--border);
-    }
-
-    .app-card:hover {
-      transform: translateY(-4px);
-      box-shadow: var(--shadow-lg);
-    }
-
-    .card-link {
-      display: flex;
-      flex-direction: column;
-      padding: 1.25rem;
-      text-decoration: none;
-      color: inherit;
-      flex: 1;
-    }
-
-    .card-link:hover {
-      color: inherit;
-    }
-
-    .app-icon {
-      width: 72px;
-      height: 72px;
-      border-radius: 18%;
-      margin-bottom: 0.75rem;
-      background-color: var(--secondary);
-    }
-
-    .app-name {
-      font-size: 1.1rem;
-      font-weight: 700;
-      margin-bottom: 0.2rem;
-    }
-
-    .app-developer {
-      color: var(--text-light);
-      font-size: 0.85rem;
-      margin-bottom: 0.5rem;
-    }
-
-    .app-short-desc {
-      font-size: 0.9rem;
-      color: var(--text-light);
-      margin-bottom: 0.75rem;
-      flex-grow: 1;
-    }
-
-    .card-meta {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      flex-wrap: wrap;
-    }
-
-    .app-type-badge {
-      padding: 0.2rem 0.5rem;
-      border-radius: 9999px;
-      font-size: 0.7rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.02em;
-    }
-
-    .app-type-badge.pwa {
-      background-color: #dcfce7;
-      color: #166534;
-    }
-
-    .app-type-badge.twa {
-      background-color: #dbeafe;
-      color: #1e40af;
-    }
-
-    .card-actions {
-      padding: 0 1.25rem 1.25rem;
-    }
-
-    .card-actions .btn {
-      width: 100%;
-    }
-
-    /* ============================================================
-       STAR RATING
-       ============================================================ */
-    .star-rating {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.1rem;
-      font-size: 0.9rem;
-    }
-
-    .star {
-      color: #fbbf24;
-      font-size: 1rem;
-      position: relative;
-    }
-
-    .star.empty {
-      color: #e2e8f0;
-    }
-
-    .star.half {
-      color: #e2e8f0;
-      background: linear-gradient(to right, #fbbf24 50%, #e2e8f0 50%);
-      -webkit-background-clip: text;
-      background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .rating-count {
-      color: var(--text-light);
-      font-size: 0.8rem;
-      margin-left: 0.3rem;
-    }
-
-    .star-btn {
-      font-size: 1.4rem;
-      color: #e2e8f0;
-      transition: var(--transition);
-      padding: 0 0.1rem;
-      background: none;
-      border: none;
-    }
-
-    .star-btn.active {
-      color: #fbbf24;
-    }
-
-    .star-btn:hover {
-      transform: scale(1.2);
-    }
-
-    /* ============================================================
-       CHIPS & CATEGORY GRID
-       ============================================================ */
-    .category-chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-    }
-
-    .chip {
-      background-color: var(--secondary);
-      padding: 0.5rem 1rem;
-      border-radius: 9999px;
-      color: var(--text);
-      text-decoration: none;
-      font-weight: 500;
-      transition: var(--transition);
-    }
-
-    .chip:hover {
-      background-color: var(--secondary-hover);
-      color: var(--text);
-    }
-
-    .category-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-      gap: 1.25rem;
-      margin-top: 1.5rem;
-    }
-
-    .category-card {
-      background-color: var(--card-bg);
-      border-radius: var(--radius);
-      padding: 1.5rem;
-      text-align: center;
-      box-shadow: var(--shadow);
-      border: 1px solid var(--border);
-      text-decoration: none;
-      color: inherit;
-      transition: var(--transition);
-    }
-
-    .category-card:hover {
-      transform: translateY(-4px);
-      box-shadow: var(--shadow-lg);
-      color: inherit;
-    }
-
-    .category-icon {
-      font-size: 2.5rem;
-      display: block;
-      margin-bottom: 0.5rem;
-    }
-
-    .category-card h3 {
-      font-size: 1.1rem;
-      margin-bottom: 0.3rem;
-    }
-
-    .category-card p {
-      color: var(--text-light);
-      font-size: 0.85rem;
-    }
-
-    /* ============================================================
-       APPS PAGE FILTERS
-       ============================================================ */
-    .apps-page {
-      max-width: 100%;
-    }
-
-    .apps-header {
-      margin-bottom: 1.5rem;
-    }
-
-    .apps-header h1 {
-      font-size: 2rem;
-    }
-
-    .apps-header p {
-      color: var(--text-light);
-    }
-
-    .filters-bar {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1rem;
-      background-color: var(--card-bg);
-      padding: 1rem;
-      border-radius: var(--radius);
-      border: 1px solid var(--border);
-      box-shadow: var(--shadow);
-      margin-bottom: 1.5rem;
-    }
-
-    .filter-group {
-      display: flex;
-      flex-direction: column;
-      gap: 0.3rem;
-      flex: 1 1 160px;
-    }
-
-    .filter-group label {
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: var(--text-light);
-    }
-
-    .results-count {
-      margin-bottom: 1rem;
-      color: var(--text-light);
-      font-weight: 500;
-    }
-
-    /* ============================================================
-       APP DETAIL
-       ============================================================ */
-    .app-detail {
-      max-width: 800px;
-      margin: 0 auto;
-    }
-
-    .back-btn {
-      margin-bottom: 1rem;
-      font-weight: 500;
-      color: var(--text-light);
-      background: none;
-      border: none;
-      font-size: 1rem;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.3rem;
-    }
-
-    .back-btn:hover {
-      color: var(--text);
-    }
-
-    .detail-hero {
-      display: flex;
-      gap: 1.5rem;
-      align-items: flex-start;
-      background-color: var(--card-bg);
-      border-radius: var(--radius-lg);
-      padding: 2rem;
-      border: 1px solid var(--border);
-      box-shadow: var(--shadow);
-      margin-bottom: 1.5rem;
-      flex-wrap: wrap;
-    }
-
-    .detail-icon {
-      width: 110px;
-      height: 110px;
-      border-radius: 22%;
-      flex-shrink: 0;
-    }
-
-    .detail-info {
-      flex: 1;
-      min-width: 200px;
-    }
-
-    .detail-info h1 {
-      font-size: 1.8rem;
-      margin-bottom: 0.2rem;
-    }
-
-    .detail-developer {
-      color: var(--text-light);
-      margin-bottom: 0.5rem;
-    }
-
-    .detail-rating {
-      margin-bottom: 0.75rem;
-    }
-
-    .detail-meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-    }
-
-    .badge {
-      padding: 0.25rem 0.6rem;
-      border-radius: 9999px;
-      background-color: var(--secondary);
-      color: var(--text);
-      font-size: 0.75rem;
-      font-weight: 600;
-    }
-
-    .badge.pwa {
-      background-color: #dcfce7;
-      color: #166534;
-    }
-
-    .badge.twa {
-      background-color: #dbeafe;
-      color: #1e40af;
-    }
-
-    .detail-actions {
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-      min-width: 200px;
-    }
-
-    .install-instructions {
-      font-size: 0.8rem;
-      color: var(--text-light);
-      background-color: var(--bg);
-      padding: 0.75rem;
-      border-radius: var(--radius-sm);
-      border: 1px dashed var(--border);
-    }
-
-    .detail-section {
-      background-color: var(--card-bg);
-      border-radius: var(--radius);
-      padding: 1.5rem;
-      border: 1px solid var(--border);
-      box-shadow: var(--shadow);
-      margin-bottom: 1.5rem;
-    }
-
-    .detail-section h2 {
-      margin-bottom: 1rem;
-      font-size: 1.3rem;
-    }
-
-    .screenshots-container {
-      display: flex;
-      gap: 0.75rem;
-      overflow-x: auto;
-      padding-bottom: 0.5rem;
-    }
-
-    .screenshot {
-      width: 260px;
-      height: 180px;
-      object-fit: cover;
-      border-radius: var(--radius-sm);
-      flex-shrink: 0;
-    }
-
-    .features-list {
-      list-style: none;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-    }
-
-    .features-list li {
-      background-color: var(--secondary);
-      padding: 0.4rem 0.8rem;
-      border-radius: 9999px;
-      font-size: 0.85rem;
-    }
-
-    .info-table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-
-    .info-table th, .info-table td {
-      padding: 0.5rem 0;
-      border-bottom: 1px solid var(--border);
-      text-align: left;
-    }
-
-    .info-table th {
-      color: var(--text-light);
-      font-weight: 600;
-      width: 40%;
-    }
-
-    .rating-summary {
-      display: flex;
-      align-items: center;
-      gap: 1.5rem;
-      margin-bottom: 1rem;
-    }
-
-    .big-number {
-      font-size: 2.5rem;
-      font-weight: 700;
-    }
-
-    .user-rating {
-      margin-top: 1rem;
-    }
-
-    .interactive-stars {
-      display: flex;
-      gap: 0.2rem;
-      margin-bottom: 0.5rem;
-    }
-
-    .login-prompt {
-      background-color: var(--bg);
-      padding: 1rem;
-      border-radius: var(--radius-sm);
-      text-align: center;
-    }
-
-    /* ============================================================
-       ACCOUNT PAGE
-       ============================================================ */
-    .account-page {
-      max-width: 600px;
-      margin: 0 auto;
-    }
-
-    .profile-card {
-      text-align: center;
-      background-color: var(--card-bg);
-      border-radius: var(--radius-lg);
-      padding: 2rem;
-      border: 1px solid var(--border);
-      box-shadow: var(--shadow);
-      margin-bottom: 1.5rem;
-    }
-
-    .profile-avatar {
-      width: 100px;
-      height: 100px;
-      border-radius: 50%;
-      object-fit: cover;
-      margin-bottom: 1rem;
-      border: 4px solid var(--secondary);
-    }
-
-    .profile-avatar.fallback {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 2rem;
-      background-color: var(--accent);
-      color: white;
-      margin-left: auto;
-      margin-right: auto;
-    }
-
-    .profile-card h2 {
-      margin-bottom: 0.2rem;
-    }
-
-    .profile-card p {
-      color: var(--text-light);
-      margin-bottom: 1rem;
-    }
-
-    .my-ratings-section {
-      background-color: var(--card-bg);
-      border-radius: var(--radius);
-      padding: 1.5rem;
-      border: 1px solid var(--border);
-      box-shadow: var(--shadow);
-    }
-
-    .my-ratings-section h3 {
-      margin-bottom: 1rem;
-    }
-
-    .rating-item {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      padding: 0.75rem 0;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .rating-item:last-child {
-      border-bottom: none;
-    }
-
-    .rating-app-icon {
-      width: 40px;
-      height: 40px;
-      border-radius: 8px;
-    }
-
-    .rating-item-info a {
-      font-weight: 500;
-      text-decoration: none;
-    }
-
-    /* ============================================================
-       CONTACT PAGE
-       ============================================================ */
-    .contact-page {
-      max-width: 600px;
-      margin: 0 auto;
-    }
-
-    .contact-page h1 {
-      margin-bottom: 0.5rem;
-    }
-
-    .contact-page > p {
-      color: var(--text-light);
-      margin-bottom: 1.5rem;
-    }
-
-    .form-group {
-      margin-bottom: 1rem;
-    }
-
-    .form-group label {
-      display: block;
-      margin-bottom: 0.3rem;
-      font-weight: 600;
-    }
-
-    .error-message {
-      color: var(--error);
-      font-size: 0.8rem;
-      margin-top: 0.2rem;
-      min-height: 1.2em;
-    }
-
-    .form-status {
-      margin-top: 1rem;
-      padding: 0.75rem;
-      border-radius: var(--radius-sm);
-      text-align: center;
-      font-weight: 500;
-    }
-
-    .form-status.success {
-      background-color: #dcfce7;
-      color: #166534;
-    }
-
-    .form-status.error {
-      background-color: #fee2e2;
-      color: #b91c1c;
-    }
-
-    /* ============================================================
-       NOT FOUND
-       ============================================================ */
-    .not-found {
-      text-align: center;
-      padding: 3rem 0;
-    }
-
-    .not-found h1 {
-      font-size: 4rem;
-      margin-bottom: 0.5rem;
-    }
-
-    .not-found p {
-      color: var(--text-light);
-      margin-bottom: 1.5rem;
-    }
-
-    /* ============================================================
-       EMPTY STATE
-       ============================================================ */
-    .empty-state {
-      text-align: center;
-      padding: 3rem 1rem;
-      background-color: var(--card-bg);
-      border-radius: var(--radius);
-      border: 1px dashed var(--border);
-    }
-
-    .empty-icon {
-      font-size: 3rem;
-      margin-bottom: 1rem;
-    }
-
-    .empty-state h3 {
-      margin-bottom: 0.5rem;
-    }
-
-    .empty-state p {
-      color: var(--text-light);
-    }
-
-    /* ============================================================
-       MODAL
-       ============================================================ */
-    .modal-overlay {
-      position: fixed;
-      inset: 0;
-      background-color: rgba(0,0,0,0.5);
-      z-index: 200;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 1rem;
-    }
-
-    .modal-dialog {
-      background-color: var(--card-bg);
-      border-radius: var(--radius-lg);
-      max-width: 500px;
-      width: 100%;
-      max-height: 80vh;
-      overflow-y: auto;
-      padding: 1.5rem;
-      position: relative;
-      box-shadow: var(--shadow-lg);
-    }
-
-    .modal-close {
-      position: absolute;
-      top: 0.75rem;
-      right: 0.75rem;
-      font-size: 1.5rem;
-      background: none;
-      border: none;
-      color: var(--text-light);
-      cursor: pointer;
-      transition: var(--transition);
-    }
-
-    .modal-close:hover {
-      color: var(--text);
-      transform: rotate(90deg);
-    }
-
-    .modal-content {
-      margin-top: 0.5rem;
-    }
-
-    /* ============================================================
-       TOAST
-       ============================================================ */
-    #toast-container {
-      position: fixed;
-      bottom: 1.5rem;
-      right: 1.5rem;
-      z-index: 300;
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-
-    .toast {
-      padding: 0.75rem 1.25rem;
-      border-radius: var(--radius-sm);
-      color: white;
-      font-weight: 500;
-      box-shadow: var(--shadow-lg);
-      animation: slideIn 0.3s ease;
-      background-color: var(--text);
-    }
-
-    .toast-success { background-color: var(--success); }
-    .toast-error { background-color: var(--error); }
-    .toast-info { background-color: var(--accent); }
-    .toast-warning { background-color: var(--warning); }
-
-    .toast.out {
-      opacity: 0;
-      transition: opacity 0.4s;
-    }
-
-    @keyframes slideIn {
-      from { transform: translateY(100%); opacity: 0; }
-      to { transform: translateY(0); opacity: 1; }
-    }
-
-    /* ============================================================
-       SKELETON LOADING (optional)
-       ============================================================ */
-    .skeleton {
-      background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
-      background-size: 200% 100%;
-      animation: shimmer 1.5s infinite;
-      border-radius: var(--radius-sm);
-    }
-
-    @keyframes shimmer {
-      0% { background-position: -200% 0; }
-      100% { background-position: 200% 0; }
-    }
-
-    /* ============================================================
-       RESPONSIVE
-       ============================================================ */
-    @media (max-width: 768px) {
-      .header-inner {
-        gap: 0.75rem;
-      }
-
-      .logo-text {
-        display: none;
-      }
-
-      .search-bar {
-        max-width: none;
-        margin: 0;
-      }
-
-      .main-nav {
-        display: none;
-      }
-
-      .hamburger {
-        display: block;
-      }
-
-      .mobile-nav {
-        display: flex;
-      }
-
-      .mobile-nav .nav-link {
-        padding: 0.75rem 0;
-        border-bottom: 1px solid var(--border);
-      }
-
-      .hero {
-        padding: 2rem 1rem;
-      }
-
-      .hero h1 {
-        font-size: 1.8rem;
-      }
-
-      .app-grid {
-        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-        gap: 0.75rem;
-      }
-
-      .detail-hero {
-        flex-direction: column;
-        align-items: center;
-        text-align: center;
-      }
-
-      .detail-actions {
-        width: 100%;
-      }
-
-      .rating-summary {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.5rem;
-      }
-
-      .filters-bar {
-        flex-direction: column;
-      }
-
-      .filter-group {
-        flex: 1 1 auto;
-      }
-    }
-
-    @media (max-width: 480px) {
-      .app-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .app-card {
-        flex-direction: row;
-      }
-
-      .card-link {
-        flex-direction: row;
-        align-items: center;
-        gap: 1rem;
-      }
-
-      .app-icon {
-        width: 60px;
-        height: 60px;
-        margin-bottom: 0;
-        flex-shrink: 0;
-      }
-
-      .card-info {
-        flex: 1;
-      }
-
-      .card-actions {
-        padding: 0 1rem 1rem;
-        align-self: center;
-      }
-
-      .card-actions .btn {
-        width: auto;
-      }
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>NullVault — App Distribution</title>
+<meta name="description" content="A private distribution vault for PWA and TWA applications.">
+<meta name="theme-color" content="#0A0E12">
+
+<!-- ============================================================
+     PWA MANIFEST + ICONS
+     Real same-origin files that ship alongside index.html:
+       manifest.json          — web app manifest
+       icons/icon-*.png       — standard PWA icon sizes
+       icons/icon-maskable-*.png — Android adaptive/maskable icons
+       icons/apple-touch-icon.png, favicon-32.png, favicon-16.png
+     Browsers are more consistent about installability with a real
+     same-origin manifest file than a data: URI, so unlike the
+     service worker discussion below, there's no reason to inline
+     this — it's shipped as a plain file from the start.
+     ============================================================ -->
+<link rel="manifest" href="./manifest.json">
+
+<link rel="icon" type="image/png" sizes="32x32" href="./icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="./icons/favicon-16.png">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- ============================================================
+     FIREBASE SDKs (CDN, modular v9+ syntax)
+     ============================================================ -->
+<script type="module">
+  // Firebase is initialized further down in the main <script type="module">
+  // block, right after the CONFIGURATION section. It's imported there
+  // to keep all app logic in a single module graph.
+</script>
+
+<style>
+/* ==================================================================
+   NullVault — DESIGN SYSTEM
+   Token system: vault-terminal aesthetic. Sharp edges, phosphor glow
+   accents instead of soft drop shadows, monospace for structure,
+   humanist sans for reading. No border-radius > 4px anywhere except
+   the icon tiles and avatar circles.
+   ================================================================== */
+
+:root{
+  /* --- Color --- */
+  --bg:            #0A0E12;
+  --bg-raised:     #10161C;
+  --bg-panel:      #141B22;
+  --bg-hover:      #1A232B;
+  --border:        #232E38;
+  --border-bright: #34424F;
+
+  --text:          #E8ECEF;
+  --text-dim:      #8B98A5;
+  --text-faint:    #5A6772;
+
+  --accent:        #4AFFB0;   /* PWA / primary phosphor green */
+  --accent-dim:    #2A8F63;
+  --accent-glow:   rgba(74,255,176,0.18);
+
+  --violet:        #7B61FF;   /* TWA / secondary accent */
+  --violet-dim:    #4B3D9E;
+  --violet-glow:   rgba(123,97,255,0.18);
+
+  --amber:         #FFB84A;   /* ratings */
+  --amber-dim:     #8F6B2A;
+
+  --danger:        #FF5C7A;
+  --danger-glow:   rgba(255,92,122,0.15);
+
+  /* --- Type --- */
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* --- Layout --- */
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-icon: 10px;
+  --header-h: 64px;
+  --container: 1280px;
+}
+
+*,*::before,*::after{ box-sizing:border-box; }
+html{ scroll-behavior:smooth; }
+html,body{ height:100%; }
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--font-sans);
+  font-size:15px;
+  line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+  background-image:
+    radial-gradient(circle at 15% 0%, rgba(74,255,176,0.05), transparent 40%),
+    radial-gradient(circle at 85% 15%, rgba(123,97,255,0.04), transparent 45%);
+  background-attachment:fixed;
+}
+
+@media (prefers-reduced-motion: reduce){
+  *{ animation-duration:0.01ms !important; animation-iteration-count:1 !important; transition-duration:0.01ms !important; scroll-behavior:auto !important; }
+}
+
+h1,h2,h3,h4{ font-family:var(--font-mono); font-weight:700; margin:0; letter-spacing:-0.01em; color:var(--text); }
+p{ margin:0; }
+a{ color:inherit; text-decoration:none; }
+button{ font-family:inherit; }
+img{ max-width:100%; display:block; }
+
+::selection{ background:var(--accent-glow); color:var(--accent); }
+
+/* Focus visibility — accessible, on-brand: a phosphor outline, not a browser default */
+:focus-visible{
+  outline:2px solid var(--accent);
+  outline-offset:2px;
+  border-radius:var(--radius-sm);
+}
+
+.container{ max-width:var(--container); margin:0 auto; padding:0 24px; }
+@media (max-width:640px){ .container{ padding:0 16px; } }
+
+.mono{ font-family:var(--font-mono); }
+.visually-hidden{
+  position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+  overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
+}
+.skip-link{
+  position:absolute; left:16px; top:-48px; z-index:1000;
+  background:var(--accent); color:var(--bg); padding:10px 16px;
+  font-family:var(--font-mono); font-weight:700; font-size:13px;
+  border-radius:var(--radius-md); transition:top .15s ease;
+}
+.skip-link:focus{ top:16px; }
+
+/* ---------- Eyebrow / status LED pattern (signature detail) ---------- */
+.led{
+  display:inline-block; width:7px; height:7px; border-radius:50%;
+  box-shadow:0 0 6px currentColor;
+}
+.led.pwa{ background:var(--accent); color:var(--accent); }
+.led.twa{ background:var(--violet); color:var(--violet); }
+
+.eyebrow{
+  font-family:var(--font-mono); font-size:11px; font-weight:600;
+  letter-spacing:0.14em; text-transform:uppercase; color:var(--text-faint);
+  display:flex; align-items:center; gap:8px;
+}
+
+/* ---------- Header ---------- */
+.site-header{
+  position:sticky; top:0; z-index:100;
+  height:var(--header-h);
+  background:rgba(10,14,18,0.85);
+  backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--border);
+}
+.site-header .container{
+  height:100%; display:flex; align-items:center; gap:24px;
+}
+.brand{
+  display:flex; align-items:center; gap:10px;
+  font-family:var(--font-mono); font-weight:800; font-size:16px;
+  letter-spacing:0.02em; color:var(--text); flex-shrink:0;
+  white-space:nowrap;
+}
+.brand-mark{
+  width:28px; height:28px; flex-shrink:0;
+}
+.brand small{
+  display:block; font-size:9px; font-weight:600; color:var(--accent);
+  letter-spacing:0.16em; margin-top:1px;
+}
+
+.main-nav{
+  display:flex; align-items:center; gap:4px; margin-left:8px;
+}
+.main-nav a{
+  font-family:var(--font-mono); font-size:13px; font-weight:500;
+  color:var(--text-dim); padding:8px 12px; border-radius:var(--radius-md);
+  transition:color .15s, background .15s;
+}
+.main-nav a:hover{ color:var(--text); background:var(--bg-hover); }
+.main-nav a.active{ color:var(--accent); }
+
+.header-spacer{ flex:1; }
+
+.search-wrap{
+  position:relative; width:280px; flex-shrink:1; min-width:0;
+}
+.search-wrap input{
+  width:100%; background:var(--bg-panel); border:1px solid var(--border);
+  color:var(--text); font-family:var(--font-sans); font-size:13.5px;
+  padding:9px 12px 9px 34px; border-radius:var(--radius-md);
+  transition:border-color .15s, background .15s;
+}
+.search-wrap input::placeholder{ color:var(--text-faint); }
+.search-wrap input:hover{ border-color:var(--border-bright); }
+.search-wrap input:focus{ outline:none; border-color:var(--accent); background:var(--bg-raised); }
+.search-wrap svg{
+  position:absolute; left:11px; top:50%; transform:translateY(-50%);
+  width:14px; height:14px; color:var(--text-faint); pointer-events:none;
+}
+
+.header-actions{ display:flex; align-items:center; gap:10px; flex-shrink:0; }
+
+.btn{
+  font-family:var(--font-mono); font-size:13px; font-weight:600;
+  padding:9px 16px; border-radius:var(--radius-md); border:1px solid transparent;
+  cursor:pointer; display:inline-flex; align-items:center; gap:8px;
+  transition:transform .1s ease, box-shadow .15s ease, background .15s ease, border-color .15s ease;
+  white-space:nowrap;
+}
+.btn:active{ transform:scale(0.97); }
+.btn-primary{
+  background:var(--accent); color:var(--bg); border-color:var(--accent);
+}
+.btn-primary:hover{ box-shadow:0 0 0 3px var(--accent-glow); }
+.btn-secondary{
+  background:transparent; color:var(--text); border-color:var(--border-bright);
+}
+.btn-secondary:hover{ background:var(--bg-hover); border-color:var(--accent-dim); }
+.btn-violet{ background:var(--violet); color:#fff; border-color:var(--violet); }
+.btn-violet:hover{ box-shadow:0 0 0 3px var(--violet-glow); }
+.btn-ghost{
+  background:transparent; color:var(--text-dim); border-color:transparent;
+}
+.btn-ghost:hover{ color:var(--text); background:var(--bg-hover); }
+.btn-block{ width:100%; justify-content:center; }
+.btn-lg{ padding:13px 22px; font-size:14px; }
+.btn[disabled]{ opacity:0.45; cursor:not-allowed; }
+.btn svg{ width:15px; height:15px; flex-shrink:0; }
+
+.avatar-btn{
+  width:36px; height:36px; border-radius:50%; overflow:hidden;
+  border:1.5px solid var(--border-bright); cursor:pointer; background:var(--bg-panel);
+  flex-shrink:0; padding:0;
+}
+.avatar-btn img{ width:100%; height:100%; object-fit:cover; }
+.avatar-btn:hover{ border-color:var(--accent); }
+
+.mobile-menu-btn{ display:none; background:transparent; border:0; color:var(--text); padding:8px; cursor:pointer; }
+.mobile-menu-btn svg{ width:22px; height:22px; }
+
+/* Mobile nav drawer */
+.mobile-drawer{
+  display:none; position:fixed; inset:0; z-index:200;
+}
+.mobile-drawer.open{ display:block; }
+.mobile-drawer-scrim{
+  position:absolute; inset:0; background:rgba(0,0,0,0.6);
+}
+.mobile-drawer-panel{
+  position:absolute; top:0; right:0; bottom:0; width:min(78vw,320px);
+  background:var(--bg-raised); border-left:1px solid var(--border);
+  padding:20px; display:flex; flex-direction:column; gap:4px;
+  animation:slideIn .18s ease;
+}
+@keyframes slideIn{ from{ transform:translateX(100%); } to{ transform:translateX(0); } }
+.mobile-drawer-panel a{
+  font-family:var(--font-mono); font-size:15px; padding:14px 10px;
+  border-bottom:1px solid var(--border); color:var(--text);
+}
+.mobile-drawer-close{
+  align-self:flex-end; background:transparent; border:0; color:var(--text-dim);
+  padding:8px; cursor:pointer; margin-bottom:8px;
+}
+
+@media (max-width:900px){
+  .main-nav{ display:none; }
+  .search-wrap{ display:none; }
+  .mobile-menu-btn{ display:inline-flex; }
+}
+@media (max-width:640px){
+  .brand span.brand-name-full{ display:none; }
+}
+
+/* ---------- Hero ---------- */
+.hero{
+  border-bottom:1px solid var(--border);
+  padding:64px 0 56px;
+  position:relative; overflow:hidden;
+}
+.hero::before{
+  content:''; position:absolute; inset:0; pointer-events:none;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size:48px 48px;
+  mask-image:radial-gradient(ellipse 60% 100% at 50% 0%, black, transparent);
+  opacity:0.35;
+}
+.hero-inner{ position:relative; max-width:720px; }
+.hero h1{
+  font-size:clamp(28px,4.5vw,42px); line-height:1.15; margin:14px 0 16px;
+}
+.hero h1 .accent-text{ color:var(--accent); }
+.hero p.lead{
+  font-family:var(--font-sans); color:var(--text-dim); font-size:16px;
+  max-width:560px; margin-bottom:28px;
+}
+.hero-stats{ display:flex; gap:28px; margin-top:32px; flex-wrap:wrap; }
+.hero-stat{ font-family:var(--font-mono); }
+.hero-stat .n{ font-size:22px; font-weight:800; color:var(--accent); display:block; }
+.hero-stat .l{ font-size:11px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.1em; }
+
+/* ---------- Section headers ---------- */
+.section{ padding:48px 0; }
+.section-head{
+  display:flex; align-items:baseline; justify-content:space-between;
+  margin-bottom:22px; gap:16px; flex-wrap:wrap;
+}
+.section-head h2{ font-size:20px; }
+.section-head .see-all{
+  font-family:var(--font-mono); font-size:12.5px; color:var(--accent);
+  display:flex; align-items:center; gap:4px; flex-shrink:0;
+}
+.section-head .see-all svg{ width:13px; height:13px; }
+.section-head .see-all:hover{ text-decoration:underline; }
+
+/* ---------- App card grid ---------- */
+.app-grid{
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
+  gap:16px;
+}
+.app-grid.rail{
+  display:flex; overflow-x:auto; scroll-snap-type:x proximity;
+  gap:16px; padding-bottom:8px; margin:0 -24px; padding-left:24px; padding-right:24px;
+}
+.app-grid.rail .app-card{ min-width:250px; scroll-snap-align:start; }
+.app-grid.rail::-webkit-scrollbar{ height:6px; }
+.app-grid.rail::-webkit-scrollbar-thumb{ background:var(--border-bright); border-radius:3px; }
+
+.app-card{
+  background:var(--bg-panel); border:1px solid var(--border);
+  border-radius:var(--radius-lg); padding:16px; cursor:pointer;
+  display:flex; flex-direction:column; gap:12px;
+  transition:border-color .15s ease, transform .12s ease, box-shadow .15s ease;
+  position:relative; overflow:hidden;
+  text-align:left;
+}
+.app-card::after{
+  content:''; position:absolute; inset:0; pointer-events:none;
+  background:linear-gradient(120deg, transparent 40%, rgba(74,255,176,0.06) 50%, transparent 60%);
+  transform:translateX(-120%);
+  transition:transform .5s ease;
+}
+.app-card:hover{
+  border-color:var(--accent-dim); transform:translateY(-2px);
+  box-shadow:0 8px 24px -12px rgba(0,0,0,0.5);
+}
+.app-card:hover::after{ transform:translateX(120%); }
+.app-card:focus-visible{ border-color:var(--accent); }
+
+.app-card-top{ display:flex; gap:12px; align-items:flex-start; }
+.app-icon{
+  width:56px; height:56px; border-radius:var(--radius-icon); flex-shrink:0;
+  object-fit:cover; background:var(--bg-hover); border:1px solid var(--border);
+}
+.app-card-meta{ min-width:0; flex:1; }
+.app-card-meta h3{
+  font-family:var(--font-sans); font-size:15px; font-weight:700; color:var(--text);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.app-card-dev{
+  font-size:12.5px; color:var(--text-dim); white-space:nowrap; overflow:hidden;
+  text-overflow:ellipsis; margin-top:2px;
+}
+.app-card-badges{ display:flex; align-items:center; gap:6px; margin-top:6px; }
+.type-badge{
+  font-family:var(--font-mono); font-size:10px; font-weight:700; letter-spacing:0.06em;
+  padding:2px 6px; border-radius:var(--radius-sm); display:inline-flex; align-items:center; gap:4px;
+  border:1px solid var(--border-bright);
+}
+.type-badge.pwa{ color:var(--accent); border-color:var(--accent-dim); }
+.type-badge.twa{ color:var(--violet); border-color:var(--violet-dim); }
+
+.app-card-desc{
+  font-size:13px; color:var(--text-dim); line-height:1.5;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+  flex:1;
+}
+.app-card-bottom{
+  display:flex; align-items:center; justify-content:space-between;
+  padding-top:10px; border-top:1px solid var(--border);
+}
+.rating-inline{ display:flex; align-items:center; gap:5px; font-family:var(--font-mono); font-size:12.5px; color:var(--amber); }
+.rating-inline svg{ width:13px; height:13px; }
+.rating-inline .count{ color:var(--text-faint); }
+.category-chip{
+  font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint);
+  text-transform:uppercase; letter-spacing:0.05em;
+}
+
+.featured-card{
+  grid-column:span 1;
+}
+
+/* ---------- Filter bar ---------- */
+.filter-bar{
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  padding:14px 0; margin-bottom:8px; border-bottom:1px solid var(--border);
+}
+.filter-bar select{
+  background:var(--bg-panel); color:var(--text); border:1px solid var(--border);
+  font-family:var(--font-mono); font-size:12.5px; padding:8px 10px;
+  border-radius:var(--radius-md); cursor:pointer;
+}
+.filter-bar select:hover{ border-color:var(--border-bright); }
+.filter-bar select:focus{ outline:none; border-color:var(--accent); }
+.filter-chip-group{ display:flex; gap:6px; }
+.filter-chip{
+  font-family:var(--font-mono); font-size:12px; font-weight:600;
+  padding:7px 12px; border-radius:999px; border:1px solid var(--border);
+  background:transparent; color:var(--text-dim); cursor:pointer;
+  transition:all .15s ease;
+}
+.filter-chip:hover{ border-color:var(--border-bright); color:var(--text); }
+.filter-chip.active{ background:var(--accent-glow); border-color:var(--accent); color:var(--accent); }
+.filter-bar .result-count{
+  margin-left:auto; font-family:var(--font-mono); font-size:12px; color:var(--text-faint);
+}
+
+/* ---------- Category tiles ---------- */
+.cat-grid{
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px;
+}
+.cat-tile{
+  background:var(--bg-panel); border:1px solid var(--border); border-radius:var(--radius-lg);
+  padding:18px; cursor:pointer; transition:border-color .15s, transform .12s;
+}
+.cat-tile:hover{ border-color:var(--accent-dim); transform:translateY(-2px); }
+.cat-tile .cat-icon{ font-size:22px; margin-bottom:10px; display:block; }
+.cat-tile h4{ font-family:var(--font-sans); font-size:14px; font-weight:600; }
+.cat-tile .cat-count{ font-family:var(--font-mono); font-size:11px; color:var(--text-faint); margin-top:4px; }
+
+/* ---------- Skeletons ---------- */
+.skeleton{
+  background:linear-gradient(90deg, var(--bg-panel) 25%, var(--bg-hover) 37%, var(--bg-panel) 63%);
+  background-size:400% 100%; animation:shimmer 1.4s ease infinite; border-radius:var(--radius-md);
+}
+@keyframes shimmer{ 0%{ background-position:100% 0; } 100%{ background-position:0 0; } }
+.skel-card{ height:172px; }
+
+/* ---------- Empty / error state ---------- */
+.state-block{
+  text-align:center; padding:64px 20px; color:var(--text-dim);
+}
+.state-block .state-icon{ font-size:36px; margin-bottom:16px; opacity:0.6; }
+.state-block h3{ font-family:var(--font-sans); font-size:16px; color:var(--text); margin-bottom:6px; }
+.state-block p{ font-size:13.5px; max-width:360px; margin:0 auto; }
+
+/* ---------- App detail page ---------- */
+.app-detail-header{
+  display:flex; gap:24px; padding:40px 0 32px; border-bottom:1px solid var(--border);
+  flex-wrap:wrap;
+}
+.app-detail-icon{
+  width:120px; height:120px; border-radius:22px; flex-shrink:0;
+  border:1px solid var(--border-bright); object-fit:cover; background:var(--bg-panel);
+}
+.app-detail-info{ flex:1; min-width:240px; }
+.app-detail-info h1{ font-family:var(--font-sans); font-size:26px; margin-bottom:4px; }
+.app-detail-dev{ color:var(--text-dim); font-size:14px; margin-bottom:12px; }
+.app-detail-meta-row{
+  display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:16px;
+}
+.app-detail-meta-row .rating-inline{ font-size:14px; }
+.app-detail-meta-row .rating-inline svg{ width:15px; height:15px; }
+.app-detail-actions{ display:flex; gap:10px; flex-wrap:wrap; }
+
+.stat-strip{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr));
+  gap:1px; background:var(--border); border:1px solid var(--border);
+  border-radius:var(--radius-lg); overflow:hidden; margin:28px 0;
+}
+.stat-cell{ background:var(--bg-panel); padding:14px 16px; }
+.stat-cell .l{ font-family:var(--font-mono); font-size:10px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:6px; }
+.stat-cell .v{ font-family:var(--font-sans); font-size:14px; font-weight:600; color:var(--text); }
+
+.detail-section{ margin:32px 0; }
+.detail-section h2{ font-size:15px; margin-bottom:14px; color:var(--text); }
+.detail-section .body-text{ color:var(--text-dim); font-size:14.5px; line-height:1.7; white-space:pre-line; }
+
+.screenshot-rail{
+  display:flex; gap:14px; overflow-x:auto; padding-bottom:10px; scroll-snap-type:x proximity;
+}
+.screenshot-rail img{
+  height:340px; width:auto; border-radius:var(--radius-lg); border:1px solid var(--border);
+  flex-shrink:0; scroll-snap-align:start; background:var(--bg-panel);
+}
+@media (max-width:640px){ .screenshot-rail img{ height:220px; } }
+
+.feature-list{ list-style:none; padding:0; margin:0; display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px; }
+.feature-list li{
+  display:flex; gap:10px; align-items:flex-start; font-size:13.5px; color:var(--text-dim);
+}
+.feature-list svg{ width:15px; height:15px; color:var(--accent); flex-shrink:0; margin-top:2px; }
+
+.platform-list{ display:flex; gap:8px; flex-wrap:wrap; }
+.platform-chip{
+  font-family:var(--font-mono); font-size:12px; padding:6px 12px; border-radius:999px;
+  border:1px solid var(--border-bright); color:var(--text-dim);
+}
+
+/* ---------- Rating widget ---------- */
+.rate-box{
+  background:var(--bg-panel); border:1px solid var(--border); border-radius:var(--radius-lg);
+  padding:22px; margin:32px 0;
+}
+.rate-box-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; gap:10px; }
+.star-input{ display:flex; gap:4px; }
+.star-input button{
+  background:transparent; border:0; cursor:pointer; padding:2px; color:var(--border-bright);
+  transition:color .1s ease, transform .1s ease;
+}
+.star-input button svg{ width:26px; height:26px; }
+.star-input button:hover, .star-input button.hovered{ transform:scale(1.1); }
+.star-input.filled button.on, .star-input button.on{ color:var(--amber); }
+.rate-status{ font-family:var(--font-mono); font-size:12px; color:var(--text-faint); margin-top:10px; }
+.rate-login-prompt{
+  display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+}
+.rate-login-prompt p{ color:var(--text-dim); font-size:13.5px; }
+
+/* ---------- Toasts ---------- */
+.toast-stack{
+  position:fixed; bottom:20px; right:20px; z-index:1000;
+  display:flex; flex-direction:column; gap:10px; max-width:min(90vw,340px);
+}
+.toast{
+  background:var(--bg-raised); border:1px solid var(--border-bright); border-left:3px solid var(--accent);
+  border-radius:var(--radius-md); padding:12px 14px; font-size:13px; color:var(--text);
+  box-shadow:0 10px 30px -10px rgba(0,0,0,0.6);
+  animation:toastIn .2s ease;
+  display:flex; align-items:flex-start; gap:10px;
+}
+.toast.error{ border-left-color:var(--danger); }
+.toast.info{ border-left-color:var(--violet); }
+@keyframes toastIn{ from{ opacity:0; transform:translateY(8px); } to{ opacity:1; transform:translateY(0); } }
+.toast button{ background:transparent; border:0; color:var(--text-faint); cursor:pointer; margin-left:auto; padding:0; line-height:1; flex-shrink:0; }
+
+/* ---------- Modal ---------- */
+.modal-scrim{
+  position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:300;
+  display:flex; align-items:center; justify-content:center; padding:20px;
+  animation:fadeIn .15s ease;
+}
+@keyframes fadeIn{ from{ opacity:0; } to{ opacity:1; } }
+.modal-box{
+  background:var(--bg-raised); border:1px solid var(--border-bright); border-radius:var(--radius-lg);
+  max-width:420px; width:100%; padding:26px; animation:modalIn .18s ease;
+}
+@keyframes modalIn{ from{ opacity:0; transform:scale(0.96) translateY(8px); } to{ opacity:1; transform:scale(1) translateY(0); } }
+.modal-box h3{ font-size:17px; margin-bottom:10px; font-family:var(--font-sans); }
+.modal-box p{ color:var(--text-dim); font-size:13.5px; margin-bottom:20px; }
+.modal-actions{ display:flex; gap:10px; justify-content:flex-end; }
+
+/* ---------- Forms ---------- */
+.form-group{ margin-bottom:16px; }
+.form-group label{
+  display:block; font-family:var(--font-mono); font-size:12px; color:var(--text-dim);
+  margin-bottom:6px; text-transform:uppercase; letter-spacing:0.05em;
+}
+.form-group input, .form-group textarea{
+  width:100%; background:var(--bg-panel); border:1px solid var(--border);
+  color:var(--text); font-family:var(--font-sans); font-size:14px;
+  padding:11px 13px; border-radius:var(--radius-md); transition:border-color .15s;
+}
+.form-group input:hover, .form-group textarea:hover{ border-color:var(--border-bright); }
+.form-group input:focus, .form-group textarea:focus{ outline:none; border-color:var(--accent); }
+.form-group textarea{ resize:vertical; min-height:120px; }
+.form-error{ color:var(--danger); font-size:12px; margin-top:6px; font-family:var(--font-mono); }
+.form-group.has-error input, .form-group.has-error textarea{ border-color:var(--danger); }
+.form-success-box{
+  background:var(--accent-glow); border:1px solid var(--accent-dim); border-radius:var(--radius-lg);
+  padding:24px; text-align:center;
+}
+.form-success-box svg{ width:32px; height:32px; color:var(--accent); margin-bottom:10px; }
+
+/* ---------- Account page ---------- */
+.account-header{
+  display:flex; align-items:center; gap:18px; padding:40px 0 32px; border-bottom:1px solid var(--border);
+  flex-wrap:wrap;
+}
+.account-avatar{ width:76px; height:76px; border-radius:50%; border:2px solid var(--accent-dim); object-fit:cover; }
+.account-header h1{ font-family:var(--font-sans); font-size:22px; }
+.account-header .email{ color:var(--text-dim); font-size:13.5px; margin-top:2px; }
+
+.my-ratings-list{ display:flex; flex-direction:column; gap:1px; background:var(--border); border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden; margin-top:16px; }
+.my-rating-row{
+  background:var(--bg-panel); padding:14px 16px; display:flex; align-items:center; gap:14px; cursor:pointer;
+  transition:background .12s;
+}
+.my-rating-row:hover{ background:var(--bg-hover); }
+.my-rating-row img{ width:36px; height:36px; border-radius:8px; flex-shrink:0; }
+.my-rating-row .name{ font-size:13.5px; font-weight:600; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.my-rating-row .stars{ display:flex; gap:2px; color:var(--amber); flex-shrink:0; }
+.my-rating-row .stars svg{ width:13px; height:13px; }
+
+/* ---------- Login gate panel ---------- */
+.login-panel{
+  background:var(--bg-panel); border:1px solid var(--border); border-radius:var(--radius-lg);
+  padding:48px 24px; text-align:center; max-width:400px; margin:60px auto;
+}
+.login-panel .vault-icon{ width:44px; height:44px; color:var(--accent); margin:0 auto 18px; }
+.login-panel h2{ font-family:var(--font-sans); font-size:18px; margin-bottom:8px; }
+.login-panel p{ color:var(--text-dim); font-size:13.5px; margin-bottom:22px; }
+
+/* ---------- Install banner (beforeinstallprompt for the store PWA itself) ---------- */
+.install-banner{
+  display:none; align-items:center; gap:12px; background:var(--bg-panel);
+  border:1px solid var(--accent-dim); border-radius:var(--radius-lg);
+  padding:12px 16px; margin:16px 0;
+}
+.install-banner.show{ display:flex; }
+.install-banner p{ flex:1; font-size:13px; color:var(--text-dim); }
+.install-banner .close-install{ background:transparent; border:0; color:var(--text-faint); cursor:pointer; }
+
+/* ---------- Footer ---------- */
+.site-footer{
+  border-top:1px solid var(--border); padding:40px 0 32px; margin-top:60px;
+}
+.footer-grid{ display:flex; justify-content:space-between; gap:24px; flex-wrap:wrap; }
+.footer-brand{ font-family:var(--font-mono); font-weight:700; font-size:14px; margin-bottom:8px; }
+.footer-tag{ color:var(--text-faint); font-size:12.5px; max-width:280px; }
+.footer-links{ display:flex; gap:28px; flex-wrap:wrap; }
+.footer-col h5{ font-family:var(--font-mono); font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-faint); margin-bottom:12px; }
+.footer-col a{ display:block; font-size:13px; color:var(--text-dim); padding:4px 0; }
+.footer-col a:hover{ color:var(--accent); }
+.footer-bottom{ margin-top:32px; padding-top:20px; border-top:1px solid var(--border); font-size:12px; color:var(--text-faint); font-family:var(--font-mono); }
+
+/* ---------- Utility: page transition ---------- */
+.page-enter{ animation:pageIn .22s ease; }
+@keyframes pageIn{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:translateY(0); } }
+
+/* ---------- Back link ---------- */
+.back-link{
+  display:inline-flex; align-items:center; gap:6px; font-family:var(--font-mono);
+  font-size:12.5px; color:var(--text-dim); margin:20px 0 0; padding:6px 0;
+  background:transparent; border:0; cursor:pointer; text-align:left;
+  -webkit-appearance:none; appearance:none;
+}
+.back-link:hover{ color:var(--accent); }
+.back-link:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; border-radius:var(--radius-sm); }
+.back-link svg{ width:14px; height:14px; }
+</style>
 </head>
 <body>
-  <header id="site-header"></header>
-  <main id="main-content"></main>
-  <footer style="text-align:center; padding:1rem; background:var(--card-bg); border-top:1px solid var(--border); color:var(--text-light); font-size:0.85rem;">
-    &copy; 2026 AppVault Store. All rights reserved.
-  </footer>
-  <div id="toast-container"></div>
-  <div id="modal-root"></div>
+<a href="#main" class="skip-link">Skip to content</a>
+
+<div id="app-root"></div>
+<div class="toast-stack" id="toast-stack" aria-live="polite"></div>
+
+<script type="module">
+/* ====================================================================
+   ██╗   ██╗ █████╗ ██╗   ██╗██╗  ████████╗
+   ██║   ██║██╔══██╗██║   ██║██║  ╚══██╔══╝
+   ██║   ██║███████║██║   ██║██║     ██║
+   ╚██╗ ██╔╝██╔══██║██║   ██║██║     ██║
+    ╚████╔╝ ██║  ██║╚██████╔╝███████╗██║
+     ╚═══╝  ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝
+
+   =====================  CONFIGURATION  =============================
+   NullVault now reads its configuration from two plain JSON files that
+   sit next to index.html, so you can edit the store WITHOUT touching
+   any code:
+
+     settings.json   -> store branding, contact endpoint, Firebase config
+     app-list.json   -> the entire app catalog (add/remove apps here)
+
+   Both are loaded by loadConfiguration() below, at boot, over fetch().
+   If either file is missing or fails to load (for example if you open
+   index.html directly via file:// without a local server, where fetch
+   of local files is blocked by the browser), NullVault falls back to
+   the small built-in defaults defined right here, so the app never
+   breaks — it just won't reflect your edits until served over http(s).
+   ==================================================================== */
+
+// Fallback used only if settings.json can't be fetched.
+let STORE_CONFIG = {
+  name: "NullVault",
+  tagline: "Private distribution for PWA & TWA builds",
+  logoInitial: "V",
+  contactEndpoint: null,
+  contactEndpointExtraFields: {},
+};
+
+// Fallback used only if settings.json can't be fetched.
+let FIREBASE_CONFIG = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID",
+};
+
+/* ----------------------------------------------------------------------
+   EXAMPLE FIRESTORE SECURITY RULES
+   Paste into Firebase Console → Firestore Database → Rules.
+   These rules:
+     - let ANYONE read ratings (needed to show averages publicly)
+     - only let a SIGNED-IN user write a rating doc whose ID == their uid
+     - validate the rating shape (1-5 numeric star value)
+     - never let a user write into another user's rating doc
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /apps/{appId}/ratings/{userId} {
+      allow read: if true;
+      allow create, update: if request.auth != null
+                             && request.auth.uid == userId
+                             && request.resource.data.rating is int
+                             && request.resource.data.rating >= 1
+                             && request.resource.data.rating <= 5
+                             && request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+---------------------------------------------------------------------- */
+
+// Fallback used only if app-list.json can't be fetched — kept small on
+// purpose since the real catalog now lives in app-list.json.
+let APP_CATALOG = [
+  {
+    id: "stage-whisper",
+    name: "Stage Whisper",
+    icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%23161b22'/%3E%3Cpath d='M30 65 Q30 30 50 30 Q70 30 70 65' fill='none' stroke='%234AFFB0' stroke-width='5' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='30' r='7' fill='%234AFFB0'/%3E%3Cline x1='30' y1='65' x2='30' y2='75' stroke='%234AFFB0' stroke-width='5' stroke-linecap='round'/%3E%3Cline x1='70' y1='65' x2='70' y2='75' stroke='%234AFFB0' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E",
+    developer: "NullVault",
+    shortDescription: "Practice your lines with AI-powered scene partners and on-demand hints.",
+    fullDescription: "Stage Whisper turns your phone into a rehearsal partner. Load a script, assign roles, and run scenes with natural-sounding AI voices reading opposite you. On-demand hints surface your next line only when you ask for it, scene transition banners keep you oriented in long rehearsals, and everything syncs across devices so you can pick up backstage exactly where you left off at home.",
+    version: "2.4.1",
+    category: "Productivity",
+    tags: ["theatre", "acting", "scripts", "rehearsal", "voice"],
+    screenshots: [
+      "https://images.unsplash.com/photo-1503095396549-807759245b35?w=800&q=80",
+      "https://images.unsplash.com/photo-1524712245354-2c4e5e7121c0?w=800&q=80",
+      "https://images.unsplash.com/photo-1516307365426-bea591f05011?w=800&q=80",
+    ],
+    downloadUrl: "https://stagewhisper.nullvault.eu",
+    type: "PWA",
+    appUrl: "https://stagewhisper.nullvault.eu",
+    rating: 4.8,
+    ratingCount: 214,
+    releaseDate: "2025-02-11",
+    lastUpdated: "2026-08-02",
+    platforms: ["Web", "Android", "iOS", "Desktop"],
+    features: [
+      "Multi-provider AI voices (Google AI Studio + more)",
+      "On-demand line hints, not spoiler overlays",
+      "Scene transition banners for long scripts",
+      "Offline rehearsal mode",
+      "Cross-device sync with conflict resolution",
+    ],
+    featured: true,
+  },
+];
+
+/* ====================================================================
+   CONFIGURATION LOADER
+   Fetches settings.json and app-list.json and merges them over the
+   built-in fallback defaults above. Called once at boot, before the
+   first render(), so the page always shows real content on the first
+   paint — never a loading spinner for the whole app shell.
+   ==================================================================== */
+async function loadConfiguration(){
+  await Promise.all([loadSettings(), loadAppList()]);
+}
+
+async function loadSettings(){
+  try{
+    const res = await fetch("./settings.json", { cache: "no-cache" });
+    if(!res.ok) throw new Error(`settings.json responded ${res.status}`);
+    const settings = await res.json();
+
+    if(settings.store){
+      STORE_CONFIG = {
+        name: settings.store.name ?? STORE_CONFIG.name,
+        tagline: settings.store.tagline ?? STORE_CONFIG.tagline,
+        logoInitial: settings.store.logoInitial ?? STORE_CONFIG.logoInitial,
+        contactEndpoint: settings.contact?.endpoint ?? null,
+        contactEndpointExtraFields: settings.contact?.extraFields
+          ? Object.fromEntries(Object.entries(settings.contact.extraFields).filter(([k]) => k !== "_comment" && settings.contact.extraFields[k]))
+          : {},
+      };
+    }
+    if(settings.firebase){
+      const { _comment, ...fb } = settings.firebase;
+      FIREBASE_CONFIG = { ...FIREBASE_CONFIG, ...fb };
+    }
+  } catch(e){
+    // settings.json missing, malformed, or unreachable (e.g. opened via
+    // file:// where fetch of local files is blocked). Built-in defaults
+    // defined earlier in this file remain in effect.
+    console.warn("[VAULT] Could not load settings.json, using built-in defaults:", e.message);
+  }
+}
+
+async function loadAppList(){
+  try{
+    const res = await fetch("./app-list.json", { cache: "no-cache" });
+    if(!res.ok) throw new Error(`app-list.json responded ${res.status}`);
+    const apps = await res.json();
+    if(Array.isArray(apps) && apps.length > 0){
+      APP_CATALOG = apps;
+    }
+  } catch(e){
+    console.warn("[VAULT] Could not load app-list.json, using built-in fallback catalog:", e.message);
+  }
+}
+
+/* ====================================================================
+   FIREBASE INIT
+   NOTE: This is loaded via dynamic import() rather than a static
+   top-level `import`. Static imports are hoisted and run before any
+   other module code — if the Firebase CDN request fails (offline, an
+   ad-blocker, a restrictive network, or a stale/placeholder config
+   causing a load-time error), a static import throws and SILENTLY
+   KILLS THE ENTIRE MODULE, including the render() call at the bottom
+   of this file, leaving a blank page with no visible error. Dynamic
+   import() runs inside our own try/catch, so a Firebase failure only
+   ever disables auth/ratings — it can never blank the whole store.
+   ==================================================================== */
+let firebaseApp, auth, db, googleProvider;
+let firebaseReady = false;
+let firebaseFns = {}; // populated with the Firestore helper functions once loaded
+
+async function initFirebase(){
+  try {
+    const [{ initializeApp }, authMod, storeMod] = await Promise.all([
+      import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"),
+      import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js"),
+      import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"),
+    ]);
+    const { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } = authMod;
+    const { getFirestore, doc, setDoc, getDoc, collection, getDocs, onSnapshot } = storeMod;
+    firebaseFns = { signInWithPopup, signOut, onAuthStateChanged, doc, setDoc, getDoc, collection, getDocs, onSnapshot };
+
+    firebaseApp = initializeApp(FIREBASE_CONFIG);
+    auth = getAuth(firebaseApp);
+    db = getFirestore(firebaseApp);
+    googleProvider = new GoogleAuthProvider();
+    setPersistence(auth, browserLocalPersistence).catch(() => {});
+    firebaseReady = true;
+
+    firebaseFns.onAuthStateChanged(auth, (user) => {
+      state.user = user;
+      render();
+    });
+  } catch (e) {
+    // Firebase CDN unreachable, blocked, or still using placeholder
+    // config values. The app remains fully browsable — only
+    // auth/ratings degrade gracefully (see guardAuthAction()).
+    firebaseReady = false;
+    console.warn("[VAULT] Firebase not available yet:", e.message);
+  }
+}
+
+/* ====================================================================
+   GLOBAL STATE
+   ==================================================================== */
+const state = {
+  user: null,             // Firebase user object, or null
+  route: { name: "home", params: {} },
+  search: "",
+  filters: { category: "all", type: "all", minRating: 0 },
+  sort: "popularity",
+  ratingsCache: new Map(), // appId -> { average, count, mine }
+  myRatingsCache: null,    // array of { appId, rating, timestamp } for current user
+  deferredInstallPrompt: null,
+  mobileNavOpen: false,
+};
+
+/* ====================================================================
+   ICONS (inline SVG strings — no icon library dependency)
+   ==================================================================== */
+const ICON = {
+  search: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`,
+  star: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`,
+  starOutline: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`,
+  arrowRight: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>`,
+  chevronLeft: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>`,
+  menu: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>`,
+  close: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>`,
+  download: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
+  external: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>`,
+  check: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>`,
+  checkCircle: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`,
+  vault: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="3" x2="12" y2="7"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="3" y1="12" x2="7" y2="12"/><line x1="17" y1="12" x2="21" y2="12"/></svg>`,
+  google: `<svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>`,
+  info: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`,
+  logout: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`,
+};
+function icon(name, cls=""){ return `<span class="icon ${cls}" style="display:inline-flex">${ICON[name]||""}</span>`; }
+
+/* ====================================================================
+   UTILITIES
+   ==================================================================== */
+function escapeHtml(str){
+  return String(str ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function formatDate(iso){
+  try{
+    return new Date(iso + "T00:00:00").toLocaleDateString(undefined, { year:"numeric", month:"short", day:"numeric" });
+  } catch { return iso; }
+}
+function debounce(fn, ms){
+  let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+function starRow(rating, size=""){
+  const full = Math.round(rating);
+  let out = "";
+  for(let i=1;i<=5;i++){ out += icon(i<=full ? "star" : "starOutline"); }
+  return `<span class="stars-row ${size}">${out}</span>`;
+}
+function getEffectiveRating(app){
+  const cached = state.ratingsCache.get(app.id);
+  if(cached) return { average: cached.average, count: cached.count };
+  return { average: app.rating, count: app.ratingCount };
+}
+function showToast(message, type="success", timeout=4200){
+  const stack = document.getElementById("toast-stack");
+  const el = document.createElement("div");
+  el.className = `toast ${type}`;
+  const iconName = type === "error" ? "info" : type === "info" ? "info" : "checkCircle";
+  el.innerHTML = `${icon(iconName)}<span>${escapeHtml(message)}</span><button aria-label="Dismiss">${ICON.close}</button>`;
+  el.querySelector("button").addEventListener("click", () => el.remove());
+  stack.appendChild(el);
+  setTimeout(() => el.remove(), timeout);
+}
+function categories(){
+  const set = new Map();
+  APP_CATALOG.forEach(a => set.set(a.category, (set.get(a.category)||0)+1));
+  return [...set.entries()].map(([name,count]) => ({name,count}));
+}
+const CATEGORY_ICONS = {
+  "Productivity": "🗂", "Finance": "📊", "Graphics & Design": "🎨", "Utilities": "🛠",
+};
+
+/* ====================================================================
+   ROUTER
+   Hash-based client-side routing. No framework, no reload.
+   Routes: #/  #/apps  #/categories  #/app/{id}  #/account  #/contact
+   ==================================================================== */
+function parseHash(){
+  const hash = location.hash.replace(/^#\/?/, "");
+  const [path, queryStr] = hash.split("?");
+  const parts = path.split("/").filter(Boolean);
+  const query = new URLSearchParams(queryStr || "");
+
+  if(parts.length === 0) return { name:"home", params:{}, query };
+  if(parts[0] === "apps") return { name:"apps", params:{}, query };
+  if(parts[0] === "categories" && !parts[1]) return { name:"categories", params:{}, query };
+  if(parts[0] === "categories" && parts[1]) return { name:"apps", params:{}, query: new URLSearchParams([...query, ["category", decodeURIComponent(parts[1])]]) };
+  if(parts[0] === "app" && parts[1]) return { name:"app-detail", params:{ id: decodeURIComponent(parts[1]) }, query };
+  if(parts[0] === "account") return { name:"account", params:{}, query };
+  if(parts[0] === "contact") return { name:"contact", params:{}, query };
+  return { name:"not-found", params:{}, query };
+}
+function navigate(path){
+  if(location.hash === "#" + path) { render(); return; }
+  location.hash = path;
+}
+window.addEventListener("hashchange", () => { state.route = parseHash(); window.scrollTo({top:0}); render(); });
+
+/* ====================================================================
+   AUTH
+   ==================================================================== */
+function guardAuthAction(actionLabel="do this"){
+  if(!firebaseReady){
+    showToast(`Firebase isn't configured yet, so you can't ${actionLabel}. Add your project config in FIREBASE_CONFIG.`, "error");
+    return false;
+  }
+  return true;
+}
+async function handleSignIn(){
+  if(!guardAuthAction("sign in")) return;
+  try{
+    await firebaseFns.signInWithPopup(auth, googleProvider);
+    showToast("Signed in.");
+  } catch(e){
+    if(e.code !== "auth/popup-closed-by-user") showToast("Sign-in failed: " + e.message, "error");
+  }
+}
+async function handleSignOut(){
+  try{
+    await firebaseFns.signOut(auth);
+    state.myRatingsCache = null;
+    showToast("Signed out.");
+    if(state.route.name === "account") navigate("/");
+  } catch(e){
+    showToast("Sign-out failed: " + e.message, "error");
+  }
+}
+// Note: the auth-state listener itself is attached inside initFirebase(),
+// right after auth is created — see the FIREBASE INIT block above.
+
+/* ====================================================================
+   FIRESTORE — RATINGS
+   apps/{appId}/ratings/{userId}  ->  { userId, rating, timestamp }
+   ==================================================================== */
+async function fetchRatingsFor(appId){
+  if(!firebaseReady) return null;
+  if(state.ratingsCache.has(appId)) return state.ratingsCache.get(appId);
+  try{
+    const { collection, getDocs } = firebaseFns;
+    const snap = await getDocs(collection(db, "apps", appId, "ratings"));
+    let sum = 0, count = 0, mine = null;
+    snap.forEach(d => {
+      const data = d.data();
+      sum += data.rating; count++;
+      if(state.user && d.id === state.user.uid) mine = data.rating;
+    });
+    const fallback = APP_CATALOG.find(a => a.id === appId);
+    const result = count > 0
+      ? { average: sum / count, count, mine }
+      : { average: fallback?.rating ?? 0, count: fallback?.ratingCount ?? 0, mine };
+    state.ratingsCache.set(appId, result);
+    return result;
+  } catch(e){
+    console.warn("[VAULT] Could not fetch ratings for", appId, e.message);
+    return null;
+  }
+}
+async function submitRating(appId, ratingValue){
+  if(!guardAuthAction("rate this app")) return false;
+  if(!state.user){ return false; }
+  try{
+    const { doc, setDoc } = firebaseFns;
+    await setDoc(doc(db, "apps", appId, "ratings", state.user.uid), {
+      userId: state.user.uid,
+      rating: ratingValue,
+      timestamp: Date.now(),
+    });
+    state.ratingsCache.delete(appId); // force refetch of the average
+    state.myRatingsCache = null;
+    showToast("Rating saved.");
+    return true;
+  } catch(e){
+    showToast("Couldn't save your rating: " + e.message, "error");
+    return false;
+  }
+}
+async function fetchMyRatings(){
+  if(!firebaseReady || !state.user) return [];
+  if(state.myRatingsCache) return state.myRatingsCache;
+  const results = [];
+  const { doc, getDoc } = firebaseFns;
+  // Firestore has no cheap "collection group where userId==me" without
+  // an index, so for a catalog this size we just check each app's doc
+  // directly — simplest correct approach at this scale.
+  await Promise.all(APP_CATALOG.map(async (app) => {
+    try{
+      const snap = await getDoc(doc(db, "apps", app.id, "ratings", state.user.uid));
+      if(snap.exists()){
+        results.push({ appId: app.id, appName: app.name, appIcon: app.icon, ...snap.data() });
+      }
+    } catch {}
+  }));
+  results.sort((a,b) => (b.timestamp||0) - (a.timestamp||0));
+  state.myRatingsCache = results;
+  return results;
+}
+
+/* ====================================================================
+   FILTER / SEARCH / SORT
+   ==================================================================== */
+function matchesSearch(app, q){
+  if(!q) return true;
+  const hay = [app.name, app.developer, app.category, app.shortDescription, ...(app.tags||[])].join(" ").toLowerCase();
+  return hay.includes(q.toLowerCase());
+}
+function getFilteredApps(){
+  const { search, filters, sort } = state;
+  let list = APP_CATALOG.filter(app => {
+    if(!matchesSearch(app, search)) return false;
+    if(filters.category !== "all" && app.category !== filters.category) return false;
+    if(filters.type !== "all" && app.type !== filters.type) return false;
+    if(filters.minRating > 0 && app.rating < filters.minRating) return false;
+    return true;
+  });
+  switch(sort){
+    case "rating": list.sort((a,b) => b.rating - a.rating); break;
+    case "newest": list.sort((a,b) => new Date(b.releaseDate) - new Date(a.releaseDate)); break;
+    case "name": list.sort((a,b) => a.name.localeCompare(b.name)); break;
+    case "popularity":
+    default: list.sort((a,b) => b.ratingCount - a.ratingCount); break;
+  }
+  return list;
+}
+
+/* ====================================================================
+   RENDER ENGINE
+   Each page render function returns an HTML string. render() swaps
+   #app-root's content and re-binds event listeners for that page only
+   — no virtual DOM, but scoped enough to stay maintainable in one file.
+   ==================================================================== */
+const root = document.getElementById("app-root");
+
+function layout(pageHtml){
+  return `
+    ${renderHeader()}
+    <main id="main" class="page-enter">${pageHtml}</main>
+    ${renderFooter()}
+    ${renderMobileDrawer()}
+  `;
+}
+
+function renderHeader(){
+  const r = state.route.name;
+  const navLink = (path, label, routeName) =>
+    `<a href="#${path}" class="${r===routeName ? "active" : ""}">${label}</a>`;
+
+  return `
+  <header class="site-header">
+    <div class="container">
+      <a href="#/" class="brand">
+        <svg class="brand-mark" viewBox="0 0 100 100"><rect width="100" height="100" rx="18" fill="#0A0E12" stroke="#232E38"/><path d="M50 20 L75 35 L75 65 L50 80 L25 65 L25 35 Z" fill="none" stroke="#4AFFB0" stroke-width="4"/><circle cx="50" cy="50" r="10" fill="#4AFFB0"/></svg>
+        <span>
+          <span class="brand-name-full">${escapeHtml(STORE_CONFIG.name)}</span>
+          <small>APP DISTRIBUTION</small>
+        </span>
+      </a>
+      <nav class="main-nav" aria-label="Primary">
+        ${navLink("/", "Home", "home")}
+        ${navLink("/apps", "Apps", "apps")}
+        ${navLink("/categories", "Categories", "categories")}
+        ${navLink("/contact", "Contact", "contact")}
+      </nav>
+      <div class="header-spacer"></div>
+      <form class="search-wrap" id="header-search-form" role="search">
+        ${icon("search")}
+        <input type="search" id="header-search-input" placeholder="Search apps..." value="${escapeHtml(state.search)}" aria-label="Search apps">
+      </form>
+      <div class="header-actions">
+        ${state.user ? `
+          <button class="avatar-btn" id="header-avatar-btn" aria-label="Account">
+            <img src="${state.user.photoURL || fallbackAvatar(state.user.displayName)}" alt="">
+          </button>
+        ` : `
+          <button class="btn btn-secondary" id="header-signin-btn">${icon("google")} Sign in</button>
+        `}
+        <button class="mobile-menu-btn" id="mobile-menu-toggle" aria-label="Open menu">${ICON.menu}</button>
+      </div>
+    </div>
+  </header>`;
+}
+
+function fallbackAvatar(name){
+  const initial = (name||"U").charAt(0).toUpperCase();
+  return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#1A232B"/><text x="50" y="63" font-family="monospace" font-size="42" fill="#4AFFB0" text-anchor="middle">${initial}</text></svg>`)}`;
+}
+
+function renderMobileDrawer(){
+  const r = state.route.name;
+  return `
+  <div class="mobile-drawer ${state.mobileNavOpen ? "open":""}" id="mobile-drawer">
+    <div class="mobile-drawer-scrim" id="mobile-drawer-scrim"></div>
+    <div class="mobile-drawer-panel">
+      <button class="mobile-drawer-close" id="mobile-drawer-close" aria-label="Close menu">${ICON.close}</button>
+      <a href="#/" class="${r==="home"?"active":""}" style="color:${r==="home"?"var(--accent)":""}">Home</a>
+      <a href="#/apps" class="${r==="apps"?"active":""}" style="color:${r==="apps"?"var(--accent)":""}">Apps</a>
+      <a href="#/categories" class="${r==="categories"?"active":""}" style="color:${r==="categories"?"var(--accent)":""}">Categories</a>
+      <a href="#/contact" class="${r==="contact"?"active":""}" style="color:${r==="contact"?"var(--accent)":""}">Contact</a>
+      ${state.user ? `<a href="#/account">Account</a>` : ""}
+    </div>
+  </div>`;
+}
+
+function renderFooter(){
+  return `
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="footer-brand mono">${escapeHtml(STORE_CONFIG.name)}</div>
+          <p class="footer-tag">${escapeHtml(STORE_CONFIG.tagline)}.</p>
+        </div>
+        <div class="footer-links">
+          <div class="footer-col">
+            <h5>Browse</h5>
+            <a href="#/apps">All apps</a>
+            <a href="#/categories">Categories</a>
+          </div>
+          <div class="footer-col">
+            <h5>Account</h5>
+            <a href="#/account">My account</a>
+            <a href="#/contact">Contact</a>
+          </div>
+        </div>
+      </div>
+      <div class="footer-bottom">© ${new Date().getFullYear()} ${escapeHtml(STORE_CONFIG.name)}. All listed applications remain property of their respective developers.</div>
+    </div>
+  </footer>`;
+}
+
+/* ---------- App card ---------- */
+function appCard(app){
+  const { average, count } = getEffectiveRating(app);
+  return `
+  <button class="app-card" data-nav="/app/${encodeURIComponent(app.id)}" aria-label="View ${escapeHtml(app.name)}">
+    <div class="app-card-top">
+      <img class="app-icon" src="${app.icon}" alt="" loading="lazy">
+      <div class="app-card-meta">
+        <h3>${escapeHtml(app.name)}</h3>
+        <div class="app-card-dev">${escapeHtml(app.developer)}</div>
+        <div class="app-card-badges">
+          <span class="type-badge ${app.type.toLowerCase()}"><span class="led ${app.type.toLowerCase()}"></span>${app.type}</span>
+        </div>
+      </div>
+    </div>
+    <p class="app-card-desc">${escapeHtml(app.shortDescription)}</p>
+    <div class="app-card-bottom">
+      <span class="rating-inline">${icon("star")} ${average.toFixed(1)} <span class="count">(${count})</span></span>
+      <span class="category-chip">${escapeHtml(app.category)}</span>
+    </div>
+  </button>`;
+}
+function appCardSkeleton(){
+  return `<div class="app-card skel-card skeleton"></div>`;
+}
+function emptyState(title, body, icon_="search"){
+  return `<div class="state-block">
+    <div class="state-icon">${ICON[icon_] ? `<span style="display:inline-flex;width:36px;height:36px;color:var(--text-faint)">${ICON[icon_]}</span>` : "◇"}</div>
+    <h3>${escapeHtml(title)}</h3>
+    <p>${escapeHtml(body)}</p>
+  </div>`;
+}
+
+/* ---------- HOME PAGE ---------- */
+function pageHome(){
+  const featured = APP_CATALOG.filter(a => a.featured);
+  const popular = [...APP_CATALOG].sort((a,b)=>b.ratingCount-a.ratingCount).slice(0,6);
+  const recent = [...APP_CATALOG].sort((a,b)=>new Date(b.releaseDate)-new Date(a.releaseDate)).slice(0,6);
+  const cats = categories();
+
+  return `
+  <section class="hero">
+    <div class="container hero-inner">
+      <div class="eyebrow">${icon("vault")} ACCESS: PUBLIC CATALOG</div>
+      <h1>Your own apps.<br>One <span class="accent-text">vault</span>, properly indexed.</h1>
+      <p class="lead">${escapeHtml(STORE_CONFIG.tagline)}. Browse, install as a PWA, or grab the TWA build for Android — everything catalogued, rated, and searchable in one place.</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;">
+        <button class="btn btn-primary btn-lg" data-nav="/apps">Browse all apps ${icon("arrowRight")}</button>
+        <button class="btn btn-secondary btn-lg" data-nav="/categories">View categories</button>
+      </div>
+      <div class="hero-stats">
+        <div class="hero-stat"><span class="n">${APP_CATALOG.length}</span><span class="l">Apps listed</span></div>
+        <div class="hero-stat"><span class="n">${APP_CATALOG.filter(a=>a.type==="PWA").length}</span><span class="l">PWA</span></div>
+        <div class="hero-stat"><span class="n">${APP_CATALOG.filter(a=>a.type==="TWA").length}</span><span class="l">TWA</span></div>
+        <div class="hero-stat"><span class="n">${cats.length}</span><span class="l">Categories</span></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="container">
+    <section class="section" style="padding-bottom:0;">
+      <div class="section-head">
+        <h2>Featured</h2>
+        <a href="#/apps" class="see-all">See all ${icon("arrowRight")}</a>
+      </div>
+      <div class="app-grid">${featured.map(appCard).join("")}</div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2>Popular right now</h2>
+        <a href="#/apps" class="see-all">See all ${icon("arrowRight")}</a>
+      </div>
+      <div class="app-grid rail">${popular.map(appCard).join("")}</div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2>Recently added</h2>
+        <a href="#/apps" class="see-all">See all ${icon("arrowRight")}</a>
+      </div>
+      <div class="app-grid rail">${recent.map(appCard).join("")}</div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><h2>Browse by category</h2></div>
+      <div class="cat-grid">
+        ${cats.map(c => `
+          <button class="cat-tile" data-nav="/categories/${encodeURIComponent(c.name)}">
+            <span class="cat-icon">${CATEGORY_ICONS[c.name] || "📦"}</span>
+            <h4>${escapeHtml(c.name)}</h4>
+            <div class="cat-count">${c.count} app${c.count===1?"":"s"}</div>
+          </button>
+        `).join("")}
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2>Full catalog</h2>
+      </div>
+      <div class="app-grid">${APP_CATALOG.slice(0,8).map(appCard).join("")}</div>
+      <div style="text-align:center;margin-top:24px;">
+        <button class="btn btn-secondary" data-nav="/apps">View complete listing ${icon("arrowRight")}</button>
+      </div>
+    </section>
+  </div>`;
+}
+
+/* ---------- APPS LISTING PAGE (search + filter + sort) ---------- */
+function pageApps(){
+  const cats = categories();
+  const results = getFilteredApps();
+  const { filters, sort, search } = state;
+
+  return `
+  <div class="container">
+    <div style="padding:32px 0 8px;">
+      <div class="eyebrow">${icon("vault")} FULL CATALOG</div>
+      <h1 style="font-size:24px;margin-top:10px;">All applications</h1>
+    </div>
+
+    <div class="filter-bar">
+      <div class="filter-chip-group" role="group" aria-label="Filter by app type">
+        <button class="filter-chip ${filters.type==="all"?"active":""}" data-filter-type="all">All types</button>
+        <button class="filter-chip ${filters.type==="PWA"?"active":""}" data-filter-type="PWA">PWA</button>
+        <button class="filter-chip ${filters.type==="TWA"?"active":""}" data-filter-type="TWA">TWA</button>
+      </div>
+
+      <select id="category-filter" aria-label="Filter by category">
+        <option value="all" ${filters.category==="all"?"selected":""}>All categories</option>
+        ${cats.map(c => `<option value="${escapeHtml(c.name)}" ${filters.category===c.name?"selected":""}>${escapeHtml(c.name)}</option>`).join("")}
+      </select>
+
+      <select id="rating-filter" aria-label="Filter by minimum rating">
+        <option value="0" ${filters.minRating===0?"selected":""}>Any rating</option>
+        <option value="4.5" ${filters.minRating===4.5?"selected":""}>4.5+ stars</option>
+        <option value="4" ${filters.minRating===4?"selected":""}>4.0+ stars</option>
+        <option value="3" ${filters.minRating===3?"selected":""}>3.0+ stars</option>
+      </select>
+
+      <select id="sort-select" aria-label="Sort apps">
+        <option value="popularity" ${sort==="popularity"?"selected":""}>Sort: Popularity</option>
+        <option value="rating" ${sort==="rating"?"selected":""}>Sort: Rating</option>
+        <option value="newest" ${sort==="newest"?"selected":""}>Sort: Newest</option>
+        <option value="name" ${sort==="name"?"selected":""}>Sort: Name (A–Z)</option>
+      </select>
+
+      <span class="result-count">${results.length} result${results.length===1?"":"s"}${search ? ` for "${escapeHtml(search)}"` : ""}</span>
+    </div>
+
+    ${results.length === 0
+      ? emptyState("No applications match", "Try a different search term or loosen your filters.", "search")
+      : `<div class="app-grid" style="margin-top:20px;">${results.map(appCard).join("")}</div>`
+    }
+  </div>`;
+}
+
+/* ---------- CATEGORIES PAGE ---------- */
+function pageCategories(){
+  const cats = categories();
+  return `
+  <div class="container">
+    <div style="padding:32px 0 8px;">
+      <div class="eyebrow">${icon("vault")} INDEX</div>
+      <h1 style="font-size:24px;margin-top:10px;">Categories</h1>
+    </div>
+    <section class="section">
+      <div class="cat-grid">
+        ${cats.map(c => `
+          <button class="cat-tile" data-nav="/categories/${encodeURIComponent(c.name)}">
+            <span class="cat-icon">${CATEGORY_ICONS[c.name] || "📦"}</span>
+            <h4>${escapeHtml(c.name)}</h4>
+            <div class="cat-count">${c.count} app${c.count===1?"":"s"}</div>
+          </button>
+        `).join("")}
+      </div>
+    </section>
+  </div>`;
+}
+
+/* ---------- APP DETAIL PAGE ---------- */
+function pageAppDetail(id){
+  const app = APP_CATALOG.find(a => a.id === id);
+  if(!app){
+    return `<div class="container">${emptyState("App not found", "This listing may have been removed or the link is incorrect.", "info")}
+      <div style="text-align:center;"><button class="btn btn-secondary" data-nav="/apps">Back to catalog</button></div></div>`;
+  }
+  const { average, count } = getEffectiveRating(app);
+
+  const primaryAction = app.type === "PWA"
+    ? `
+      <button class="btn btn-primary btn-lg" id="pwa-install-btn">${icon("download")} Install App</button>
+      <button class="btn btn-secondary btn-lg" id="pwa-open-btn">${icon("external")} Open App</button>
+    `
+    : `
+      <a class="btn btn-violet btn-lg" href="${escapeHtml(app.downloadUrl)}" target="_blank" rel="noopener noreferrer">${icon("download")} Download for Android</a>
+    `;
+
+  return `
+  <div class="container">
+    <button class="back-link" data-nav="/apps">${icon("chevronLeft")} Back to catalog</button>
+
+    <div class="app-detail-header">
+      <img class="app-detail-icon" src="${app.icon}" alt="">
+      <div class="app-detail-info">
+        <h1>${escapeHtml(app.name)}</h1>
+        <div class="app-detail-dev">by ${escapeHtml(app.developer)}</div>
+        <div class="app-detail-meta-row">
+          <span class="rating-inline">${icon("star")} ${average.toFixed(1)} <span class="count">(${count} rating${count===1?"":"s"})</span></span>
+          <span class="type-badge ${app.type.toLowerCase()}"><span class="led ${app.type.toLowerCase()}"></span>${app.type}</span>
+          <span class="category-chip">${escapeHtml(app.category)}</span>
+        </div>
+        <div class="app-detail-actions">${primaryAction}</div>
+        <div id="install-status-msg"></div>
+      </div>
+    </div>
+
+    <div class="stat-strip">
+      <div class="stat-cell"><div class="l">Version</div><div class="v">${escapeHtml(app.version)}</div></div>
+      <div class="stat-cell"><div class="l">Updated</div><div class="v">${formatDate(app.lastUpdated)}</div></div>
+      <div class="stat-cell"><div class="l">Released</div><div class="v">${formatDate(app.releaseDate)}</div></div>
+      <div class="stat-cell"><div class="l">Type</div><div class="v">${app.type}</div></div>
+      <div class="stat-cell"><div class="l">Category</div><div class="v">${escapeHtml(app.category)}</div></div>
+    </div>
+
+    <div class="detail-section">
+      <h2>About this app</h2>
+      <p class="body-text">${escapeHtml(app.fullDescription)}</p>
+    </div>
+
+    ${app.screenshots?.length ? `
+    <div class="detail-section">
+      <h2>Screenshots</h2>
+      <div class="screenshot-rail">
+        ${app.screenshots.map(s => `<img src="${s}" alt="Screenshot of ${escapeHtml(app.name)}" loading="lazy">`).join("")}
+      </div>
+    </div>` : ""}
+
+    ${app.features?.length ? `
+    <div class="detail-section">
+      <h2>Features</h2>
+      <ul class="feature-list">
+        ${app.features.map(f => `<li>${icon("check")}<span>${escapeHtml(f)}</span></li>`).join("")}
+      </ul>
+    </div>` : ""}
+
+    <div class="detail-section">
+      <h2>Supported platforms</h2>
+      <div class="platform-list">
+        ${app.platforms.map(p => `<span class="platform-chip">${escapeHtml(p)}</span>`).join("")}
+      </div>
+    </div>
+
+    <div id="rate-box-mount"></div>
+  </div>`;
+}
+
+/* ---------- Rating widget (mounted after page render, needs async Firestore read) ---------- */
+function renderRateBox(app, ratingsInfo){
+  const mine = ratingsInfo?.mine ?? null;
+  if(!state.user){
+    return `
+    <div class="rate-box">
+      <div class="rate-login-prompt">
+        <div>
+          <div class="eyebrow" style="margin-bottom:6px;">RATE THIS APP</div>
+          <p>Sign in with Google to leave a rating.</p>
+        </div>
+        <button class="btn btn-secondary" id="rate-signin-btn">${icon("google")} Sign in</button>
+      </div>
+    </div>`;
+  }
+  return `
+  <div class="rate-box">
+    <div class="rate-box-head">
+      <div class="eyebrow">${mine ? "YOUR RATING" : "RATE THIS APP"}</div>
+    </div>
+    <div class="star-input" id="star-input" data-app-id="${escapeHtml(app.id)}" data-current="${mine||0}">
+      ${[1,2,3,4,5].map(n => `<button type="button" data-star="${n}" class="${mine && n<=mine ? "on":""}" aria-label="${n} star${n===1?"":"s"}">${ICON.star}</button>`).join("")}
+    </div>
+    <div class="rate-status" id="rate-status">${mine ? `You rated this ${mine} star${mine===1?"":"s"}. Tap to change it.` : "Tap a star to rate."}</div>
+  </div>`;
+}
+
+/* ---------- ACCOUNT PAGE ---------- */
+function pageAccount(){
+  if(!state.user){
+    return `<div class="container">
+      <div class="login-panel">
+        <div class="vault-icon">${ICON.vault}</div>
+        <h2>Access restricted</h2>
+        <p>Sign in with Google to view your account and rating history.</p>
+        <button class="btn btn-primary btn-block" id="account-signin-btn">${icon("google")} Sign in with Google</button>
+      </div>
+    </div>`;
+  }
+  const u = state.user;
+  return `
+  <div class="container">
+    <div class="account-header">
+      <img class="account-avatar" src="${u.photoURL || fallbackAvatar(u.displayName)}" alt="">
+      <div>
+        <h1>${escapeHtml(u.displayName || "Vault user")}</h1>
+        <div class="email mono">${escapeHtml(u.email || "")}</div>
+      </div>
+      <div style="margin-left:auto;">
+        <button class="btn btn-secondary" id="account-signout-btn">${icon("logout")} Sign out</button>
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <h2>My ratings</h2>
+      <div id="my-ratings-mount">
+        <div class="skeleton" style="height:60px;margin-bottom:1px;"></div>
+        <div class="skeleton" style="height:60px;"></div>
+      </div>
+    </div>
+  </div>`;
+}
+function renderMyRatingsList(ratings){
+  if(ratings.length === 0){
+    return emptyState("No ratings yet", "Apps you rate will show up here.", "star");
+  }
+  return `<div class="my-ratings-list">
+    ${ratings.map(r => `
+      <div class="my-rating-row" data-nav="/app/${encodeURIComponent(r.appId)}">
+        <img src="${r.appIcon}" alt="">
+        <span class="name">${escapeHtml(r.appName)}</span>
+        <span class="stars">${[1,2,3,4,5].map(n => icon(n<=r.rating ? "star":"starOutline")).join("")}</span>
+      </div>
+    `).join("")}
+  </div>`;
+}
+
+/* ---------- CONTACT PAGE ---------- */
+function pageContact(){
+  return `
+  <div class="container">
+    <div style="padding:32px 0 8px;max-width:560px;">
+      <div class="eyebrow">${icon("vault")} TRANSMIT</div>
+      <h1 style="font-size:24px;margin-top:10px;">Contact</h1>
+      <p style="color:var(--text-dim);margin-top:8px;font-size:14px;">Questions, bug reports, or app submissions — send a message below.</p>
+    </div>
+    <div style="max-width:560px;margin:24px 0 60px;">
+      <div id="contact-form-mount">${renderContactForm()}</div>
+    </div>
+  </div>`;
+}
+function renderContactForm(){
+  return `
+  <form id="contact-form" novalidate>
+    <div class="form-group" id="fg-name">
+      <label for="cf-name">Name</label>
+      <input type="text" id="cf-name" name="name" autocomplete="name">
+      <div class="form-error" id="err-name" hidden></div>
+    </div>
+    <div class="form-group" id="fg-email">
+      <label for="cf-email">Email</label>
+      <input type="email" id="cf-email" name="email" autocomplete="email">
+      <div class="form-error" id="err-email" hidden></div>
+    </div>
+    <div class="form-group" id="fg-subject">
+      <label for="cf-subject">Subject</label>
+      <input type="text" id="cf-subject" name="subject">
+      <div class="form-error" id="err-subject" hidden></div>
+    </div>
+    <div class="form-group" id="fg-message">
+      <label for="cf-message">Message</label>
+      <textarea id="cf-message" name="message"></textarea>
+      <div class="form-error" id="err-message" hidden></div>
+    </div>
+    <button type="submit" class="btn btn-primary btn-lg btn-block" id="contact-submit-btn">Send message</button>
+  </form>`;
+}
+function renderContactSuccess(){
+  return `
+  <div class="form-success-box">
+    ${icon("checkCircle")}
+    <h3>Message sent</h3>
+    <p style="margin-top:6px;">Thanks — we'll get back to you soon.</p>
+    <button class="btn btn-secondary" id="contact-reset-btn" style="margin-top:6px;">Send another</button>
+  </div>`;
+}
+
+/* ---------- Login-required modal ---------- */
+function showLoginModal(){
+  const scrim = document.createElement("div");
+  scrim.className = "modal-scrim";
+  scrim.innerHTML = `
+    <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="login-modal-title">
+      <h3 id="login-modal-title">Sign in required</h3>
+      <p>You need to be signed in with Google to rate applications.</p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="login-modal-cancel">Cancel</button>
+        <button class="btn btn-primary" id="login-modal-signin">${icon("google")} Sign in</button>
+      </div>
+    </div>`;
+  document.body.appendChild(scrim);
+  const close = () => scrim.remove();
+  scrim.addEventListener("click", (e) => { if(e.target === scrim) close(); });
+  scrim.querySelector("#login-modal-cancel").addEventListener("click", close);
+  scrim.querySelector("#login-modal-signin").addEventListener("click", async () => { close(); await handleSignIn(); });
+}
+
+/* ---------- Contact form validation + submission ---------- */
+function validateContactForm(data){
+  const errors = {};
+  if(!data.name.trim()) errors.name = "Name is required.";
+  if(!data.email.trim()) errors.email = "Email is required.";
+  else if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email.trim())) errors.email = "Enter a valid email address.";
+  if(!data.subject.trim()) errors.subject = "Subject is required.";
+  if(!data.message.trim()) errors.message = "Message is required.";
+  else if(data.message.trim().length < 10) errors.message = "Message should be at least 10 characters.";
+  return errors;
+}
+async function submitContactForm(data){
+  // ----------------------------------------------------------------
+  // If STORE_CONFIG.contactEndpoint is set, this posts there (works
+  // as-is for Formspree / Web3Forms style endpoints). Otherwise it
+  // simulates a network round trip so the UI states are demonstrable
+  // without a backend configured yet.
+  // ----------------------------------------------------------------
+  if(!STORE_CONFIG.contactEndpoint){
+    await new Promise(res => setTimeout(res, 900));
+    return { ok: true, simulated: true };
+  }
+  const res = await fetch(STORE_CONFIG.contactEndpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ ...data, ...STORE_CONFIG.contactEndpointExtraFields }),
+  });
+  if(!res.ok) throw new Error(`Server responded ${res.status}`);
+  return { ok: true, simulated: false };
+}
+
+/* ====================================================================
+   MASTER RENDER + EVENT BINDING
+   ==================================================================== */
+function render(){
+  const r = state.route;
+  let pageHtml = "";
+  switch(r.name){
+    case "home": pageHtml = pageHome(); break;
+    case "apps": {
+      // support ?category=X coming from /categories/{name} redirects
+      const cat = r.query.get("category");
+      if(cat) state.filters.category = cat;
+      pageHtml = pageApps();
+      break;
+    }
+    case "categories": pageHtml = pageCategories(); break;
+    case "app-detail": pageHtml = pageAppDetail(r.params.id); break;
+    case "account": pageHtml = pageAccount(); break;
+    case "contact": pageHtml = pageContact(); break;
+    default: pageHtml = `<div class="container">${emptyState("Page not found", "That route doesn't exist.", "info")}<div style="text-align:center;"><button class="btn btn-secondary" data-nav="/">Go home</button></div></div>`;
+  }
+  root.innerHTML = layout(pageHtml);
+  bindGlobalEvents();
+  bindPageEvents(r);
+  updateInstallBannerVisibility();
+}
+
+function bindGlobalEvents(){
+  // Generic [data-nav] click delegation — covers cards, buttons, category tiles
+  root.querySelectorAll("[data-nav]").forEach(el => {
+    el.addEventListener("click", () => navigate(el.getAttribute("data-nav")));
+  });
+
+  // Header search
+  const searchForm = document.getElementById("header-search-form");
+  const searchInput = document.getElementById("header-search-input");
+  if(searchInput){
+    const debounced = debounce((val) => {
+      state.search = val;
+      if(state.route.name !== "apps") navigate("/apps");
+      else render();
+    }, 220);
+    searchInput.addEventListener("input", (e) => debounced(e.target.value));
+    searchForm.addEventListener("submit", (e) => { e.preventDefault(); state.search = searchInput.value; if(state.route.name!=="apps") navigate("/apps"); else render(); });
+  }
+
+  // Sign in / avatar / mobile menu
+  document.getElementById("header-signin-btn")?.addEventListener("click", handleSignIn);
+  document.getElementById("header-avatar-btn")?.addEventListener("click", () => navigate("/account"));
+  document.getElementById("mobile-menu-toggle")?.addEventListener("click", () => { state.mobileNavOpen = true; render(); });
+  document.getElementById("mobile-drawer-close")?.addEventListener("click", () => { state.mobileNavOpen = false; render(); });
+  document.getElementById("mobile-drawer-scrim")?.addEventListener("click", () => { state.mobileNavOpen = false; render(); });
+  document.querySelectorAll(".mobile-drawer-panel a").forEach(a => a.addEventListener("click", () => { state.mobileNavOpen = false; }));
+}
+
+function bindPageEvents(route){
+  if(route.name === "apps") bindAppsPageEvents();
+  if(route.name === "app-detail") bindAppDetailEvents(route.params.id);
+  if(route.name === "account") bindAccountEvents();
+  if(route.name === "contact") bindContactEvents();
+}
+
+function bindAppsPageEvents(){
+  document.querySelectorAll("[data-filter-type]").forEach(btn => {
+    btn.addEventListener("click", () => { state.filters.type = btn.getAttribute("data-filter-type"); render(); });
+  });
+  document.getElementById("category-filter")?.addEventListener("change", (e) => { state.filters.category = e.target.value; render(); });
+  document.getElementById("rating-filter")?.addEventListener("change", (e) => { state.filters.minRating = parseFloat(e.target.value); render(); });
+  document.getElementById("sort-select")?.addEventListener("change", (e) => { state.sort = e.target.value; render(); });
+}
+
+function bindAppDetailEvents(appId){
+  const app = APP_CATALOG.find(a => a.id === appId);
+  if(!app) return;
+
+  // --- PWA install handling ---
+  if(app.type === "PWA"){
+    const installBtn = document.getElementById("pwa-install-btn");
+    const openBtn = document.getElementById("pwa-open-btn");
+    const statusMsg = document.getElementById("install-status-msg");
+
+    openBtn?.addEventListener("click", () => window.open(app.appUrl, "_blank", "noopener,noreferrer"));
+
+    installBtn?.addEventListener("click", async () => {
+      // NOTE: beforeinstallprompt only fires for THIS site (the store
+      // itself) in a real browser — a listed third-party PWA can't be
+      // silently installed from here due to the same-origin nature of
+      // the install prompt. We use the store's own deferred prompt if
+      // present (e.g. when this store is itself installable) and
+      // otherwise fall back to opening the app so the user can install
+      // it from its own origin, which is what real app stores that
+      // list PWAs do in practice.
+      if(state.deferredInstallPrompt){
+        state.deferredInstallPrompt.prompt();
+        const choice = await state.deferredInstallPrompt.userChoice;
+        state.deferredInstallPrompt = null;
+        if(choice.outcome === "accepted") showToast("Installed.");
+        updateInstallBannerVisibility();
+      } else {
+        statusMsg.innerHTML = `<div class="rate-status" style="margin-top:10px;">Your browser didn't offer an install prompt for this app from here. Opening it directly — look for an "Install" icon in the address bar, or your browser's menu, once it loads.</div>`;
+        window.open(app.appUrl, "_blank", "noopener,noreferrer");
+      }
+    });
+  }
+
+  // --- Ratings: async fetch then mount ---
+  const mount = document.getElementById("rate-box-mount");
+  if(mount){
+    mount.innerHTML = `<div class="skeleton" style="height:110px;"></div>`;
+    fetchRatingsFor(app.id).then(info => {
+      state.ratingsCache.set(app.id, info || { average: app.rating, count: app.ratingCount, mine: null });
+      // refresh the rating shown in the header meta row too
+      const ratingEl = document.querySelector(".rating-inline");
+      const eff = getEffectiveRating(app);
+      if(ratingEl) ratingEl.innerHTML = `${icon("star")} ${eff.average.toFixed(1)} <span class="count">(${eff.count} rating${eff.count===1?"":"s"})</span>`;
+      mount.innerHTML = renderRateBox(app, info);
+      bindRateBoxEvents(app);
+    });
+  }
+}
+
+function bindRateBoxEvents(app){
+  document.getElementById("rate-signin-btn")?.addEventListener("click", handleSignIn);
+  const starInput = document.getElementById("star-input");
+  if(!starInput) return;
+  const buttons = [...starInput.querySelectorAll("button[data-star]")];
+  const statusEl = document.getElementById("rate-status");
+
+  const paintHover = (n) => buttons.forEach(b => b.classList.toggle("hovered", parseInt(b.dataset.star) <= n));
+  buttons.forEach(b => {
+    b.addEventListener("mouseenter", () => paintHover(parseInt(b.dataset.star)));
+    b.addEventListener("mouseleave", () => paintHover(0));
+    b.addEventListener("click", async () => {
+      if(!state.user){ showLoginModal(); return; }
+      const val = parseInt(b.dataset.star);
+      statusEl.textContent = "Saving...";
+      const ok = await submitRating(app.id, val);
+      if(ok){
+        buttons.forEach(btn => btn.classList.toggle("on", parseInt(btn.dataset.star) <= val));
+        statusEl.textContent = `You rated this ${val} star${val===1?"":"s"}. Tap to change it.`;
+        // refresh average shown up top
+        const info = await fetchRatingsFor(app.id);
+        const ratingEl = document.querySelector(".rating-inline");
+        if(ratingEl && info) ratingEl.innerHTML = `${icon("star")} ${info.average.toFixed(1)} <span class="count">(${info.count} rating${info.count===1?"":"s"})</span>`;
+      } else {
+        statusEl.textContent = "Couldn't save your rating. Try again.";
+      }
+    });
+  });
+}
+
+function bindAccountEvents(){
+  document.getElementById("account-signin-btn")?.addEventListener("click", handleSignIn);
+  document.getElementById("account-signout-btn")?.addEventListener("click", handleSignOut);
+  const mount = document.getElementById("my-ratings-mount");
+  if(mount && state.user){
+    fetchMyRatings().then(ratings => { mount.innerHTML = renderMyRatingsList(ratings); bindGlobalEvents(); });
+  }
+}
+
+function bindContactEvents(){
+  const form = document.getElementById("contact-form");
+  if(!form) return;
+  const fields = ["name","email","subject","message"];
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const data = Object.fromEntries(fields.map(f => [f, form.querySelector(`#cf-${f}`).value]));
+    const errors = validateContactForm(data);
+
+    fields.forEach(f => {
+      const group = document.getElementById(`fg-${f}`);
+      const errEl = document.getElementById(`err-${f}`);
+      if(errors[f]){ group.classList.add("has-error"); errEl.hidden = false; errEl.textContent = errors[f]; }
+      else { group.classList.remove("has-error"); errEl.hidden = true; }
+    });
+    if(Object.keys(errors).length > 0) return;
+
+    const submitBtn = document.getElementById("contact-submit-btn");
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Sending...";
+    try{
+      await submitContactForm(data);
+      document.getElementById("contact-form-mount").innerHTML = renderContactSuccess();
+      document.getElementById("contact-reset-btn").addEventListener("click", () => {
+        document.getElementById("contact-form-mount").innerHTML = renderContactForm();
+        bindContactEvents();
+      });
+      showToast("Message sent.");
+    } catch(err){
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Send message";
+      showToast("Couldn't send your message: " + err.message, "error");
+    }
+  });
+}
+
+function updateInstallBannerVisibility(){
+  // Placeholder hook — currently the install offer surfaces via the
+  // "Install App" button on each PWA's own detail page rather than a
+  // persistent top-level banner, to avoid nagging on every route.
+}
+
+/* ====================================================================
+   PWA — THE STORE ITSELF
+   manifest.json, sw.js, and icons/*.png are now real files shipped
+   alongside index.html (see the file list in the project root). This
+   section wires them up and reflects any branding changes pulled from
+   settings.json into the document's <title>/meta tags at runtime.
+   ==================================================================== */
+
+// Reflect settings.json branding (store name/tagline) into the document
+// itself. Called once after loadConfiguration() resolves. The manifest
+// and icon <link> tags themselves point at the static files below and
+// don't need to change at runtime — only the visible title/meta do.
+function applyManifestAndMeta(){
+  document.title = `${STORE_CONFIG.name} — App Distribution`;
+  const desc = document.querySelector('meta[name="description"]');
+  if(desc) desc.setAttribute("content", `${STORE_CONFIG.tagline}.`);
+}
+
+// --- Service worker ---
+// sw.js lives at the project root (see sw.js). It cannot be inlined
+// into index.html — the Service Worker spec requires it to be
+// registered from its own same-origin script file, since that file's
+// URL doubles as its scope boundary. If sw.js is missing from the
+// deployed origin, registration below just fails silently (caught)
+// and the site continues to work normally online-only.
+function registerServiceWorker(){
+  if(!("serviceWorker" in navigator)) return;
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch((e) => {
+      console.info("[VAULT] sw.js registration failed — offline support disabled:", e.message);
+    });
+  });
+}
+
+// Capture the store's own install prompt (for installing NullVault itself)
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  state.deferredInstallPrompt = e;
+  updateInstallBannerVisibility();
+});
+window.addEventListener("appinstalled", () => {
+  state.deferredInstallPrompt = null;
+  showToast("NullVault installed to your device.");
+});
+
+/* ====================================================================
+   BOOT
+   Render the UI immediately and unconditionally first — the store must
+   be fully browsable with zero network dependencies. Firebase is then
+   initialized in the background; when/if it becomes ready, its own
+   onAuthStateChanged listener (inside initFirebase) triggers a re-render
+   to reflect signed-in state. A top-level catch ensures that even a
+   truly unexpected error can't leave a blank page silently.
+   ==================================================================== */
+/* ====================================================================
+   BOOT
+   Render the UI immediately with built-in fallback data first — the
+   store must be visible with zero network dependencies, even offline
+   or on a file:// preview. settings.json and app-list.json are then
+   fetched in the background; once they resolve, a second render()
+   picks up the real branding/catalog. Firebase loads in parallel and
+   independently — none of these three can block or break another.
+   A top-level catch ensures even a truly unexpected error can't leave
+   a blank page silently.
+   ==================================================================== */
+function safeRender(){
+  try {
+    render();
+  } catch (e) {
+    console.error("[VAULT] Fatal render error:", e);
+    root.innerHTML = `<div style="padding:60px 24px;text-align:center;font-family:monospace;color:#E8ECEF;">
+      <h1 style="color:#FF5C7A;">Something broke on load</h1>
+      <p style="color:#8B98A5;margin-top:10px;">${escapeHtml(e.message)}</p>
+      <p style="color:#8B98A5;margin-top:10px;">Check the browser console for details.</p>
+    </div>`;
+  }
+}
+
+state.route = parseHash();
+safeRender(); // instant paint using built-in fallback config/catalog
+
+loadConfiguration().then(() => {
+  applyManifestAndMeta(); // reflect any store-name/branding changes from settings.json
+  safeRender();           // re-render with the real settings.json / app-list.json data
+});
+
+initFirebase(); // fire-and-forget; never blocks or breaks initial render
+registerServiceWorker();
+
+</script>
 </body>
 </html>
+
+
+
+
+

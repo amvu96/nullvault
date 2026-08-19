@@ -1,0 +1,272 @@
+[
+  {
+    "id": "stage-whisper",
+    "name": "Stage Whisper",
+    "icon": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%23161b22'/%3E%3Cpath d='M30 65 Q30 30 50 30 Q70 30 70 65' fill='none' stroke='%234AFFB0' stroke-width='5' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='30' r='7' fill='%234AFFB0'/%3E%3Cline x1='30' y1='65' x2='30' y2='75' stroke='%234AFFB0' stroke-width='5' stroke-linecap='round'/%3E%3Cline x1='70' y1='65' x2='70' y2='75' stroke='%234AFFB0' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E",
+    "developer": "NullVault",
+    "shortDescription": "Practice your lines with AI-powered scene partners and on-demand hints.",
+    "fullDescription": "Stage Whisper turns your phone into a rehearsal partner. Load a script, assign roles, and run scenes with natural-sounding AI voices reading opposite you. On-demand hints surface your next line only when you ask for it, scene transition banners keep you oriented in long rehearsals, and everything syncs across devices so you can pick up backstage exactly where you left off at home.",
+    "version": "2.4.1",
+    "category": "Productivity",
+    "tags": [
+      "theatre",
+      "acting",
+      "scripts",
+      "rehearsal",
+      "voice"
+    ],
+    "screenshots": [
+      "https://images.unsplash.com/photo-1503095396549-807759245b35?w=800&q=80",
+      "https://images.unsplash.com/photo-1524712245354-2c4e5e7121c0?w=800&q=80",
+      "https://images.unsplash.com/photo-1516307365426-bea591f05011?w=800&q=80"
+    ],
+    "downloadUrl": "https://stagewhisper.nullvault.eu",
+    "type": "PWA",
+    "appUrl": "https://stagewhisper.nullvault.eu",
+    "rating": 4.8,
+    "ratingCount": 214,
+    "releaseDate": "2025-02-11",
+    "lastUpdated": "2026-08-02",
+    "platforms": [
+      "Web",
+      "Android",
+      "iOS",
+      "Desktop"
+    ],
+    "features": [
+      "Multi-provider AI voices (Google AI Studio + more)",
+      "On-demand line hints, not spoiler overlays",
+      "Scene transition banners for long scripts",
+      "Offline rehearsal mode",
+      "Cross-device sync with conflict resolution"
+    ],
+    "featured": true
+  },
+  {
+    "id": "rca-breakeven",
+    "name": "RCA Break-Even",
+    "icon": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%23161b22'/%3E%3Crect x='22' y='45' width='56' height='24' rx='6' fill='none' stroke='%237B61FF' stroke-width='5'/%3E%3Ccircle cx='34' cy='69' r='6' fill='%237B61FF'/%3E%3Ccircle cx='66' cy='69' r='6' fill='%237B61FF'/%3E%3Cpath d='M28 45 L34 30 L66 30 L72 45' fill='none' stroke='%237B61FF' stroke-width='5' stroke-linejoin='round'/%3E%3C/svg%3E",
+    "developer": "NullVault",
+    "shortDescription": "Simulate bonus-malus classes to find your true break-even point on a claim.",
+    "fullDescription": "A single-page calculator for Romanian RCA policyholders. Enter your current bonus-malus class and premium, then simulate two parallel futures — filing a claim versus paying out of pocket — across multiple years. An interactive car diagram helps you log damage points, and the year-by-year cost comparison makes the break-even threshold immediately visible instead of buried in an insurer's table.",
+    "version": "1.3.0",
+    "category": "Finance",
+    "tags": [
+      "insurance",
+      "romania",
+      "calculator",
+      "rca",
+      "bonus-malus"
+    ],
+    "screenshots": [
+      "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=800&q=80",
+      "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=800&q=80"
+    ],
+    "downloadUrl": "https://nullvault.eu/tools/rca-breakeven",
+    "type": "PWA",
+    "appUrl": "https://nullvault.eu/tools/rca-breakeven",
+    "rating": 4.6,
+    "ratingCount": 89,
+    "releaseDate": "2025-11-04",
+    "lastUpdated": "2026-06-18",
+    "platforms": [
+      "Web",
+      "Desktop"
+    ],
+    "features": [
+      "Bonus-malus class simulation",
+      "Parallel claim vs. no-claim cost trajectories",
+      "Interactive SVG damage diagram",
+      "Works fully offline, no data leaves your device"
+    ],
+    "featured": true
+  },
+  {
+    "id": "vault-notes",
+    "name": "Vault Notes",
+    "icon": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%23161b22'/%3E%3Crect x='28' y='22' width='44' height='56' rx='4' fill='none' stroke='%234AFFB0' stroke-width='5'/%3E%3Cline x1='36' y1='38' x2='64' y2='38' stroke='%234AFFB0' stroke-width='4'/%3E%3Cline x1='36' y1='50' x2='64' y2='50' stroke='%234AFFB0' stroke-width='4'/%3E%3Cline x1='36' y1='62' x2='54' y2='62' stroke='%234AFFB0' stroke-width='4'/%3E%3C/svg%3E",
+    "developer": "NullVault",
+    "shortDescription": "Encrypted local-first note vault with Markdown and full-text search.",
+    "fullDescription": "Vault Notes keeps everything on-device by default with an optional encrypted sync layer. Written in plain Markdown, indexed for instant full-text search, and organized by tags rather than rigid folders. Built for people who want their notes fast and private without renting space in someone else's cloud.",
+    "version": "3.1.0",
+    "category": "Productivity",
+    "tags": [
+      "notes",
+      "markdown",
+      "encryption",
+      "offline"
+    ],
+    "screenshots": [
+      "https://images.unsplash.com/photo-1517842645767-c639042777db?w=800&q=80",
+      "https://images.unsplash.com/photo-1517842645767-c639042777db?w=801&q=80"
+    ],
+    "downloadUrl": "https://play.google.com/store/apps/details?id=eu.nullvault.vaultnotes",
+    "type": "TWA",
+    "appUrl": "",
+    "rating": 4.4,
+    "ratingCount": 156,
+    "releaseDate": "2024-09-20",
+    "lastUpdated": "2026-05-30",
+    "platforms": [
+      "Android"
+    ],
+    "features": [
+      "Local-first storage, optional encrypted sync",
+      "Full Markdown support with live preview",
+      "Instant full-text search across all notes",
+      "Tag-based organization"
+    ],
+    "featured": false
+  },
+  {
+    "id": "pixel-forge",
+    "name": "Pixel Forge",
+    "icon": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%23161b22'/%3E%3Crect x='25' y='25' width='16' height='16' fill='%23FFB84A'/%3E%3Crect x='42' y='25' width='16' height='16' fill='%234AFFB0'/%3E%3Crect x='59' y='25' width='16' height='16' fill='%237B61FF'/%3E%3Crect x='25' y='42' width='16' height='16' fill='%237B61FF'/%3E%3Crect x='42' y='59' width='16' height='16' fill='%23FFB84A'/%3E%3C/svg%3E",
+    "developer": "NullVault",
+    "shortDescription": "A minimalist pixel-art editor with layer support and GIF export.",
+    "fullDescription": "Pixel Forge is a lightweight sprite editor for game developers and pixel artists. Grid-snapped drawing, onion-skinning for animation frames, palette management, and one-click export to spritesheet or animated GIF — all running client-side with no account required.",
+    "version": "1.0.4",
+    "category": "Graphics & Design",
+    "tags": [
+      "pixel art",
+      "sprites",
+      "game dev",
+      "editor"
+    ],
+    "screenshots": [
+      "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=800&q=80",
+      "https://images.unsplash.com/photo-1550745165-9bc0b252726e?w=800&q=80"
+    ],
+    "downloadUrl": "https://nullvault.eu/tools/pixel-forge",
+    "type": "PWA",
+    "appUrl": "https://nullvault.eu/tools/pixel-forge",
+    "rating": 4.2,
+    "ratingCount": 47,
+    "releaseDate": "2026-01-15",
+    "lastUpdated": "2026-07-22",
+    "platforms": [
+      "Web",
+      "Desktop"
+    ],
+    "features": [
+      "Layer support with onion-skinning",
+      "Custom palette management",
+      "Spritesheet & animated GIF export",
+      "No account, no cloud, fully client-side"
+    ],
+    "featured": false
+  },
+  {
+    "id": "signal-drift",
+    "name": "Signal Drift",
+    "icon": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%23161b22'/%3E%3Cpath d='M20 60 L35 40 L50 55 L65 30 L80 50' fill='none' stroke='%23FF5C7A' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='80' cy='50' r='5' fill='%23FF5C7A'/%3E%3C/svg%3E",
+    "developer": "Third-Party Labs",
+    "shortDescription": "Real-time ETF and index tracker with UCITS-focused watchlists.",
+    "fullDescription": "Signal Drift is a lightweight portfolio dashboard focused on UCITS-domiciled ETFs available to European investors. Build watchlists, compare TER and tracking difference across similar funds, and get plain-language breakdowns of what actually differs between products that look identical on the surface.",
+    "version": "0.9.2",
+    "category": "Finance",
+    "tags": [
+      "etf",
+      "investing",
+      "ucits",
+      "portfolio"
+    ],
+    "screenshots": [
+      "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&q=80",
+      "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=800&q=80"
+    ],
+    "downloadUrl": "https://play.google.com/store/apps/details?id=com.signaldrift.app",
+    "type": "TWA",
+    "appUrl": "",
+    "rating": 3.9,
+    "ratingCount": 63,
+    "releaseDate": "2025-06-01",
+    "lastUpdated": "2026-03-11",
+    "platforms": [
+      "Android"
+    ],
+    "features": [
+      "UCITS-focused fund comparisons",
+      "TER & tracking difference breakdowns",
+      "Custom watchlists",
+      "Price alerts"
+    ],
+    "featured": false
+  },
+  {
+    "id": "quiet-timer",
+    "name": "Quiet Timer",
+    "icon": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%23161b22'/%3E%3Ccircle cx='50' cy='54' r='26' fill='none' stroke='%234AFFB0' stroke-width='5'/%3E%3Cline x1='50' y1='54' x2='50' y2='38' stroke='%234AFFB0' stroke-width='4' stroke-linecap='round'/%3E%3Cline x1='50' y1='54' x2='61' y2='54' stroke='%234AFFB0' stroke-width='4' stroke-linecap='round'/%3E%3Cline x1='42' y1='22' x2='58' y2='22' stroke='%234AFFB0' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E",
+    "developer": "NullVault",
+    "shortDescription": "A distraction-free focus timer with ambient soundscapes.",
+    "fullDescription": "Quiet Timer strips the Pomodoro concept down to essentials: one big timer, a handful of ambient soundscapes, and nothing else competing for your attention. No streaks to maintain, no social features, no notifications begging you back — just a timer that respects that you opened it to focus.",
+    "version": "2.0.0",
+    "category": "Productivity",
+    "tags": [
+      "focus",
+      "pomodoro",
+      "timer",
+      "ambient"
+    ],
+    "screenshots": [
+      "https://images.unsplash.com/photo-1495364141860-b0d03eccd065?w=800&q=80",
+      "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=800&q=80"
+    ],
+    "downloadUrl": "https://nullvault.eu/tools/quiet-timer",
+    "type": "PWA",
+    "appUrl": "https://nullvault.eu/tools/quiet-timer",
+    "rating": 4.9,
+    "ratingCount": 302,
+    "releaseDate": "2024-04-18",
+    "lastUpdated": "2026-07-05",
+    "platforms": [
+      "Web",
+      "Android",
+      "iOS",
+      "Desktop"
+    ],
+    "features": [
+      "Ambient soundscape mixer",
+      "Zero notifications, zero streaks",
+      "Custom interval presets",
+      "Works fully offline"
+    ],
+    "featured": true
+  },
+  {
+    "id": "romana-tts-bridge",
+    "name": "Română TTS Bridge",
+    "icon": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%23161b22'/%3E%3Cpath d='M30 40 L30 60 L42 60 L58 74 L58 26 L42 40 Z' fill='%237B61FF'/%3E%3Cpath d='M68 38 Q76 50 68 62' fill='none' stroke='%237B61FF' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E",
+    "developer": "NullVault",
+    "shortDescription": "Routes Romanian text to higher-quality neural TTS engines.",
+    "fullDescription": "A small bridge utility that sends Romanian text to cloud-based neural voice engines when the on-device voice quality isn't good enough — common on Android's default Romanian TTS. Useful as a companion utility for reading apps, script rehearsal tools, and accessibility workflows.",
+    "version": "0.6.1",
+    "category": "Utilities",
+    "tags": [
+      "romanian",
+      "tts",
+      "accessibility",
+      "voice"
+    ],
+    "screenshots": [
+      "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=800&q=80"
+    ],
+    "downloadUrl": "https://nullvault.eu/tools/ro-tts-bridge",
+    "type": "PWA",
+    "appUrl": "https://nullvault.eu/tools/ro-tts-bridge",
+    "rating": 4.1,
+    "ratingCount": 22,
+    "releaseDate": "2026-04-30",
+    "lastUpdated": "2026-08-10",
+    "platforms": [
+      "Web",
+      "Android"
+    ],
+    "features": [
+      "Cloud neural voice routing for Romanian",
+      "Configurable engine fallback chain",
+      "Simple text-in, audio-out API"
+    ],
+    "featured": false
+  }
+]
