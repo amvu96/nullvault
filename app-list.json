@@ -79,7 +79,7 @@
       "Interactive SVG damage diagram",
       "Works fully offline, no data leaves your device"
     ],
-    "featured": true
+    "featured": false
   },
   {
     "id": "vault-notes",
@@ -231,7 +231,7 @@
       "Custom interval presets",
       "Works fully offline"
     ],
-    "featured": true
+    "featured": false
   },
   {
     "id": "romana-tts-bridge",
@@ -304,6 +304,6 @@
       "Visual spending breakdowns",
       "No ads, no subscription paywall"
     ],
-    "featured": false
+    "featured": true
   }
 ]
