@@ -182,10 +182,8 @@ img{ max-width:100%; display:block; }
 .main-nav a:hover{ color:var(--text); background:var(--bg-hover); }
 .main-nav a.active{ color:var(--accent); }
 
-.header-spacer{ flex:1 1 auto; min-width:24px; }
-
 .search-wrap{
-  position:relative; flex:0 1 360px; width:100%; max-width:360px; min-width:160px;
+  position:relative; flex:1 1 auto; max-width:360px; min-width:160px;
 }
 .search-wrap input{
   width:100%; background:var(--bg-panel); border:1px solid var(--border);
@@ -906,7 +904,6 @@ function renderHeader(){
         ${navLink("/categories", "Categories", "categories")}
         ${navLink("/contact", "Contact", "contact")}
       </nav>
-      <div class="header-spacer"></div>
       <form class="search-wrap" id="header-search-form" role="search">
         ${icon("search")}
         <input type="search" id="header-search-input" placeholder="Search apps..." value="${escapeHtml(state.search)}" aria-label="Search apps">
