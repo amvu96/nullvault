@@ -1,5 +1,5 @@
 {
-  "name": "NullVault — App Distribution",
+  "name": "NullVault",
   "short_name": "NullVault",
   "description": "Private distribution for PWA & TWA builds.",
   "start_url": "./index.html",
