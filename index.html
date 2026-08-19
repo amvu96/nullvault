@@ -1,1 +1,2531 @@
  
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>AppVault Store</title>
+  <meta name="description" content="Discover and install PWA and TWA applications.">
+  <meta name="theme-color" content="#0f172a">
+
+  <!--
+  ============================================================
+  PWA MANIFEST & SERVICE WORKER LIMITATION
+  ============================================================
+  A fully installable PWA typically requires two additional files:
+  
+  1. manifest.json
+  2. sw.js (service worker)
+
+  Since this is a single index.html, the manifest and service worker
+  cannot be embedded inline. You should add the following files in the
+  same directory to make the store itself installable and offline-capable.
+
+  --- manifest.json (example) ---
+  {
+    "name": "AppVault Store",
+    "short_name": "AppVault",
+    "start_url": "./index.html",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#0f172a",
+    "icons": [
+      {
+        "src": "icon-192.png",
+        "sizes": "192x192",
+        "type": "image/png"
+      },
+      {
+        "src": "icon-512.png",
+        "sizes": "512x512",
+        "type": "image/png"
+      }
+    ]
+  }
+
+  --- sw.js (example) ---
+  const CACHE_NAME = 'appvault-cache-v1';
+  const urlsToCache = ['./index.html'];
+  self.addEventListener('install', event => {
+    event.waitUntil(
+      caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))
+    );
+  });
+  self.addEventListener('fetch', event => {
+    event.respondWith(
+      caches.match(event.request).then(response => response || fetch(event.request))
+    );
+  });
+
+  Uncomment the manifest link and service worker registration below
+  after you create those files.
+  -->
+
+  <!-- Uncomment when manifest.json is available -->
+  <!-- <link rel="manifest" href="manifest.json"> -->
+
+  <!-- ============================================================
+       CONFIGURATION SECTION
+       Replace these placeholder values with your own.
+       ============================================================ -->
+  <script>
+    // ===== STORE CONFIGURATION =====
+    window.CONFIG = {
+      // Firebase web configuration (replace with your project's config)
+      firebaseConfig: {
+        apiKey: "YOUR_API_KEY",
+        authDomain: "YOUR_PROJECT.firebaseapp.com",
+        projectId: "YOUR_PROJECT_ID",
+        storageBucket: "YOUR_PROJECT.appspot.com",
+        messagingSenderId: "YOUR_SENDER_ID",
+        appId: "YOUR_APP_ID"
+      },
+      // Store branding
+      storeName: "AppVault Store",
+      storeLogo: "🛍️", // emoji or text logo
+      storeTagline: "Discover & install the best PWA and TWA apps",
+      // Contact form endpoint (e.g. "https://formspree.io/f/yourFormId")
+      // Leave empty to show a configuration error when submitting.
+      contactEndpoint: "",
+      // Enable/disable Firebase (set to false if you want to demo UI only)
+      useFirebase: true
+    };
+
+    // ===== APPLICATION CATALOG =====
+    // Add a new app by adding another object to this array.
+    // Required fields: id, name, developer, shortDescription, fullDescription,
+    // version, category, screenshots, appType, rating, ratingCount,
+    // releaseDate, updatedDate, platforms, tags, iconColor1, iconColor2
+    // Optional: downloadUrl (TWA), appUrl (PWA), featured
+    window.APP_CATALOG = [
+      {
+        id: "notes-pwa",
+        name: "Notes PWA",
+        developer: "Acme Apps",
+        shortDescription: "Simple and fast note taking, offline first.",
+        fullDescription: "A beautiful note-taking app that works offline. Organize your thoughts with markdown support, sync across devices, and never lose a note. Perfect for students, writers, and anyone who loves simplicity.",
+        version: "2.1.0",
+        category: "Productivity",
+        screenshots: [
+          "https://picsum.photos/seed/notes1/400/300",
+          "https://picsum.photos/seed/notes2/400/300",
+          "https://picsum.photos/seed/notes3/400/300"
+        ],
+        appType: "PWA",
+        appUrl: "https://example.com/notes",
+        rating: 4.5,
+        ratingCount: 124,
+        releaseDate: "2023-05-15",
+        updatedDate: "2026-01-20",
+        platforms: ["Android", "iOS", "Web"],
+        featured: true,
+        tags: ["notes", "productivity", "offline", "markdown"],
+        iconColor1: "#FF6B6B",
+        iconColor2: "#FF8E53"
+      },
+      {
+        id: "taskflow",
+        name: "TaskFlow",
+        developer: "Zenith Labs",
+        shortDescription: "Kanban boards for modern teams.",
+        fullDescription: "TaskFlow is a project management tool with a beautiful Kanban interface. Collaborate in real time, track progress, and meet deadlines. PWA installation gives you a native app feel on any device.",
+        version: "1.8.3",
+        category: "Productivity",
+        screenshots: [
+          "https://picsum.photos/seed/taskflow1/400/300",
+          "https://picsum.photos/seed/taskflow2/400/300",
+          "https://picsum.photos/seed/taskflow3/400/300"
+        ],
+        appType: "PWA",
+        appUrl: "https://example.com/taskflow",
+        rating: 4.2,
+        ratingCount: 89,
+        releaseDate: "2022-11-02",
+        updatedDate: "2026-02-10",
+        platforms: ["Web", "Android", "iOS"],
+        featured: false,
+        tags: ["kanban", "project-management", "team", "collaboration"],
+        iconColor1: "#4ECDC4",
+        iconColor2: "#556270"
+      },
+      {
+        id: "meditation-twa",
+        name: "Zen Meditation",
+        developer: "CalmTech",
+        shortDescription: "Guided meditations and sleep stories.",
+        fullDescription: "Find peace with Zen Meditation. Hundreds of guided sessions, breathing exercises, and sleep stories. The TWA version provides a full Android experience through Google Play.",
+        version: "3.0.1",
+        category: "Health & Fitness",
+        screenshots: [
+          "https://picsum.photos/seed/zen1/400/300",
+          "https://picsum.photos/seed/zen2/400/300",
+          "https://picsum.photos/seed/zen3/400/300"
+        ],
+        appType: "TWA",
+        downloadUrl: "https://play.google.com/store/apps/details?id=com.example.zen",
+        rating: 4.8,
+        ratingCount: 245,
+        releaseDate: "2022-01-10",
+        updatedDate: "2026-03-05",
+        platforms: ["Android"],
+        featured: true,
+        tags: ["meditation", "health", "wellness", "sleep"],
+        iconColor1: "#A18CD1",
+        iconColor2: "#FBC2EB"
+      },
+      {
+        id: "budget-tracker",
+        name: "Budget Tracker",
+        developer: "MoneyWise",
+        shortDescription: "Track expenses and reach financial goals.",
+        fullDescription: "Take control of your finances with Budget Tracker. Set budgets, categorize expenses, and get insights with beautiful charts. Available as a TWA on Google Play.",
+        version: "5.2.0",
+        category: "Finance",
+        screenshots: [
+          "https://picsum.photos/seed/budget1/400/300",
+          "https://picsum.photos/seed/budget2/400/300",
+          "https://picsum.photos/seed/budget3/400/300"
+        ],
+        appType: "TWA",
+        downloadUrl: "https://play.google.com/store/apps/details?id=com.example.budget",
+        rating: 4.4,
+        ratingCount: 178,
+        releaseDate: "2021-08-20",
+        updatedDate: "2026-01-15",
+        platforms: ["Android"],
+        featured: false,
+        tags: ["finance", "budget", "expenses", "money"],
+        iconColor1: "#43E97B",
+        iconColor2: "#38F9D7"
+      },
+      {
+        id: "photo-editor",
+        name: "Pixel Photo Editor",
+        developer: "Creative Suite",
+        shortDescription: "Professional photo editing in your browser.",
+        fullDescription: "Edit photos with powerful tools: filters, layers, adjustments, and more. Pixel Photo Editor works offline and saves your projects locally. A must-have for photographers on the go.",
+        version: "2.7.5",
+        category: "Photography",
+        screenshots: [
+          "https://picsum.photos/seed/photo1/400/300",
+          "https://picsum.photos/seed/photo2/400/300",
+          "https://picsum.photos/seed/photo3/400/300"
+        ],
+        appType: "PWA",
+        appUrl: "https://example.com/pixel-editor",
+        rating: 4.6,
+        ratingCount: 312,
+        releaseDate: "2022-04-12",
+        updatedDate: "2026-02-28",
+        platforms: ["Web", "Android", "iOS"],
+        featured: true,
+        tags: ["photo", "editor", "creative", "offline"],
+        iconColor1: "#FA709A",
+        iconColor2: "#FEE140"
+      },
+      {
+        id: "recipe-box",
+        name: "Recipe Box",
+        developer: "HomeCook",
+        shortDescription: "Save, organize, and share your favorite recipes.",
+        fullDescription: "Recipe Box is your digital cookbook. Import recipes from the web, create shopping lists, and plan meals. The PWA version works on any device and syncs your data.",
+        version: "1.5.2",
+        category: "Food & Drink",
+        screenshots: [
+          "https://picsum.photos/seed/recipe1/400/300",
+          "https://picsum.photos/seed/recipe2/400/300",
+          "https://picsum.photos/seed/recipe3/400/300"
+        ],
+        appType: "PWA",
+        appUrl: "https://example.com/recipe-box",
+        rating: 4.3,
+        ratingCount: 67,
+        releaseDate: "2023-09-01",
+        updatedDate: "2026-02-14",
+        platforms: ["Web", "Android", "iOS"],
+        featured: false,
+        tags: ["recipes", "cooking", "meal-planning", "food"],
+        iconColor1: "#F6D365",
+        iconColor2: "#FDA085"
+      }
+    ];
+  </script>
+
+  <!-- Firebase SDKs (loaded via CDN) -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
+    import { getFirestore, collection, doc, getDocs, getDoc, setDoc, query, where, collectionGroup, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+
+    const CONFIG = window.CONFIG;
+    const APP_CATALOG = window.APP_CATALOG;
+
+    // ============================================================
+    // FIREBASE SECURITY RULES (for Firestore)
+    // ============================================================
+    /*
+      rules_version = '2';
+      service cloud.firestore {
+        match /databases/{database}/documents {
+          // Users can read ratings for any app
+          match /apps/{appId}/ratings/{userId} {
+            allow read: if true;
+            // Only the authenticated user can create/update their own rating
+            allow create, update: if request.auth != null && request.auth.uid == userId;
+            // Optionally prevent delete or allow delete of own rating
+            allow delete: if request.auth != null && request.auth.uid == userId;
+          }
+          // Collection group query for user ratings requires an index
+          // Create composite index on collectionGroup 'ratings' with fields userId, timestamp
+        }
+      }
+    */
+
+    // ============================================================
+    // GLOBAL STATE
+    // ============================================================
+    let currentUser = null;
+    let deferredPrompt = null;
+    const ratingsCache = {}; // appId -> { average, count, userRating }
+
+    // ============================================================
+    // FIREBASE INITIALIZATION
+    // ============================================================
+    let app = null;
+    let auth = null;
+    let db = null;
+    let googleProvider = null;
+
+    function initFirebase() {
+      if (!CONFIG.useFirebase) return;
+      const cfg = CONFIG.firebaseConfig;
+      // Check if placeholder is present
+      if (cfg.apiKey && cfg.apiKey.includes("YOUR_")) {
+        console.warn("Firebase configuration is placeholder. Auth and ratings will be disabled.");
+        return;
+      }
+      try {
+        app = initializeApp(cfg);
+        auth = getAuth(app);
+        db = getFirestore(app);
+        googleProvider = new GoogleAuthProvider();
+        // Set up auth state listener
+        onAuthStateChanged(auth, (user) => {
+          currentUser = user;
+          updateAuthUI();
+          // Re-render current view to reflect auth state
+          router();
+        });
+      } catch (e) {
+        console.error("Firebase initialization error:", e);
+      }
+    }
+
+    // ============================================================
+    // UTILITY FUNCTIONS
+    // ============================================================
+    function escapeHTML(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function formatDate(dateString) {
+      const options = { year: 'numeric', month: 'short', day: 'numeric' };
+      return new Date(dateString + 'T00:00:00').toLocaleDateString(undefined, options);
+    }
+
+    function createAppIcon(app, size = 80) {
+      const initials = app.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+      const svg = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+          <defs>
+            <linearGradient id="grad-${app.id}" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="${app.iconColor1}" />
+              <stop offset="100%" stop-color="${app.iconColor2}" />
+            </linearGradient>
+          </defs>
+          <rect width="100%" height="100%" rx="20%" fill="url(#grad-${app.id})" />
+          <text x="50%" y="50%" dy=".35em" text-anchor="middle" font-family="Arial, sans-serif" font-weight="bold" font-size="${size * 0.4}px" fill="#ffffff">${initials}</text>
+        </svg>
+      `;
+      return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+    }
+
+    function getAppById(id) {
+      return APP_CATALOG.find(a => a.id === id);
+    }
+
+    function getAppActionButton(app, context = 'card') {
+      if (app.appType === 'TWA') {
+        return `<a href="${escapeHTML(app.downloadUrl || '#')}" class="btn btn-primary btn-sm" target="_blank" rel="noopener">Download</a>`;
+      } else {
+        if (context === 'card') {
+          return `<a href="#/app/${app.id}" class="btn btn-secondary btn-sm">Open</a>`;
+        } else {
+          // Detail page will handle install and open separately
+          return '';
+        }
+      }
+    }
+
+    function starRatingHTML(rating, count = null, interactive = false, selected = 0) {
+      const fullStars = Math.floor(rating);
+      const halfStar = rating - fullStars >= 0.5 ? 1 : 0;
+      const emptyStars = 5 - fullStars - halfStar;
+      let stars = '';
+      for (let i = 1; i <= 5; i++) {
+        if (interactive) {
+          stars += `<button class="star-btn ${i <= selected ? 'active' : ''}" data-rating="${i}" aria-label="${i} star">★</button>`;
+        } else {
+          let cls = 'star';
+          if (i <= fullStars) cls += ' filled';
+          else if (i === fullStars + 1 && halfStar) cls += ' half';
+          else cls += ' empty';
+          stars += `<span class="${cls}">★</span>`;
+        }
+      }
+      let countHtml = count !== null ? `<span class="rating-count">${escapeHTML(String(count))}</span>` : '';
+      return `<div class="star-rating" role="img" aria-label="Rating: ${rating} out of 5">${stars}${countHtml}</div>`;
+    }
+
+    function showToast(message, type = 'info', duration = 3000) {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = `toast toast-${type}`;
+      toast.textContent = message;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.classList.add('out');
+        setTimeout(() => toast.remove(), 400);
+      }, duration);
+    }
+
+    function openModal(html) {
+      closeModal();
+      const modalRoot = document.getElementById('modal-root');
+      modalRoot.innerHTML = `
+        <div class="modal-overlay" id="modal-overlay">
+          <div class="modal-dialog" role="dialog" aria-modal="true">
+            <button class="modal-close" id="modal-close" aria-label="Close dialog">×</button>
+            <div class="modal-content">${html}</div>
+          </div>
+        </div>
+      `;
+      document.getElementById('modal-close').addEventListener('click', closeModal);
+      document.getElementById('modal-overlay').addEventListener('click', (e) => {
+        if (e.target === e.currentTarget) closeModal();
+      });
+      // Focus close button
+      document.getElementById('modal-close').focus();
+      // Handle Escape
+      document.addEventListener('keydown', handleModalEscape);
+    }
+
+    function closeModal() {
+      const modalRoot = document.getElementById('modal-root');
+      modalRoot.innerHTML = '';
+      document.removeEventListener('keydown', handleModalEscape);
+    }
+
+    function handleModalEscape(e) {
+      if (e.key === 'Escape') closeModal();
+    }
+
+    // ============================================================
+    // ROUTING
+    // ============================================================
+    function parseHash() {
+      const hash = location.hash.slice(1); // remove '#'
+      const [pathPart, queryPart] = hash.split('?');
+      const path = pathPart || '/';
+      const params = new URLSearchParams(queryPart || '');
+      return { path, params };
+    }
+
+    function navigate(path, params = {}) {
+      const queryString = new URLSearchParams(params).toString();
+      location.hash = queryString ? `${path}?${queryString}` : path;
+    }
+
+    function router() {
+      const { path, params } = parseHash();
+      const main = document.getElementById('main-content');
+      const navLinks = document.querySelectorAll('.nav-link');
+      navLinks.forEach(link => {
+        link.classList.toggle('active', link.getAttribute('href') === `#${path}`);
+      });
+
+      // Close any open modal on navigation
+      closeModal();
+
+      switch (path) {
+        case '/':
+          renderHome(main);
+          break;
+        case '/apps':
+          renderApps(main, params);
+          break;
+        case '/categories':
+          renderCategories(main);
+          break;
+        case '/app':
+          const appId = params.get('id') || '';
+          renderAppDetail(main, appId);
+          break;
+        case '/account':
+          renderAccount(main);
+          break;
+        case '/contact':
+          renderContact(main);
+          break;
+        default:
+          renderNotFound(main);
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // ============================================================
+    // HEADER / NAVIGATION
+    // ============================================================
+    function updateAuthUI() {
+      const authButton = document.getElementById('auth-button');
+      if (!authButton) return;
+      if (currentUser) {
+        const avatar = currentUser.photoURL ? `<img src="${escapeHTML(currentUser.photoURL)}" alt="${escapeHTML(currentUser.displayName || 'User')}" class="avatar-img">` : `<span class="avatar-fallback">${escapeHTML((currentUser.displayName || currentUser.email || 'U')[0].toUpperCase())}</span>`;
+        authButton.innerHTML = `${avatar}<span class="auth-label">${escapeHTML(currentUser.displayName || currentUser.email || 'Account')}</span>`;
+        authButton.setAttribute('href', '#/account');
+      } else {
+        authButton.innerHTML = `<span class="auth-icon">👤</span><span class="auth-label">Sign In</span>`;
+        authButton.setAttribute('href', '#/account');
+      }
+    }
+
+    function initHeader() {
+      const header = document.getElementById('site-header');
+      header.innerHTML = `
+        <div class="header-inner">
+          <a href="#/" class="logo" aria-label="${escapeHTML(CONFIG.storeName)} home">
+            <span class="logo-icon">${CONFIG.storeLogo}</span>
+            <span class="logo-text">${escapeHTML(CONFIG.storeName)}</span>
+          </a>
+          <div class="search-bar">
+            <input type="search" id="header-search" placeholder="Search apps..." aria-label="Search apps" autocomplete="off">
+            <span class="search-icon">🔍</span>
+          </div>
+          <nav class="main-nav" aria-label="Main navigation">
+            <a href="#/" class="nav-link">Home</a>
+            <a href="#/categories" class="nav-link">Categories</a>
+            <a href="#/contact" class="nav-link">Contact</a>
+            <a href="#/account" id="auth-button" class="btn btn-secondary btn-auth">Sign In</a>
+          </nav>
+          <button class="hamburger" id="hamburger" aria-label="Toggle menu" aria-expanded="false">☰</button>
+        </div>
+        <div class="mobile-nav" id="mobile-nav" hidden>
+          <a href="#/" class="nav-link">Home</a>
+          <a href="#/categories" class="nav-link">Categories</a>
+          <a href="#/contact" class="nav-link">Contact</a>
+          <a href="#/account" class="nav-link">Account</a>
+        </div>
+      `;
+
+      // Hamburger toggle
+      document.getElementById('hamburger').addEventListener('click', () => {
+        const nav = document.getElementById('mobile-nav');
+        const expanded = document.getElementById('hamburger').getAttribute('aria-expanded') === 'true';
+        document.getElementById('hamburger').setAttribute('aria-expanded', !expanded);
+        nav.hidden = expanded;
+      });
+
+      // Header search
+      const searchInput = document.getElementById('header-search');
+      let debounceTimer;
+      searchInput.addEventListener('input', (e) => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          const query = e.target.value.trim();
+          const currentHash = parseHash();
+          if (currentHash.path === '/apps') {
+            const newParams = new URLSearchParams(currentHash.params);
+            if (query) newParams.set('search', query);
+            else newParams.delete('search');
+            navigate('/apps', Object.fromEntries(newParams));
+          } else {
+            const params = {};
+            if (query) params.search = query;
+            navigate('/apps', params);
+          }
+        }, 300);
+      });
+
+      // Sync header search if we navigate with search param
+      window.addEventListener('hashchange', () => {
+        const { path, params } = parseHash();
+        if (path === '/apps') {
+          const searchVal = params.get('search') || '';
+          if (document.activeElement !== searchInput) searchInput.value = searchVal;
+        } else {
+          searchInput.value = '';
+        }
+      });
+
+      updateAuthUI();
+    }
+
+    // ============================================================
+    // HOME PAGE
+    // ============================================================
+    function renderHome(container) {
+      const featured = APP_CATALOG.filter(a => a.featured).slice(0, 4);
+      const popular = [...APP_CATALOG].sort((a,b) => b.ratingCount - a.ratingCount).slice(0, 6);
+      const recent = [...APP_CATALOG].sort((a,b) => new Date(b.updatedDate) - new Date(a.updatedDate)).slice(0, 4);
+      const categories = [...new Set(APP_CATALOG.map(a => a.category))].slice(0, 6);
+
+      container.innerHTML = `
+        <section class="hero">
+          <div class="hero-content">
+            <h1>${escapeHTML(CONFIG.storeTagline)}</h1>
+            <p>Your one-stop shop for progressive web apps and trusted web activities. Install or download with confidence.</p>
+            <a href="#/apps" class="btn btn-primary btn-lg">Browse All Apps</a>
+          </div>
+        </section>
+
+        ${featured.length ? `
+        <section class="section">
+          <div class="section-header">
+            <h2>Featured Apps</h2>
+            <a href="#/apps?featured=1" class="see-all">See all</a>
+          </div>
+          <div class="app-grid">
+            ${featured.map(app => renderAppCard(app)).join('')}
+          </div>
+        </section>` : ''}
+
+        ${popular.length ? `
+        <section class="section">
+          <div class="section-header">
+            <h2>Popular Apps</h2>
+            <a href="#/apps?sort=popularity" class="see-all">See all</a>
+          </div>
+          <div class="app-grid">
+            ${popular.map(app => renderAppCard(app)).join('')}
+          </div>
+        </section>` : ''}
+
+        ${recent.length ? `
+        <section class="section">
+          <div class="section-header">
+            <h2>Recently Updated</h2>
+            <a href="#/apps?sort=newest" class="see-all">See all</a>
+          </div>
+          <div class="app-grid">
+            ${recent.map(app => renderAppCard(app)).join('')}
+          </div>
+        </section>` : ''}
+
+        ${categories.length ? `
+        <section class="section">
+          <div class="section-header">
+            <h2>Browse Categories</h2>
+            <a href="#/categories" class="see-all">All categories</a>
+          </div>
+          <div class="category-chips">
+            ${categories.map(cat => `<a href="#/apps?category=${encodeURIComponent(cat)}" class="chip">${escapeHTML(cat)}</a>`).join('')}
+          </div>
+        </section>` : ''}
+      `;
+    }
+
+    function renderAppCard(app) {
+      return `
+        <article class="app-card" data-app-id="${app.id}">
+          <a href="#/app/${app.id}" class="card-link" aria-label="${escapeHTML(app.name)}">
+            <img src="${createAppIcon(app)}" alt="${escapeHTML(app.name)} icon" class="app-icon" loading="lazy">
+            <div class="card-info">
+              <h3 class="app-name">${escapeHTML(app.name)}</h3>
+              <p class="app-developer">${escapeHTML(app.developer)}</p>
+              <p class="app-short-desc">${escapeHTML(app.shortDescription)}</p>
+              <div class="card-meta">
+                <span class="app-type-badge ${app.appType.toLowerCase()}">${app.appType}</span>
+                ${starRatingHTML(app.rating, app.ratingCount)}
+              </div>
+            </div>
+          </a>
+          <div class="card-actions">
+            ${getAppActionButton(app)}
+          </div>
+        </article>
+      `;
+    }
+
+    // ============================================================
+    // APPS LISTING (SEARCH / FILTER / SORT)
+    // ============================================================
+    function renderApps(container, params) {
+      const searchQuery = params.get('search') || '';
+      const category = params.get('category') || '';
+      const type = params.get('type') || '';
+      const minRating = params.get('rating') ? parseInt(params.get('rating')) : 0;
+      const sort = params.get('sort') || 'popularity';
+
+      let filtered = [...APP_CATALOG];
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        filtered = filtered.filter(app => {
+          return app.name.toLowerCase().includes(q) ||
+            app.developer.toLowerCase().includes(q) ||
+            app.shortDescription.toLowerCase().includes(q) ||
+            app.fullDescription.toLowerCase().includes(q) ||
+            app.category.toLowerCase().includes(q) ||
+            app.tags.some(t => t.toLowerCase().includes(q));
+        });
+      }
+      if (category) {
+        filtered = filtered.filter(app => app.category === category);
+      }
+      if (type) {
+        filtered = filtered.filter(app => app.appType === type.toUpperCase());
+      }
+      if (minRating) {
+        filtered = filtered.filter(app => app.rating >= minRating);
+      }
+
+      // Sorting
+      switch (sort) {
+        case 'name':
+          filtered.sort((a,b) => a.name.localeCompare(b.name));
+          break;
+        case 'rating':
+          filtered.sort((a,b) => b.rating - a.rating);
+          break;
+        case 'newest':
+          filtered.sort((a,b) => new Date(b.updatedDate) - new Date(a.updatedDate));
+          break;
+        case 'popularity':
+        default:
+          filtered.sort((a,b) => b.ratingCount - a.ratingCount);
+      }
+
+      const categories = [...new Set(APP_CATALOG.map(a => a.category))].sort();
+
+      container.innerHTML = `
+        <div class="apps-page">
+          <div class="apps-header">
+            <h1>Browse Apps</h1>
+            <p>Discover your next favorite app.</p>
+          </div>
+
+          <div class="filters-bar">
+            <div class="filter-group">
+              <label for="filter-category">Category</label>
+              <select id="filter-category">
+                <option value="">All Categories</option>
+                ${categories.map(c => `<option value="${escapeHTML(c)}" ${category===c?'selected':''}>${escapeHTML(c)}</option>`).join('')}
+              </select>
+            </div>
+            <div class="filter-group">
+              <label for="filter-type">Type</label>
+              <select id="filter-type">
+                <option value="">All Types</option>
+                <option value="PWA" ${type==='PWA'?'selected':''}>PWA</option>
+                <option value="TWA" ${type==='TWA'?'selected':''}>TWA</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <label for="filter-rating">Rating</label>
+              <select id="filter-rating">
+                <option value="0">Any Rating</option>
+                <option value="4" ${minRating===4?'selected':''}>4★ & up</option>
+                <option value="3" ${minRating===3?'selected':''}>3★ & up</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <label for="filter-sort">Sort by</label>
+              <select id="filter-sort">
+                <option value="popularity" ${sort==='popularity'?'selected':''}>Popularity</option>
+                <option value="rating" ${sort==='rating'?'selected':''}>Rating</option>
+                <option value="newest" ${sort==='newest'?'selected':''}>Newest</option>
+                <option value="name" ${sort==='name'?'selected':''}>Name</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="results-count">${filtered.length} app${filtered.length !== 1 ? 's' : ''} found</div>
+
+          ${filtered.length ? `
+            <div class="app-grid">
+              ${filtered.map(app => renderAppCard(app)).join('')}
+            </div>
+          ` : `
+            <div class="empty-state">
+              <div class="empty-icon">🔍</div>
+              <h3>No apps found</h3>
+              <p>Try adjusting your search or filters.</p>
+            </div>
+          `}
+        </div>
+      `;
+
+      // Add event listeners to filters
+      const filterCategory = document.getElementById('filter-category');
+      const filterType = document.getElementById('filter-type');
+      const filterRating = document.getElementById('filter-rating');
+      const filterSort = document.getElementById('filter-sort');
+
+      function updateFilters() {
+        const newParams = {};
+        if (searchQuery) newParams.search = searchQuery;
+        if (filterCategory.value) newParams.category = filterCategory.value;
+        if (filterType.value) newParams.type = filterType.value;
+        if (filterRating.value !== '0') newParams.rating = filterRating.value;
+        if (filterSort.value && filterSort.value !== 'popularity') newParams.sort = filterSort.value;
+        navigate('/apps', newParams);
+      }
+
+      [filterCategory, filterType, filterRating, filterSort].forEach(el => {
+        el.addEventListener('change', updateFilters);
+      });
+    }
+
+    // ============================================================
+    // CATEGORIES PAGE
+    // ============================================================
+    function renderCategories(container) {
+      const categories = {};
+      APP_CATALOG.forEach(app => {
+        if (!categories[app.category]) categories[app.category] = [];
+        categories[app.category].push(app);
+      });
+      const categoryNames = Object.keys(categories).sort();
+
+      container.innerHTML = `
+        <div class="categories-page">
+          <h1>Categories</h1>
+          <p>Browse apps by category.</p>
+          <div class="category-grid">
+            ${categoryNames.map(cat => `
+              <a href="#/apps?category=${encodeURIComponent(cat)}" class="category-card">
+                <span class="category-icon">${getCategoryIcon(cat)}</span>
+                <h3>${escapeHTML(cat)}</h3>
+                <p>${categories[cat].length} app${categories[cat].length !== 1 ? 's' : ''}</p>
+              </a>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function getCategoryIcon(category) {
+      const map = {
+        'Productivity': '📊',
+        'Health & Fitness': '🧘',
+        'Finance': '💰',
+        'Photography': '📷',
+        'Food & Drink': '🍽️'
+      };
+      return map[category] || '📱';
+    }
+
+    // ============================================================
+    // APP DETAIL PAGE
+    // ============================================================
+    async function renderAppDetail(container, appId) {
+      const app = getAppById(appId);
+      if (!app) {
+        renderNotFound(container);
+        return;
+      }
+
+      container.innerHTML = `
+        <div class="app-detail">
+          <button class="back-btn" onclick="history.back()" aria-label="Go back">← Back</button>
+          <div class="detail-hero">
+            <img src="${createAppIcon(app, 120)}" alt="${escapeHTML(app.name)} icon" class="detail-icon">
+            <div class="detail-info">
+              <h1>${escapeHTML(app.name)}</h1>
+              <p class="detail-developer">by ${escapeHTML(app.developer)}</p>
+              <div class="detail-rating">
+                ${starRatingHTML(app.rating, app.ratingCount)}
+              </div>
+              <div class="detail-meta">
+                <span class="badge">${escapeHTML(app.category)}</span>
+                <span class="badge ${app.appType.toLowerCase()}">${app.appType}</span>
+                <span class="badge">v${escapeHTML(app.version)}</span>
+              </div>
+            </div>
+            <div class="detail-actions" id="detail-actions">
+              ${renderAppActions(app)}
+            </div>
+          </div>
+
+          <div class="detail-section">
+            <h2>About this app</h2>
+            <p>${escapeHTML(app.fullDescription)}</p>
+          </div>
+
+          <div class="detail-section">
+            <h2>Screenshots</h2>
+            <div class="screenshots-container">
+              ${app.screenshots.map(src => `<img src="${escapeHTML(src)}" alt="${escapeHTML(app.name)} screenshot" loading="lazy" class="screenshot">`).join('')}
+            </div>
+          </div>
+
+          <div class="detail-section">
+            <h2>Features</h2>
+            <ul class="features-list">
+              ${app.tags.map(tag => `<li>${escapeHTML(tag)}</li>`).join('')}
+            </ul>
+          </div>
+
+          <div class="detail-section">
+            <h2>Information</h2>
+            <table class="info-table">
+              <tr><th>Version</th><td>${escapeHTML(app.version)}</td></tr>
+              <tr><th>Updated</th><td>${formatDate(app.updatedDate)}</td></tr>
+              <tr><th>Released</th><td>${formatDate(app.releaseDate)}</td></tr>
+              <tr><th>Platforms</th><td>${app.platforms.join(', ')}</td></tr>
+            </table>
+          </div>
+
+          <div class="detail-section rating-section" id="rating-section">
+            <h2>Ratings & Reviews</h2>
+            <div id="rating-summary">
+              <p>Loading ratings...</p>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // If Firebase is available, load ratings from Firestore
+      if (db && auth) {
+        loadRatings(appId).then(ratingData => {
+          updateRatingUI(appId, ratingData);
+        }).catch(err => {
+          console.error('Error loading ratings:', err);
+          // fallback to static rating
+          updateRatingUI(appId, { average: app.rating, count: app.ratingCount, userRating: null });
+        });
+      } else {
+        // Show static rating if Firebase not configured
+        updateRatingUI(appId, { average: app.rating, count: app.ratingCount, userRating: null });
+      }
+    }
+
+    function renderAppActions(app) {
+      if (app.appType === 'TWA') {
+        return `<a href="${escapeHTML(app.downloadUrl || '#')}" class="btn btn-primary btn-lg" target="_blank" rel="noopener">Download for Android</a>`;
+      } else {
+        // PWA
+        let installButton = '';
+        if (deferredPrompt) {
+          installButton = `<button class="btn btn-primary btn-lg" id="install-btn">Install App</button>`;
+        } else {
+          // Show instructions instead of fake button
+          installButton = `<div class="install-instructions">To install, use your browser's menu and select "Add to Home Screen" or "Install".</div>`;
+        }
+        return `
+          ${installButton}
+          <a href="${escapeHTML(app.appUrl || '#')}" class="btn btn-secondary btn-lg" target="_blank" rel="noopener">Open App</a>
+        `;
+      }
+    }
+
+    // ============================================================
+    // FIREBASE RATINGS LOGIC
+    // ============================================================
+    async function loadRatings(appId) {
+      if (!db) return { average: 0, count: 0, userRating: null };
+      // Check cache
+      if (ratingsCache[appId]) return ratingsCache[appId];
+
+      try {
+        const ratingsCol = collection(db, 'apps', appId, 'ratings');
+        const snapshot = await getDocs(ratingsCol);
+        let total = 0, count = 0, userRating = null;
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          if (data.rating) {
+            total += data.rating;
+            count++;
+            if (currentUser && doc.id === currentUser.uid) {
+              userRating = data.rating;
+            }
+          }
+        });
+        const average = count > 0 ? total / count : 0;
+        const result = { average, count, userRating };
+        ratingsCache[appId] = result;
+        return result;
+      } catch (e) {
+        console.error('Error fetching ratings:', e);
+        return { average: 0, count: 0, userRating: null };
+      }
+    }
+
+    function updateRatingUI(appId, ratingData) {
+      const section = document.getElementById('rating-section');
+      if (!section) return;
+      const summary = document.getElementById('rating-summary');
+      if (!summary) return;
+
+      const app = getAppById(appId);
+      const average = ratingData.average || 0;
+      const count = ratingData.count || 0;
+      const userRating = ratingData.userRating || 0;
+
+      let html = `
+        <div class="rating-summary">
+          <div class="rating-average">
+            <span class="big-number">${average.toFixed(1)}</span>
+            ${starRatingHTML(average, count)}
+            <p>${count} rating${count !== 1 ? 's' : ''}</p>
+          </div>
+        </div>
+        <div class="user-rating">
+          ${currentUser ? `
+            <p>Your rating:</p>
+            <div class="interactive-stars" id="interactive-stars">
+              ${[1,2,3,4,5].map(i => `<button class="star-btn ${i <= userRating ? 'active' : ''}" data-rating="${i}" aria-label="${i} star">★</button>`).join('')}
+            </div>
+            <button class="btn btn-secondary btn-sm" id="clear-rating" ${userRating ? '' : 'disabled'}>Clear Rating</button>
+          ` : `
+            <div class="login-prompt">
+              <p>Sign in to rate this app.</p>
+              <button class="btn btn-primary" id="login-to-rate">Sign In</button>
+            </div>
+          `}
+        </div>
+      `;
+      summary.innerHTML = html;
+
+      if (currentUser) {
+        // Add event listeners for interactive stars
+        const stars = document.querySelectorAll('#interactive-stars .star-btn');
+        stars.forEach(star => {
+          star.addEventListener('click', async (e) => {
+            const rating = parseInt(e.target.dataset.rating);
+            if (!currentUser) return;
+            try {
+              await submitRating(appId, rating);
+              showToast('Rating submitted!', 'success');
+              // Reload ratings
+              const newRatingData = await loadRatings(appId);
+              updateRatingUI(appId, newRatingData);
+            } catch (err) {
+              console.error('Error submitting rating:', err);
+              showToast('Failed to submit rating. Check permissions.', 'error');
+            }
+          });
+        });
+        document.getElementById('clear-rating')?.addEventListener('click', async () => {
+          if (!currentUser) return;
+          try {
+            await submitRating(appId, 0); // send 0 to delete? We'll handle delete separately
+            // Actually we should delete doc if rating 0
+            const ratingDoc = doc(db, 'apps', appId, 'ratings', currentUser.uid);
+            await setDoc(ratingDoc, { userId: currentUser.uid, rating: 0, timestamp: serverTimestamp() }, { merge: false });
+            // But rating 0 doesn't count; better delete doc.
+            // We'll just delete.
+            const docRef = doc(db, 'apps', appId, 'ratings', currentUser.uid);
+            await deleteDoc(docRef);
+            showToast('Rating cleared', 'info');
+            const newRatingData = await loadRatings(appId);
+            updateRatingUI(appId, newRatingData);
+          } catch (err) {
+            console.error('Error clearing rating:', err);
+            showToast('Failed to clear rating.', 'error');
+          }
+        });
+      } else {
+        document.getElementById('login-to-rate')?.addEventListener('click', () => {
+          signIn().then(() => {
+            // Re-render after login
+            router();
+          });
+        });
+      }
+    }
+
+    async function submitRating(appId, rating) {
+      if (!currentUser || !db) throw new Error('Not signed in');
+      const docRef = doc(db, 'apps', appId, 'ratings', currentUser.uid);
+      await setDoc(docRef, {
+        userId: currentUser.uid,
+        rating: rating,
+        timestamp: serverTimestamp()
+      });
+    }
+
+    // ============================================================
+    // ACCOUNT PAGE
+    // ============================================================
+    async function renderAccount(container) {
+      if (!currentUser) {
+        container.innerHTML = `
+          <div class="account-page">
+            <h1>Sign In</h1>
+            <p>Sign in with Google to rate apps and manage your account.</p>
+            <button class="btn btn-primary btn-lg" id="google-signin">Sign In with Google</button>
+          </div>
+        `;
+        document.getElementById('google-signin')?.addEventListener('click', signIn);
+        return;
+      }
+
+      container.innerHTML = `
+        <div class="account-page">
+          <div class="profile-card">
+            ${currentUser.photoURL ? `<img src="${escapeHTML(currentUser.photoURL)}" alt="Profile" class="profile-avatar">` : `<div class="profile-avatar fallback">${escapeHTML((currentUser.displayName || currentUser.email || 'U')[0].toUpperCase())}</div>`}
+            <h2>${escapeHTML(currentUser.displayName || 'User')}</h2>
+            <p>${escapeHTML(currentUser.email || '')}</p>
+            <button class="btn btn-secondary" id="signout-btn">Sign Out</button>
+          </div>
+
+          <div class="my-ratings-section">
+            <h3>My Ratings</h3>
+            <div id="my-ratings-list">
+              <p>Loading your ratings...</p>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('signout-btn')?.addEventListener('click', async () => {
+        try {
+          await signOut(auth);
+          showToast('Signed out successfully', 'info');
+          router();
+        } catch (e) {
+          console.error('Sign out error:', e);
+          showToast('Sign out failed', 'error');
+        }
+      });
+
+      // Load user ratings
+      try {
+        const userRatings = await getUserRatings();
+        const ratingsList = document.getElementById('my-ratings-list');
+        if (userRatings.length === 0) {
+          ratingsList.innerHTML = `<div class="empty-state"><p>You haven't rated any apps yet.</p></div>`;
+        } else {
+          ratingsList.innerHTML = userRatings.map(r => {
+            const app = getAppById(r.appId);
+            if (!app) return '';
+            return `
+              <div class="rating-item">
+                <img src="${createAppIcon(app, 40)}" alt="${escapeHTML(app.name)} icon" class="rating-app-icon">
+                <div class="rating-item-info">
+                  <a href="#/app/${app.id}">${escapeHTML(app.name)}</a>
+                  <span>${starRatingHTML(r.rating)}</span>
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+      } catch (e) {
+        console.error('Error fetching user ratings:', e);
+        document.getElementById('my-ratings-list').innerHTML = `<p>Could not load ratings. Make sure Firestore is configured.</p>`;
+      }
+    }
+
+    async function getUserRatings() {
+      if (!db || !currentUser) return [];
+      try {
+        // Requires a collection group index on 'ratings' with field 'userId'
+        const q = query(collectionGroup(db, 'ratings'), where('userId', '==', currentUser.uid));
+        const snapshot = await getDocs(q);
+        const ratings = [];
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          const appId = doc.ref.parent.parent.id;
+          ratings.push({ appId, rating: data.rating });
+        });
+        return ratings;
+      } catch (e) {
+        console.error('Error in getUserRatings:', e);
+        return [];
+      }
+    }
+
+    // ============================================================
+    // CONTACT PAGE
+    // ============================================================
+    function renderContact(container) {
+      container.innerHTML = `
+        <div class="contact-page">
+          <h1>Contact Us</h1>
+          <p>Have a question or feedback? Fill out the form below.</p>
+          <form id="contact-form" novalidate>
+            <div class="form-group">
+              <label for="contact-name">Name *</label>
+              <input type="text" id="contact-name" name="name" required placeholder="Your name">
+              <div class="error-message" id="name-error"></div>
+            </div>
+            <div class="form-group">
+              <label for="contact-email">Email *</label>
+              <input type="email" id="contact-email" name="email" required placeholder="you@example.com">
+              <div class="error-message" id="email-error"></div>
+            </div>
+            <div class="form-group">
+              <label for="contact-subject">Subject *</label>
+              <input type="text" id="contact-subject" name="subject" required placeholder="Subject">
+              <div class="error-message" id="subject-error"></div>
+            </div>
+            <div class="form-group">
+              <label for="contact-message">Message *</label>
+              <textarea id="contact-message" name="message" rows="5" required placeholder="Your message"></textarea>
+              <div class="error-message" id="message-error"></div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-lg" id="contact-submit">Send Message</button>
+            <div class="form-status" id="form-status" aria-live="polite"></div>
+          </form>
+        </div>
+      `;
+
+      const form = document.getElementById('contact-form');
+      form.addEventListener('submit', handleContactSubmit);
+    }
+
+    async function handleContactSubmit(e) {
+      e.preventDefault();
+      const form = e.target;
+      const name = form.name.value.trim();
+      const email = form.email.value.trim();
+      const subject = form.subject.value.trim();
+      const message = form.message.value.trim();
+
+      // Reset errors
+      document.querySelectorAll('.error-message').forEach(el => el.textContent = '');
+      const status = document.getElementById('form-status');
+      status.textContent = '';
+
+      // Validation
+      let isValid = true;
+      if (!name) {
+        document.getElementById('name-error').textContent = 'Name is required.';
+        isValid = false;
+      }
+      if (!email) {
+        document.getElementById('email-error').textContent = 'Email is required.';
+        isValid = false;
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        document.getElementById('email-error').textContent = 'Invalid email address.';
+        isValid = false;
+      }
+      if (!subject) {
+        document.getElementById('subject-error').textContent = 'Subject is required.';
+        isValid = false;
+      }
+      if (!message) {
+        document.getElementById('message-error').textContent = 'Message is required.';
+        isValid = false;
+      }
+      if (!isValid) return;
+
+      // Loading state
+      const submitBtn = document.getElementById('contact-submit');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Sending...';
+      status.textContent = '';
+      status.className = 'form-status';
+
+      try {
+        if (!CONFIG.contactEndpoint) {
+          throw new Error('Contact endpoint is not configured. Please set CONFIG.contactEndpoint in the configuration section.');
+        }
+        const response = await fetch(CONFIG.contactEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, subject, message })
+        });
+        if (!response.ok) throw new Error(`HTTP error ${response.status}`);
+        status.textContent = 'Message sent successfully!';
+        status.className = 'form-status success';
+        form.reset();
+      } catch (err) {
+        status.textContent = `Failed to send message: ${err.message}`;
+        status.className = 'form-status error';
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Send Message';
+      }
+    }
+
+    // ============================================================
+    // NOT FOUND PAGE
+    // ============================================================
+    function renderNotFound(container) {
+      container.innerHTML = `
+        <div class="not-found">
+          <h1>404</h1>
+          <p>Page not found.</p>
+          <a href="#/" class="btn btn-primary">Go Home</a>
+        </div>
+      `;
+    }
+
+    // ============================================================
+    // AUTH FUNCTIONS
+    // ============================================================
+    async function signIn() {
+      if (!auth || !googleProvider) {
+        showToast('Firebase auth is not configured.', 'error');
+        return;
+      }
+      try {
+        await signInWithPopup(auth, googleProvider);
+        showToast('Signed in successfully!', 'success');
+      } catch (err) {
+        console.error('Sign in error:', err);
+        showToast('Sign in failed. Please try again.', 'error');
+      }
+    }
+
+    // ============================================================
+    // PWA INSTALL HANDLING
+    // ============================================================
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      // If currently on an app detail page, re-render to show install button
+      const { path } = parseHash();
+      if (path === '/app') {
+        router(); // re-render to update action buttons
+      }
+    });
+
+    window.addEventListener('appinstalled', () => {
+      deferredPrompt = null;
+      showToast('App installed successfully!', 'success');
+      const { path } = parseHash();
+      if (path === '/app') router();
+    });
+
+    document.addEventListener('click', async (e) => {
+      if (e.target.id === 'install-btn') {
+        if (!deferredPrompt) {
+          showToast('Install prompt not available. Use browser menu.', 'info');
+          return;
+        }
+        deferredPrompt.prompt();
+        const choice = await deferredPrompt.userChoice;
+        if (choice.outcome === 'accepted') {
+          showToast('App installed!', 'success');
+        } else {
+          showToast('Installation dismissed.', 'info');
+        }
+        deferredPrompt = null;
+      }
+    });
+
+    // ============================================================
+    // INITIALIZATION
+    // ============================================================
+    function init() {
+      initFirebase();
+      initHeader();
+      // Register service worker (uncomment after creating sw.js)
+      // if ('serviceWorker' in navigator) {
+      //   navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW registration failed', err));
+      // }
+      router();
+      window.addEventListener('hashchange', router);
+    }
+
+    // Start the app
+    init();
+  </script>
+
+  <style>
+    /* ============================================================
+       CSS RESET & BASE
+       ============================================================ */
+    :root {
+      --primary: #0f172a;
+      --primary-hover: #1e293b;
+      --secondary: #e2e8f0;
+      --secondary-hover: #cbd5e1;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --error: #ef4444;
+      --text: #0f172a;
+      --text-light: #475569;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --border: #e2e8f0;
+      --shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+      --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+      --radius: 12px;
+      --radius-sm: 8px;
+      --radius-lg: 16px;
+      --transition: all 0.2s ease;
+      --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      --max-width: 1200px;
+      --header-height: 64px;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: var(--font);
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+      transition: var(--transition);
+    }
+
+    a:hover {
+      color: var(--accent-hover);
+    }
+
+    img {
+      max-width: 100%;
+      display: block;
+    }
+
+    button {
+      font-family: inherit;
+      cursor: pointer;
+      border: none;
+      background: none;
+      color: inherit;
+      transition: var(--transition);
+    }
+
+    input, select, textarea {
+      font-family: inherit;
+      font-size: 1rem;
+      padding: 0.6rem 1rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background-color: var(--card-bg);
+      color: var(--text);
+      transition: var(--transition);
+      width: 100%;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+    }
+
+    /* ============================================================
+       HEADER
+       ============================================================ */
+    #site-header {
+      background-color: var(--card-bg);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+
+    .header-inner {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 0 1rem;
+      height: var(--header-height);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 700;
+      font-size: 1.25rem;
+      color: var(--text);
+      text-decoration: none;
+    }
+
+    .logo-icon {
+      font-size: 1.8rem;
+    }
+
+    .logo-text {
+      white-space: nowrap;
+    }
+
+    .search-bar {
+      flex: 1;
+      max-width: 400px;
+      position: relative;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .search-bar input {
+      width: 100%;
+      padding-left: 2.5rem;
+      border-radius: 9999px;
+      background-color: var(--bg);
+      border: 1px solid var(--border);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 1rem;
+      top: 50%;
+      transform: translateY(-50%);
+      opacity: 0.6;
+    }
+
+    .main-nav {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .nav-link {
+      padding: 0.5rem 0.75rem;
+      border-radius: var(--radius-sm);
+      color: var(--text-light);
+      font-weight: 500;
+      white-space: nowrap;
+      text-decoration: none;
+    }
+
+    .nav-link:hover {
+      background-color: var(--secondary);
+      color: var(--text);
+    }
+
+    .nav-link.active {
+      color: var(--accent);
+      background-color: rgba(59,130,246,0.1);
+    }
+
+    .btn-auth {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      white-space: nowrap;
+    }
+
+    .avatar-img {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .avatar-fallback {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background-color: var(--accent);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 0.9rem;
+    }
+
+    .hamburger {
+      display: none;
+      font-size: 1.5rem;
+      padding: 0.5rem;
+    }
+
+    .mobile-nav {
+      display: none;
+      flex-direction: column;
+      padding: 0.5rem 1rem;
+      background-color: var(--card-bg);
+      border-top: 1px solid var(--border);
+    }
+
+    /* ============================================================
+       BUTTONS
+       ============================================================ */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.6rem 1.2rem;
+      border-radius: var(--radius-sm);
+      font-weight: 600;
+      text-decoration: none;
+      transition: var(--transition);
+      border: 1px solid transparent;
+      cursor: pointer;
+      font-size: 0.95rem;
+      line-height: 1.2;
+    }
+
+    .btn-primary {
+      background-color: var(--accent);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background-color: var(--accent-hover);
+      color: white;
+    }
+
+    .btn-secondary {
+      background-color: var(--secondary);
+      color: var(--text);
+    }
+
+    .btn-secondary:hover {
+      background-color: var(--secondary-hover);
+      color: var(--text);
+    }
+
+    .btn-lg {
+      padding: 0.75rem 1.5rem;
+      font-size: 1.1rem;
+    }
+
+    .btn-sm {
+      padding: 0.4rem 0.8rem;
+      font-size: 0.85rem;
+    }
+
+    /* ============================================================
+       MAIN CONTENT
+       ============================================================ */
+    #main-content {
+      flex: 1;
+      max-width: var(--max-width);
+      width: 100%;
+      margin: 0 auto;
+      padding: 1.5rem 1rem;
+    }
+
+    /* ============================================================
+       HERO
+       ============================================================ */
+    .hero {
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
+      color: white;
+      border-radius: var(--radius-lg);
+      padding: 3rem 2rem;
+      margin-bottom: 2rem;
+      text-align: center;
+    }
+
+    .hero h1 {
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .hero p {
+      font-size: 1.2rem;
+      opacity: 0.9;
+      max-width: 600px;
+      margin: 0 auto 1.5rem;
+    }
+
+    .hero .btn {
+      background-color: white;
+      color: var(--primary);
+      font-weight: 700;
+    }
+
+    .hero .btn:hover {
+      background-color: var(--secondary);
+    }
+
+    /* ============================================================
+       SECTIONS
+       ============================================================ */
+    .section {
+      margin-bottom: 2.5rem;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .section-header h2 {
+      font-size: 1.5rem;
+    }
+
+    .see-all {
+      color: var(--accent);
+      font-weight: 500;
+      text-decoration: none;
+    }
+
+    /* ============================================================
+       APP GRID & CARDS
+       ============================================================ */
+    .app-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .app-card {
+      background-color: var(--card-bg);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      transition: var(--transition);
+      display: flex;
+      flex-direction: column;
+      border: 1px solid var(--border);
+    }
+
+    .app-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .card-link {
+      display: flex;
+      flex-direction: column;
+      padding: 1.25rem;
+      text-decoration: none;
+      color: inherit;
+      flex: 1;
+    }
+
+    .card-link:hover {
+      color: inherit;
+    }
+
+    .app-icon {
+      width: 72px;
+      height: 72px;
+      border-radius: 18%;
+      margin-bottom: 0.75rem;
+      background-color: var(--secondary);
+    }
+
+    .app-name {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 0.2rem;
+    }
+
+    .app-developer {
+      color: var(--text-light);
+      font-size: 0.85rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .app-short-desc {
+      font-size: 0.9rem;
+      color: var(--text-light);
+      margin-bottom: 0.75rem;
+      flex-grow: 1;
+    }
+
+    .card-meta {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .app-type-badge {
+      padding: 0.2rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+
+    .app-type-badge.pwa {
+      background-color: #dcfce7;
+      color: #166534;
+    }
+
+    .app-type-badge.twa {
+      background-color: #dbeafe;
+      color: #1e40af;
+    }
+
+    .card-actions {
+      padding: 0 1.25rem 1.25rem;
+    }
+
+    .card-actions .btn {
+      width: 100%;
+    }
+
+    /* ============================================================
+       STAR RATING
+       ============================================================ */
+    .star-rating {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.1rem;
+      font-size: 0.9rem;
+    }
+
+    .star {
+      color: #fbbf24;
+      font-size: 1rem;
+      position: relative;
+    }
+
+    .star.empty {
+      color: #e2e8f0;
+    }
+
+    .star.half {
+      color: #e2e8f0;
+      background: linear-gradient(to right, #fbbf24 50%, #e2e8f0 50%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .rating-count {
+      color: var(--text-light);
+      font-size: 0.8rem;
+      margin-left: 0.3rem;
+    }
+
+    .star-btn {
+      font-size: 1.4rem;
+      color: #e2e8f0;
+      transition: var(--transition);
+      padding: 0 0.1rem;
+      background: none;
+      border: none;
+    }
+
+    .star-btn.active {
+      color: #fbbf24;
+    }
+
+    .star-btn:hover {
+      transform: scale(1.2);
+    }
+
+    /* ============================================================
+       CHIPS & CATEGORY GRID
+       ============================================================ */
+    .category-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .chip {
+      background-color: var(--secondary);
+      padding: 0.5rem 1rem;
+      border-radius: 9999px;
+      color: var(--text);
+      text-decoration: none;
+      font-weight: 500;
+      transition: var(--transition);
+    }
+
+    .chip:hover {
+      background-color: var(--secondary-hover);
+      color: var(--text);
+    }
+
+    .category-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 1.25rem;
+      margin-top: 1.5rem;
+    }
+
+    .category-card {
+      background-color: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      text-align: center;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      text-decoration: none;
+      color: inherit;
+      transition: var(--transition);
+    }
+
+    .category-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-lg);
+      color: inherit;
+    }
+
+    .category-icon {
+      font-size: 2.5rem;
+      display: block;
+      margin-bottom: 0.5rem;
+    }
+
+    .category-card h3 {
+      font-size: 1.1rem;
+      margin-bottom: 0.3rem;
+    }
+
+    .category-card p {
+      color: var(--text-light);
+      font-size: 0.85rem;
+    }
+
+    /* ============================================================
+       APPS PAGE FILTERS
+       ============================================================ */
+    .apps-page {
+      max-width: 100%;
+    }
+
+    .apps-header {
+      margin-bottom: 1.5rem;
+    }
+
+    .apps-header h1 {
+      font-size: 2rem;
+    }
+
+    .apps-header p {
+      color: var(--text-light);
+    }
+
+    .filters-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      background-color: var(--card-bg);
+      padding: 1rem;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      margin-bottom: 1.5rem;
+    }
+
+    .filter-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      flex: 1 1 160px;
+    }
+
+    .filter-group label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-light);
+    }
+
+    .results-count {
+      margin-bottom: 1rem;
+      color: var(--text-light);
+      font-weight: 500;
+    }
+
+    /* ============================================================
+       APP DETAIL
+       ============================================================ */
+    .app-detail {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .back-btn {
+      margin-bottom: 1rem;
+      font-weight: 500;
+      color: var(--text-light);
+      background: none;
+      border: none;
+      font-size: 1rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+
+    .back-btn:hover {
+      color: var(--text);
+    }
+
+    .detail-hero {
+      display: flex;
+      gap: 1.5rem;
+      align-items: flex-start;
+      background-color: var(--card-bg);
+      border-radius: var(--radius-lg);
+      padding: 2rem;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    .detail-icon {
+      width: 110px;
+      height: 110px;
+      border-radius: 22%;
+      flex-shrink: 0;
+    }
+
+    .detail-info {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .detail-info h1 {
+      font-size: 1.8rem;
+      margin-bottom: 0.2rem;
+    }
+
+    .detail-developer {
+      color: var(--text-light);
+      margin-bottom: 0.5rem;
+    }
+
+    .detail-rating {
+      margin-bottom: 0.75rem;
+    }
+
+    .detail-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .badge {
+      padding: 0.25rem 0.6rem;
+      border-radius: 9999px;
+      background-color: var(--secondary);
+      color: var(--text);
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge.pwa {
+      background-color: #dcfce7;
+      color: #166534;
+    }
+
+    .badge.twa {
+      background-color: #dbeafe;
+      color: #1e40af;
+    }
+
+    .detail-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      min-width: 200px;
+    }
+
+    .install-instructions {
+      font-size: 0.8rem;
+      color: var(--text-light);
+      background-color: var(--bg);
+      padding: 0.75rem;
+      border-radius: var(--radius-sm);
+      border: 1px dashed var(--border);
+    }
+
+    .detail-section {
+      background-color: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      margin-bottom: 1.5rem;
+    }
+
+    .detail-section h2 {
+      margin-bottom: 1rem;
+      font-size: 1.3rem;
+    }
+
+    .screenshots-container {
+      display: flex;
+      gap: 0.75rem;
+      overflow-x: auto;
+      padding-bottom: 0.5rem;
+    }
+
+    .screenshot {
+      width: 260px;
+      height: 180px;
+      object-fit: cover;
+      border-radius: var(--radius-sm);
+      flex-shrink: 0;
+    }
+
+    .features-list {
+      list-style: none;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .features-list li {
+      background-color: var(--secondary);
+      padding: 0.4rem 0.8rem;
+      border-radius: 9999px;
+      font-size: 0.85rem;
+    }
+
+    .info-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .info-table th, .info-table td {
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+
+    .info-table th {
+      color: var(--text-light);
+      font-weight: 600;
+      width: 40%;
+    }
+
+    .rating-summary {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .big-number {
+      font-size: 2.5rem;
+      font-weight: 700;
+    }
+
+    .user-rating {
+      margin-top: 1rem;
+    }
+
+    .interactive-stars {
+      display: flex;
+      gap: 0.2rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .login-prompt {
+      background-color: var(--bg);
+      padding: 1rem;
+      border-radius: var(--radius-sm);
+      text-align: center;
+    }
+
+    /* ============================================================
+       ACCOUNT PAGE
+       ============================================================ */
+    .account-page {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .profile-card {
+      text-align: center;
+      background-color: var(--card-bg);
+      border-radius: var(--radius-lg);
+      padding: 2rem;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      margin-bottom: 1.5rem;
+    }
+
+    .profile-avatar {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      object-fit: cover;
+      margin-bottom: 1rem;
+      border: 4px solid var(--secondary);
+    }
+
+    .profile-avatar.fallback {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      background-color: var(--accent);
+      color: white;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .profile-card h2 {
+      margin-bottom: 0.2rem;
+    }
+
+    .profile-card p {
+      color: var(--text-light);
+      margin-bottom: 1rem;
+    }
+
+    .my-ratings-section {
+      background-color: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+    }
+
+    .my-ratings-section h3 {
+      margin-bottom: 1rem;
+    }
+
+    .rating-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .rating-item:last-child {
+      border-bottom: none;
+    }
+
+    .rating-app-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+    }
+
+    .rating-item-info a {
+      font-weight: 500;
+      text-decoration: none;
+    }
+
+    /* ============================================================
+       CONTACT PAGE
+       ============================================================ */
+    .contact-page {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .contact-page h1 {
+      margin-bottom: 0.5rem;
+    }
+
+    .contact-page > p {
+      color: var(--text-light);
+      margin-bottom: 1.5rem;
+    }
+
+    .form-group {
+      margin-bottom: 1rem;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 0.3rem;
+      font-weight: 600;
+    }
+
+    .error-message {
+      color: var(--error);
+      font-size: 0.8rem;
+      margin-top: 0.2rem;
+      min-height: 1.2em;
+    }
+
+    .form-status {
+      margin-top: 1rem;
+      padding: 0.75rem;
+      border-radius: var(--radius-sm);
+      text-align: center;
+      font-weight: 500;
+    }
+
+    .form-status.success {
+      background-color: #dcfce7;
+      color: #166534;
+    }
+
+    .form-status.error {
+      background-color: #fee2e2;
+      color: #b91c1c;
+    }
+
+    /* ============================================================
+       NOT FOUND
+       ============================================================ */
+    .not-found {
+      text-align: center;
+      padding: 3rem 0;
+    }
+
+    .not-found h1 {
+      font-size: 4rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .not-found p {
+      color: var(--text-light);
+      margin-bottom: 1.5rem;
+    }
+
+    /* ============================================================
+       EMPTY STATE
+       ============================================================ */
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      background-color: var(--card-bg);
+      border-radius: var(--radius);
+      border: 1px dashed var(--border);
+    }
+
+    .empty-icon {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+    }
+
+    .empty-state h3 {
+      margin-bottom: 0.5rem;
+    }
+
+    .empty-state p {
+      color: var(--text-light);
+    }
+
+    /* ============================================================
+       MODAL
+       ============================================================ */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background-color: rgba(0,0,0,0.5);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+
+    .modal-dialog {
+      background-color: var(--card-bg);
+      border-radius: var(--radius-lg);
+      max-width: 500px;
+      width: 100%;
+      max-height: 80vh;
+      overflow-y: auto;
+      padding: 1.5rem;
+      position: relative;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 0.75rem;
+      right: 0.75rem;
+      font-size: 1.5rem;
+      background: none;
+      border: none;
+      color: var(--text-light);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+
+    .modal-close:hover {
+      color: var(--text);
+      transform: rotate(90deg);
+    }
+
+    .modal-content {
+      margin-top: 0.5rem;
+    }
+
+    /* ============================================================
+       TOAST
+       ============================================================ */
+    #toast-container {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      z-index: 300;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .toast {
+      padding: 0.75rem 1.25rem;
+      border-radius: var(--radius-sm);
+      color: white;
+      font-weight: 500;
+      box-shadow: var(--shadow-lg);
+      animation: slideIn 0.3s ease;
+      background-color: var(--text);
+    }
+
+    .toast-success { background-color: var(--success); }
+    .toast-error { background-color: var(--error); }
+    .toast-info { background-color: var(--accent); }
+    .toast-warning { background-color: var(--warning); }
+
+    .toast.out {
+      opacity: 0;
+      transition: opacity 0.4s;
+    }
+
+    @keyframes slideIn {
+      from { transform: translateY(100%); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    /* ============================================================
+       SKELETON LOADING (optional)
+       ============================================================ */
+    .skeleton {
+      background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: var(--radius-sm);
+    }
+
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+
+    /* ============================================================
+       RESPONSIVE
+       ============================================================ */
+    @media (max-width: 768px) {
+      .header-inner {
+        gap: 0.75rem;
+      }
+
+      .logo-text {
+        display: none;
+      }
+
+      .search-bar {
+        max-width: none;
+        margin: 0;
+      }
+
+      .main-nav {
+        display: none;
+      }
+
+      .hamburger {
+        display: block;
+      }
+
+      .mobile-nav {
+        display: flex;
+      }
+
+      .mobile-nav .nav-link {
+        padding: 0.75rem 0;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .hero {
+        padding: 2rem 1rem;
+      }
+
+      .hero h1 {
+        font-size: 1.8rem;
+      }
+
+      .app-grid {
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        gap: 0.75rem;
+      }
+
+      .detail-hero {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+      }
+
+      .detail-actions {
+        width: 100%;
+      }
+
+      .rating-summary {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+      }
+
+      .filters-bar {
+        flex-direction: column;
+      }
+
+      .filter-group {
+        flex: 1 1 auto;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .app-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .app-card {
+        flex-direction: row;
+      }
+
+      .card-link {
+        flex-direction: row;
+        align-items: center;
+        gap: 1rem;
+      }
+
+      .app-icon {
+        width: 60px;
+        height: 60px;
+        margin-bottom: 0;
+        flex-shrink: 0;
+      }
+
+      .card-info {
+        flex: 1;
+      }
+
+      .card-actions {
+        padding: 0 1rem 1rem;
+        align-self: center;
+      }
+
+      .card-actions .btn {
+        width: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header id="site-header"></header>
+  <main id="main-content"></main>
+  <footer style="text-align:center; padding:1rem; background:var(--card-bg); border-top:1px solid var(--border); color:var(--text-light); font-size:0.85rem;">
+    &copy; 2026 AppVault Store. All rights reserved.
+  </footer>
+  <div id="toast-container"></div>
+  <div id="modal-root"></div>
+</body>
+</html>
