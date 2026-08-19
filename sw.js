@@ -1,16 +1,6 @@
-// ============================================================
-// NullVault — Service Worker
-// A service worker must live in its own file (this one) — it cannot
-// be inlined into index.html. Browsers require the SW script URL to
-// be same-origin because that URL also defines the SW's scope.
-//
-// Strategy: cache-first for the app shell (index.html, manifest,
-// settings, catalog, icons), falling back to network, with a
-// background revalidation so content updates without needing a
-// full "clear cache" cycle.
-// ============================================================
 
-const CACHE_NAME = "nullvault-v1";
+
+const CACHE_NAME = "nullvault-v2";
 
 const PRECACHE_URLS = [
   "./",
