@@ -49,7 +49,12 @@ function saveState(){
 
 /* ---------------- HELPERS ---------------- */
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
-function fmtDateISO(d){ return d.toISOString().slice(0,10); }
+function fmtDateISO(d){
+  const y = d.getFullYear();
+  const m = (d.getMonth()+1).toString().padStart(2,'0');
+  const day = d.getDate().toString().padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
 function todayISO(){ return fmtDateISO(new Date()); }
 function parseISO(iso){ const [y,m,d]=iso.split('-').map(Number); return new Date(y,m-1,d); }
 function sameDay(a,b){ return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
