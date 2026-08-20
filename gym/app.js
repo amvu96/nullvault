@@ -157,9 +157,11 @@ function showView(name){
   if(name==='workout'){
     tabbar.classList.add('hidden');
     document.body.classList.add('workout-active');
+    if(activeWorkout) ensureFinishBar();
   } else {
     tabbar.classList.remove('hidden');
     document.body.classList.remove('workout-active');
+    removeFinishBar();
   }
   syncFabState();
 
@@ -191,9 +193,6 @@ document.getElementById('btnFabStart').addEventListener('click', ()=>{
 
 document.getElementById('btnSettings').addEventListener('click', ()=>{
   showView('settings');
-  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  document.getElementById('view-settings').classList.add('active');
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   loadSettingsIntoForm();
 });
 
