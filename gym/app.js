@@ -85,7 +85,10 @@ function estimateSetKcal(met, bodyWeightKg, seconds){
 
 function estimateStrengthExerciseKcal(exercise, sets, bodyWeightKg){
   const met = exercise.met || 4.5;
-  const workSeconds = sets.filter(s=>s.done).length * 35; // ~35s time-under-tension per set
+  // Count any set with logged weight or reps as one unit of work, not just
+  // ones explicitly checked "done" — checking off a set is optional, so kcal
+  // shouldn't depend on it.
+  const workSeconds = sets.filter(s=>s.done || s.weight || s.reps).length * 35; // ~35s time-under-tension per set
   return estimateSetKcal(met, bodyWeightKg, workSeconds);
 }
 
@@ -486,7 +489,6 @@ function finishWorkout(){
   let totalKcal = 0;
   const exercisesOut = activeWorkout.exercises.map(ex=>{
     const def = findExercise(ex.exId) || {met:4.5};
-    const completedSets = ex.sets.filter(s=>s.done && (s.weight||s.reps));
     const kcal = estimateStrengthExerciseKcal(def, ex.sets, bodyWeightKg);
     totalKcal += kcal;
     return {
