@@ -5,7 +5,7 @@
 (function(){
 'use strict';
 
-const STORAGE_KEY = 'nullvault_data_v1';
+const STORAGE_KEY = 'gymtracker_data_v1';
 const LB_PER_KG = 2.20462;
 
 /* ---------------- STATE ---------------- */
@@ -109,6 +109,16 @@ function showView(name){
   document.querySelectorAll('.tab-btn').forEach(b=>{
     b.classList.toggle('active', b.dataset.view===name);
   });
+
+  const tabbar = document.querySelector('.tabbar');
+  if(name==='workout'){
+    tabbar.classList.add('hidden');
+    document.body.classList.add('workout-active');
+  } else {
+    tabbar.classList.remove('hidden');
+    document.body.classList.remove('workout-active');
+  }
+
   if(name==='home') renderHome();
   if(name==='calendar') renderCalendar();
   if(name==='log') renderExerciseLibrary();
@@ -834,7 +844,7 @@ function updateLastBackupLabel(){
 /* ---------------- BACKUP / RESTORE ---------------- */
 document.getElementById('btnExportBackup').addEventListener('click', ()=>{
   const payload = {
-    app: 'nullvault',
+    app: 'gym-tracker',
     version: 1,
     exportedAt: new Date().toISOString(),
     data: state
@@ -844,7 +854,7 @@ document.getElementById('btnExportBackup').addEventListener('click', ()=>{
   const a = document.createElement('a');
   const stamp = todayISO();
   a.href = url;
-  a.download = `nullvault-backup-${stamp}.json`;
+  a.download = `gym-tracker-backup-${stamp}.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
