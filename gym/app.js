@@ -1133,6 +1133,33 @@ function estimate1RM(weight, reps){
   return weight * (1 + reps/30);
 }
 
+// Short "last time" summary for the exercise picker, e.g. "100kg × 10" or,
+// for incline walk, "8% @ 5.5km/h · 30min". Returns null if never logged.
+function getLastPerformance(exId){
+  const def = findExercise(exId);
+  if(!def) return null;
+
+  if(def.special==='incline_walk'){
+    const sorted = [...state.sessions].sort((a,b)=>b.date.localeCompare(a.date));
+    for(const s of sorted){
+      const ex = s.exercises.find(e=>e.exId===exId && e.sets && e.sets[0] && e.sets[0].isWalk);
+      if(ex){
+        const w = ex.sets[0];
+        return `${w.incline}% @ ${w.speed}km/h · ${w.duration}min`;
+      }
+    }
+    return null;
+  }
+
+  const history = getExerciseHistory(exId);
+  if(!history.length) return null;
+  const last = history[history.length-1];
+  if(last.bestSetWeight==null || last.bestSetReps==null) return null;
+  const displayWeight = kgToDisplay(last.bestSetWeight);
+  const assistLabel = def.assisted ? ' assist' : '';
+  return `${displayWeight}${unitLabel()}${assistLabel} × ${last.bestSetReps}`;
+}
+
 function cancelWorkout(){
   if(activeWorkout.exercises.length>0){
     if(!confirm('Discard this session? All logged sets will be lost.')) return;
@@ -1357,18 +1384,22 @@ function renderExerciseLibrary(){
     return;
   }
 
-  container.innerHTML = list.map(e=>`
+  container.innerHTML = list.map(e=>{
+    const lastPerf = getLastPerformance(e.id);
+    return `
     <div class="exercise-list-item" data-ex-id="${e.id}">
       <div class="ex-icon">${e.icon}</div>
       <div class="ex-info">
         <div class="ex-name">${e.name}${e.assisted ? ' <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#3ad6ff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:1px;"><path d="M12 5v14M5 12l7 7 7-7"/></svg>' : ''}</div>
         <div class="ex-meta">${capitalize(e.muscle)} · ${capitalize(e.type)}${e.assisted ? ' · Assisted' : ''}</div>
+        ${lastPerf ? `<div class="ex-last-perf num">Last: ${lastPerf}</div>` : ''}
       </div>
       <button class="ex-add-btn" data-add-ex="${e.id}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
       </button>
     </div>
-  `).join('');
+  `;
+  }).join('');
 
   const handleTap = (exId)=>{
     if(pickerMode==='template'){
