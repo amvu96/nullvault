@@ -12,6 +12,7 @@ const LB_PER_KG = 2.20462;
 let state = loadState();
 let currentView = 'home';
 let activeWorkout = null; // {startedAt, exercises:[{exId, name, sets:[{weight,reps,done}], notes}]}
+let pickerMode = 'session'; // 'session' = adding to activeWorkout, 'template' = adding to editingTemplateExIds
 let workoutTimerInterval = null;
 let calCursor = new Date(); // month being viewed in calendar
 let customExercises = [];
@@ -132,15 +133,20 @@ function showView(name){
   if(name==='calendar') renderCalendar();
   if(name==='log') renderExerciseLibrary();
   if(name==='progress') renderProgressList();
+  if(name==='templates') renderTemplatesFullList();
   window.scrollTo(0,0);
 }
 
 document.querySelectorAll('.tab-btn').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     if(btn.dataset.view==='log' && activeWorkout){
+      pickerMode = 'session';
       showView('workout');
       renderWorkoutView();
       return;
+    }
+    if(btn.dataset.view==='log'){
+      pickerMode = 'session';
     }
     showView(btn.dataset.view);
   });
@@ -230,11 +236,11 @@ function renderTemplatesQuickRow(){
       e.stopPropagation();
       const id = e.currentTarget.dataset.deleteTemplate;
       const t = state.templates.find(x=>x.id===id);
-      if(t && confirm(`Delete template "${t.name}"?`)){
+      if(t && confirm(`Delete routine "${t.name}"?`)){
         state.templates = state.templates.filter(x=>x.id!==id);
         saveState();
         renderTemplatesQuickRow();
-        toast('Template deleted');
+        toast('Routine deleted');
       }
     });
   });
@@ -266,6 +272,144 @@ function startWorkoutFromTemplate(templateId){
   showView('workout');
   renderWorkoutView();
 }
+
+/* ---------------- TEMPLATES TAB (full management) ---------------- */
+function renderTemplatesFullList(){
+  const container = document.getElementById('templatesFullList');
+  if(!state.templates || state.templates.length===0){
+    container.innerHTML = `<div class="empty-state">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+      <p>No routines yet. Save one after finishing a session, or build one from scratch.</p>
+    </div>`;
+    return;
+  }
+  const sorted = [...state.templates].sort((a,b)=>b.createdAt-a.createdAt);
+  container.innerHTML = sorted.map(t=>{
+    const names = t.exIds.map(id=>{
+      const def = findExercise(id);
+      return def ? def.name : null;
+    }).filter(Boolean);
+    const preview = names.slice(0,3).join(' · ');
+    const more = names.length>3 ? ` +${names.length-3} more` : '';
+    return `<div class="card mb-12" data-template-card="${t.id}">
+      <div class="row" style="align-items:flex-start;">
+        <div style="flex:1; min-width:0;">
+          <div class="settings-row-label">${t.name}</div>
+          <div class="text-sm text-faint mt-4">${names.length} exercise${names.length!==1?'s':''}${preview? ' · '+preview+more : ''}</div>
+        </div>
+      </div>
+      <div class="quick-actions mt-12" style="margin-bottom:0;">
+        <button class="btn btn-primary btn-sm" style="flex:1;" data-start-template="${t.id}">Start</button>
+        <button class="btn btn-secondary btn-sm" style="flex:1;" data-edit-template="${t.id}">Edit</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  container.querySelectorAll('[data-start-template]').forEach(btn=>{
+    btn.addEventListener('click', ()=>startWorkoutFromTemplate(btn.dataset.startTemplate));
+  });
+  container.querySelectorAll('[data-edit-template]').forEach(btn=>{
+    btn.addEventListener('click', ()=>openTemplateEditor(btn.dataset.editTemplate));
+  });
+}
+
+let editingTemplateId = null; // null = creating a new template from scratch
+
+document.getElementById('btnNewTemplate').addEventListener('click', ()=>{
+  openTemplateEditor(null);
+});
+
+function openTemplateEditor(templateId){
+  editingTemplateId = templateId;
+  const template = templateId ? state.templates.find(t=>t.id===templateId) : null;
+  // working copy of exercise ids so cancelling (closing without saving) doesn't mutate state
+  editingTemplateExIds = template ? [...template.exIds] : [];
+  refreshTemplateEditorSheet(template ? template.name : '');
+  openSheet('sheetEditTemplate');
+}
+
+function refreshTemplateEditorSheet(nameValue){
+  document.getElementById('editTemplateTitle').textContent = editingTemplateId ? 'Edit template' : 'New template';
+  if(nameValue !== undefined) document.getElementById('editTemplateNameInput').value = nameValue;
+  document.getElementById('btnDeleteTemplateFromEditor').style.display = editingTemplateId ? 'flex' : 'none';
+  renderTemplateEditorExerciseList();
+}
+
+let editingTemplateExIds = [];
+
+function renderTemplateEditorExerciseList(){
+  const list = document.getElementById('editTemplateExerciseList');
+  if(editingTemplateExIds.length===0){
+    list.innerHTML = `<p class="text-sm text-faint" style="padding:8px 2px;">No exercises added yet.</p>`;
+    return;
+  }
+  list.innerHTML = editingTemplateExIds.map((exId,idx)=>{
+    const def = findExercise(exId);
+    if(!def) return '';
+    return `<div class="exercise-list-item" style="margin-bottom:6px;">
+      <div class="ex-icon">${def.icon}</div>
+      <div class="ex-info">
+        <div class="ex-name">${def.name}</div>
+        <div class="ex-meta">${capitalize(def.muscle)}</div>
+      </div>
+      <button class="template-delete" data-remove-template-ex="${idx}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14z"/></svg>
+      </button>
+    </div>`;
+  }).join('');
+  list.querySelectorAll('[data-remove-template-ex]').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      const idx = +e.currentTarget.dataset.removeTemplateEx;
+      editingTemplateExIds.splice(idx,1);
+      renderTemplateEditorExerciseList();
+    });
+  });
+}
+
+document.getElementById('btnAddExerciseToTemplate').addEventListener('click', ()=>{
+  // reuse the exercise library picker in "template" mode
+  pickerMode = 'template';
+  closeSheet('sheetEditTemplate');
+  showView('log');
+  renderExerciseLibrary();
+});
+
+document.getElementById('btnSaveTemplateEdits').addEventListener('click', ()=>{
+  const name = (document.getElementById('editTemplateNameInput').value||'').trim();
+  if(!name){ toast('Enter a routine name'); return; }
+  if(editingTemplateExIds.length===0){ toast('Add at least one exercise'); return; }
+
+  if(editingTemplateId){
+    const t = state.templates.find(x=>x.id===editingTemplateId);
+    if(t){ t.name = name; t.exIds = [...editingTemplateExIds]; }
+  } else {
+    state.templates.push({
+      id: uid(),
+      name,
+      exIds: [...editingTemplateExIds],
+      createdAt: Date.now()
+    });
+  }
+  saveState();
+  closeSheet('sheetEditTemplate');
+  toast(editingTemplateId ? 'Routine updated' : 'Routine created');
+  renderTemplatesFullList();
+  renderTemplatesQuickRow();
+});
+
+document.getElementById('btnDeleteTemplateFromEditor').addEventListener('click', ()=>{
+  if(!editingTemplateId) return;
+  const t = state.templates.find(x=>x.id===editingTemplateId);
+  if(!t) return;
+  if(confirm(`Delete routine "${t.name}"? This cannot be undone.`)){
+    state.templates = state.templates.filter(x=>x.id!==editingTemplateId);
+    saveState();
+    closeSheet('sheetEditTemplate');
+    toast('Routine deleted');
+    renderTemplatesFullList();
+    renderTemplatesQuickRow();
+  }
+});
 
 function startOfWeek(d){
   const date = new Date(d);
@@ -359,6 +503,7 @@ function formatElapsed(ms){
 }
 
 document.getElementById('btnAddExercise').addEventListener('click', ()=>{
+  pickerMode = 'session';
   showView('log');
   renderExerciseLibrary();
 });
@@ -713,7 +858,7 @@ function suggestTemplateName(){
 document.getElementById('btnConfirmSaveTemplate').addEventListener('click', ()=>{
   if(!lastFinishedSession) return;
   const name = (document.getElementById('templateNameInput').value||'').trim();
-  if(!name){ toast('Enter a template name'); return; }
+  if(!name){ toast('Enter a routine name'); return; }
 
   // dedupe exercise IDs while preserving order; skip walk-type entries
   // since they capture live session data (speed/incline/duration), not a
@@ -739,7 +884,7 @@ document.getElementById('btnConfirmSaveTemplate').addEventListener('click', ()=>
   });
   saveState();
   closeSheet('sheetSaveTemplate');
-  toast(`Template "${name}" saved`);
+  toast(`Routine "${name}" saved`);
   showView('home');
 });
 
@@ -762,12 +907,18 @@ function renderMuscleFilters(){
 function renderExerciseLibrary(){
   renderMuscleFilters();
   const barWrap = document.getElementById('activeSessionBarWrap');
-  barWrap.innerHTML = activeWorkout ? `<div class="pill pill-accent mb-12">Session active — adding to current workout</div>` : '';
+  if(pickerMode==='template'){
+    barWrap.innerHTML = `<div class="pill pill-accent mb-12">Building routine — tap an exercise to add it</div>`;
+  } else {
+    barWrap.innerHTML = activeWorkout ? `<div class="pill pill-accent mb-12">Session active — adding to current workout</div>` : '';
+  }
 
   const query = (document.getElementById('exerciseSearchInput').value||'').toLowerCase().trim();
   let list = allExercises().filter(e=>{
     const matchesMuscle = activeMuscleFilter==='all' || e.muscle===activeMuscleFilter;
     const matchesQuery = !query || e.name.toLowerCase().includes(query);
+    // incline walk has no meaningful set structure, so exclude it from template building
+    if(pickerMode==='template' && e.special==='incline_walk') return false;
     return matchesMuscle && matchesQuery;
   });
 
@@ -793,17 +944,39 @@ function renderExerciseLibrary(){
     </div>
   `).join('');
 
+  const handleTap = (exId)=>{
+    if(pickerMode==='template'){
+      addExerciseToTemplateDraft(exId);
+    } else {
+      addExerciseToWorkout(exId);
+    }
+  };
   container.querySelectorAll('[data-add-ex]').forEach(btn=>{
     btn.addEventListener('click', (e)=>{
       e.stopPropagation();
-      addExerciseToWorkout(btn.dataset.addEx);
+      handleTap(btn.dataset.addEx);
     });
   });
   container.querySelectorAll('.exercise-list-item').forEach(item=>{
     item.addEventListener('click', ()=>{
-      addExerciseToWorkout(item.dataset.exId);
+      handleTap(item.dataset.exId);
     });
   });
+}
+
+function addExerciseToTemplateDraft(exId){
+  const def = findExercise(exId);
+  if(!def) return;
+  if(editingTemplateExIds.includes(exId)){
+    toast(`${def.name} already in routine`);
+    return;
+  }
+  editingTemplateExIds.push(exId);
+  toast(`Added ${def.name}`);
+  pickerMode = 'session';
+  showView('templates');
+  refreshTemplateEditorSheet(); // preserves name input, since nameValue is undefined
+  openSheet('sheetEditTemplate');
 }
 
 function capitalize(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
