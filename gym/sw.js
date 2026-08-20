@@ -1,4 +1,12 @@
-const CACHE_NAME = 'gym-tracker-cache-v12';
+/* Network-first for same-origin app files: always try to fetch the latest
+   version first, so code fixes reach the user on next load without needing
+   to remember to bump CACHE_NAME. Falls back to the cached copy only when
+   the network is unavailable (offline at the gym), which is what keeps the
+   app usable without a connection. Cross-origin requests (e.g. Firebase SDK
+   imports from gstatic.com) are left alone entirely — never cached, always
+   fetched normally, since caching third-party CDN code here isn't useful. */
+
+const CACHE_NAME = 'gym-tracker-cache-v4';
 const ASSETS = [
   './',
   './index.html',
@@ -25,16 +33,19 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+
+  const url = event.request.url;
+  if (!url.startsWith(self.location.origin)) return; // let cross-origin requests pass through untouched
+
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request).then((response) => {
-        if (response.ok && event.request.url.startsWith(self.location.origin)) {
+    fetch(event.request)
+      .then((response) => {
+        if (response.ok) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         }
         return response;
-      }).catch(() => cached);
-    })
+      })
+      .catch(() => caches.match(event.request)) // offline fallback to last cached copy
   );
 });
