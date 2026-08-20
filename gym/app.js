@@ -573,13 +573,25 @@ function renderWorkoutView(){
     }
 
     const exDef = findExercise(ex.exId) || {name:ex.name, met:4.5};
+    const isAssisted = !!exDef.assisted;
     const history = getExerciseHistory(ex.exId);
-    const best = history.length ? Math.max(...history.map(h=>h.maxWeight)) : 0;
-    const currentMax = Math.max(0,...ex.sets.map(s=>parseFloat(s.weight)||0));
-    const isPR = best>0 && currentMax>best;
 
-    const sparkPoints = history.slice(-6).map(h=>h.maxWeight);
-    const sparkline = sparkPoints.length>=2 ? buildSparkline(sparkPoints) : '';
+    let isPR = false, best = 0, sparkPoints = [];
+    if(isAssisted){
+      const bests = history.map(h=>h.minWeight);
+      best = bests.length ? Math.min(...bests) : null;
+      const currentAssistValues = ex.sets.map(s=>parseFloat(s.weight)).filter(w=>!isNaN(w) && w>=0);
+      const currentMin = currentAssistValues.length ? Math.min(...currentAssistValues) : null;
+      isPR = best!==null && currentMin!==null && currentMin<best;
+      sparkPoints = history.slice(-6).map(h=>h.minWeight);
+    } else {
+      best = history.length ? Math.max(...history.map(h=>h.maxWeight)) : 0;
+      const currentMax = Math.max(0,...ex.sets.map(s=>parseFloat(s.weight)||0));
+      isPR = best>0 && currentMax>best;
+      sparkPoints = history.slice(-6).map(h=>h.maxWeight);
+    }
+
+    const sparkline = sparkPoints.length>=2 ? buildSparkline(sparkPoints, isAssisted) : '';
 
     return `<div class="logging-exercise-card" data-ex-idx="${exIdx}">
       <div class="logging-exercise-header">
@@ -588,14 +600,18 @@ function renderWorkoutView(){
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14z"/></svg>
         </button>
       </div>
+      ${isAssisted ? `<div class="pill" style="margin-bottom:10px; color:var(--cyan); border-color:#3ad6ff40; background:#3ad6ff14;">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+        Lower assistance is better
+      </div>` : ''}
       ${sparkline ? `<div class="sparkline-row">${sparkline}<span class="sparkline-label">last ${sparkPoints.length} sessions</span>${isPR?'<span class="pr-badge">PR</span>':''}</div>` : ''}
       <div class="set-headers">
-        <span>#</span><span>${unitLabel()}</span><span>Reps</span><span>Difficulty</span><span></span>
+        <span>#</span><span>${unitLabel()}${isAssisted?' assist':''}</span><span>Reps</span><span>Difficulty</span><span></span>
       </div>
       ${ex.sets.map((set,setIdx)=>`
         <div class="set-row">
           <div class="set-num num">${setIdx+1}</div>
-          <input type="number" inputmode="decimal" placeholder="0" value="${set.weight||''}" data-set-field="weight" data-ex-idx="${exIdx}" data-set-idx="${setIdx}">
+          <input type="number" inputmode="decimal" placeholder="0" value="${set.weight===0?'0':(set.weight||'')}" data-set-field="weight" data-ex-idx="${exIdx}" data-set-idx="${setIdx}">
           <input type="number" inputmode="numeric" placeholder="0" value="${set.reps||''}" data-set-field="reps" data-ex-idx="${exIdx}" data-set-idx="${setIdx}">
           <div class="difficulty-group" data-ex-idx="${exIdx}" data-set-idx="${setIdx}">
             <button type="button" class="difficulty-btn ${(set.difficulty||'medium')==='easy'?'active':''}" data-diff="easy">E</button>
@@ -681,32 +697,50 @@ function attachWorkoutCardListeners(){
   });
 }
 
-function buildSparkline(points){
+function buildSparkline(points, invert){
   const w=90,h=26,pad=3;
   const min = Math.min(...points), max = Math.max(...points);
   const range = (max-min)||1;
   const stepX = (w-pad*2)/(points.length-1);
   const coords = points.map((p,i)=>{
     const x = pad+i*stepX;
-    const y = h-pad-((p-min)/range)*(h-pad*2);
+    // normal: higher value draws higher on the chart (lower y).
+    // inverted (assisted exercises): lower value draws higher, since less
+    // assistance is the improvement direction.
+    const normalized = invert ? (max-p)/range : (p-min)/range;
+    const y = h-pad-normalized*(h-pad*2);
     return [x,y];
   });
   const path = coords.map((c,i)=>(i===0?'M':'L')+c[0].toFixed(1)+' '+c[1].toFixed(1)).join(' ');
   const lastPoint = coords[coords.length-1];
+  const color = invert ? '#3ad6ff' : '#39ff9a';
   return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
-    <path d="${path}" fill="none" stroke="#39ff9a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-    <circle cx="${lastPoint[0]}" cy="${lastPoint[1]}" r="2.5" fill="#39ff9a"/>
+    <path d="${path}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="${lastPoint[0]}" cy="${lastPoint[1]}" r="2.5" fill="${color}"/>
   </svg>`;
 }
 
 function getExerciseHistory(exId){
   const out = [];
+  const exDef = findExercise(exId);
+  const isAssisted = exDef && exDef.assisted;
   const sorted = [...state.sessions].sort((a,b)=>a.date.localeCompare(b.date));
   sorted.forEach(s=>{
     const ex = s.exercises.find(e=>e.exId===exId);
     if(ex && ex.sets && ex.sets.length){
-      const weights = ex.sets.map(st=>parseFloat(st.weight)||0).filter(w=>w>0);
-      if(weights.length) out.push({date:s.date, maxWeight:Math.max(...weights)});
+      // For assisted exercises, 0kg assistance is a real, meaningful value
+      // (full bodyweight, no help) so it must not be filtered out. For normal
+      // lifts, 0 means "not entered" and should be excluded.
+      const weights = ex.sets
+        .map(st=>parseFloat(st.weight))
+        .filter(w=>!isNaN(w) && (isAssisted ? w>=0 : w>0));
+      if(weights.length){
+        out.push({
+          date:s.date,
+          maxWeight:Math.max(...weights),
+          minWeight:Math.min(...weights)
+        });
+      }
     }
   });
   return out;
@@ -935,8 +969,8 @@ function renderExerciseLibrary(){
     <div class="exercise-list-item" data-ex-id="${e.id}">
       <div class="ex-icon">${e.icon}</div>
       <div class="ex-info">
-        <div class="ex-name">${e.name}</div>
-        <div class="ex-meta">${capitalize(e.muscle)} · ${capitalize(e.type)}</div>
+        <div class="ex-name">${e.name}${e.assisted ? ' <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#3ad6ff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:1px;"><path d="M12 5v14M5 12l7 7 7-7"/></svg>' : ''}</div>
+        <div class="ex-meta">${capitalize(e.muscle)} · ${capitalize(e.type)}${e.assisted ? ' · Assisted' : ''}</div>
       </div>
       <button class="ex-add-btn" data-add-ex="${e.id}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
@@ -1207,11 +1241,18 @@ function renderProgressList(){
     s.exercises.forEach(ex=>{
       if(!ex.sets || !ex.sets.length) return;
       if(ex.sets[0].isWalk) return; // walks tracked separately, not in strength progression
-      if(!map[ex.exId]) map[ex.exId] = {name:ex.name, entries:[]};
-      const weights = ex.sets.map(st=>parseFloat(st.weight)||0).filter(w=>w>0);
-      const maxW = weights.length ? Math.max(...weights) : 0;
+      const exDef = findExercise(ex.exId);
+      const isAssisted = !!(exDef && exDef.assisted);
+      if(!map[ex.exId]) map[ex.exId] = {name:ex.name, entries:[], assisted:isAssisted};
+      // for assisted exercises 0kg assistance is a real, meaningful value
+      // (no help at all) and must not be filtered out like a blank entry.
+      const weights = ex.sets
+        .map(st=>parseFloat(st.weight))
+        .filter(w=>!isNaN(w) && (isAssisted ? w>=0 : w>0));
+      const maxW = weights.length ? Math.max(...weights) : null;
+      const minW = weights.length ? Math.min(...weights) : null;
       const totalReps = ex.sets.reduce((a,st)=>a+(parseFloat(st.reps)||0),0);
-      map[ex.exId].entries.push({date:s.date, maxWeight:maxW, sets:ex.sets.length, totalReps});
+      map[ex.exId].entries.push({date:s.date, maxWeight:maxW, minWeight:minW, sets:ex.sets.length, totalReps});
     });
   });
 
@@ -1232,19 +1273,26 @@ function renderProgressList(){
 
   container.innerHTML = entries.map(([exId,v])=>{
     const sorted = v.entries.sort((a,b)=>a.date.localeCompare(b.date));
-    const points = sorted.map(e=>e.maxWeight).filter(w=>w>0);
-    const best = points.length ? Math.max(...points) : 0;
+    const isAssisted = v.assisted;
+    const points = isAssisted
+      ? sorted.map(e=>e.minWeight).filter(w=>w!==null)
+      : sorted.map(e=>e.maxWeight).filter(w=>w!==null && w>0);
+    const best = points.length ? (isAssisted ? Math.min(...points) : Math.max(...points)) : null;
     const latest = sorted[sorted.length-1];
-    const spark = points.length>=2 ? buildSparkline(points.slice(-10)) : '<span class="text-faint text-sm">Not enough data</span>';
-    const displayBest = kgToDisplay(best);
+    const spark = points.length>=2 ? buildSparkline(points.slice(-10), isAssisted) : '<span class="text-faint text-sm">Not enough data</span>';
+    const displayBest = best!==null ? kgToDisplay(best) : null;
     return `<div class="progress-ex-card">
       <div class="progress-ex-header">
         <h3>${v.name}</h3>
         <span class="pill">${sorted.length} session${sorted.length!==1?'s':''}</span>
       </div>
+      ${isAssisted ? `<div class="pill" style="margin-top:8px; color:var(--cyan); border-color:#3ad6ff40; background:#3ad6ff14;">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+        Lower assistance is better
+      </div>` : ''}
       <div class="sparkline-row mt-8">${spark}<span class="sparkline-label">progression</span></div>
       <div class="progress-ex-stats">
-        <div class="progress-ex-stat"><div class="v num">${displayBest||'–'}</div><div class="l">Best ${unitLabel()}</div></div>
+        <div class="progress-ex-stat"><div class="v num">${displayBest!==null ? displayBest : '–'}</div><div class="l">${isAssisted ? 'Least assist' : 'Best'} ${unitLabel()}</div></div>
         <div class="progress-ex-stat"><div class="v num">${latest.sets}</div><div class="l">Last sets</div></div>
         <div class="progress-ex-stat"><div class="v num">${latest.totalReps}</div><div class="l">Last reps</div></div>
       </div>
@@ -1418,20 +1466,25 @@ function showSessionDetail(session){
       <div class="stat-box"><div class="v num">${session.durationMin}</div><div class="l">Minutes</div></div>
       <div class="stat-box"><div class="v num" style="color:var(--positive);">${Math.round(sessionTotalKcal(session))}</div><div class="l">Kcal</div></div>
     </div>
-    ${session.exercises.map(ex=>`
+    ${session.exercises.map(ex=>{
+      const exDef = findExercise(ex.exId);
+      const isAssisted = !!(exDef && exDef.assisted);
+      return `
       <div class="mb-12">
-        <div class="settings-row-label mb-8">${ex.name}</div>
+        <div class="settings-row-label mb-8">${ex.name}${isAssisted ? ' <span class="text-faint text-sm">(assisted — lower is better)</span>' : ''}</div>
         ${ex.sets.map((s,i)=>{
           if(s.isWalk){
             return `<div class="text-sm text-muted">${s.duration} min @ ${s.speed} km/h, ${s.incline}% incline</div>`;
           }
-          const w = kgToDisplay(parseFloat(s.weight)||0);
+          const wNum = parseFloat(s.weight);
+          const w = kgToDisplay(isNaN(wNum) ? 0 : wNum);
+          const wDisplay = (s.weight===0 || s.weight==='0' || w>0) ? w : '–';
           const diffLabel = {easy:'Easy', medium:'Medium', hard:'Hard'}[s.difficulty] || 'Medium';
-          return `<div class="text-sm text-muted num">Set ${i+1}: ${w||'–'} ${unitLabel()} × ${s.reps||'–'} reps · ${diffLabel}</div>`;
+          return `<div class="text-sm text-muted num">Set ${i+1}: ${wDisplay} ${unitLabel()}${isAssisted?' assist':''} × ${s.reps||'–'} reps · ${diffLabel}</div>`;
         }).join('')}
         ${ex.notes ? `<div class="text-sm text-faint mt-4">"${ex.notes}"</div>` : ''}
       </div>
-    `).join('')}
+    `;}).join('')}
     <button class="btn btn-danger btn-block mt-16" id="btnDeleteSession" data-del="${session.id}">Delete this session</button>
   `;
   openSheet('sheetExerciseDetail');
