@@ -278,6 +278,26 @@ main{max-width:640px; margin:0 auto; padding:18px 16px 40px;}
 .session-item{cursor:pointer;}
 .session-item:active{background:var(--panel-raised);}
 
+.template-item{
+  display:flex; align-items:center; gap:12px;
+  padding:13px 4px; border-bottom:1px solid var(--border-soft);
+  cursor:pointer;
+}
+.template-item:last-child{border-bottom:none;}
+.template-item:active{background:var(--panel-raised);}
+.template-icon{
+  width:38px; height:38px; border-radius:8px; flex-shrink:0;
+  background:var(--accent-glow); border:1px solid var(--accent-dim);
+  display:flex; align-items:center; justify-content:center; color:var(--accent);
+}
+.template-icon svg{width:17px; height:17px;}
+.template-info{flex:1; min-width:0;}
+.template-title{font-size:13.5px; font-weight:600;}
+.template-meta{font-size:11.5px; color:var(--text-faint); margin-top:1px;}
+.template-delete{color:var(--text-faint); background:none; border:none; padding:6px; flex-shrink:0;}
+.template-delete svg{width:16px; height:16px;}
+.template-delete:active{color:var(--danger);}
+
 /* ============ LOG / WORKOUT VIEW ============ */
 .active-session-bar{
   position:sticky; top:64px; z-index:30;
@@ -353,7 +373,7 @@ main{max-width:640px; margin:0 auto; padding:18px 16px 40px;}
 }
 
 .set-row{
-  display:grid; grid-template-columns:26px 1fr 1fr 1fr 32px; gap:8px;
+  display:grid; grid-template-columns:22px 1fr 1fr 1.3fr 32px; gap:6px;
   align-items:center; margin-bottom:8px;
 }
 .set-row .set-num{
@@ -361,10 +381,22 @@ main{max-width:640px; margin:0 auto; padding:18px 16px 40px;}
 }
 .set-row input{
   background:var(--input-bg); border:1px solid var(--border);
-  border-radius:7px; padding:9px 8px; color:var(--text); text-align:center;
+  border-radius:7px; padding:9px 6px; color:var(--text); text-align:center;
   font-size:14px; width:100%;
 }
 .set-row input:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--accent-dim);}
+.difficulty-group{
+  display:flex; gap:3px; background:var(--input-bg); border:1px solid var(--border);
+  border-radius:7px; padding:2px;
+}
+.difficulty-btn{
+  flex:1; background:none; border:none; color:var(--text-faint);
+  font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.02em;
+  padding:7px 2px; border-radius:5px; transition:background .15s, color .15s;
+}
+.difficulty-btn.active{background:var(--accent-dim); color:var(--accent);}
+.difficulty-btn.active[data-diff="hard"]{background:#ff5f6d22; color:var(--danger);}
+.difficulty-btn.active[data-diff="easy"]{background:#3ad6ff22; color:var(--cyan);}
 .set-check{
   width:32px; height:32px; border-radius:7px; border:1px solid var(--border);
   background:var(--input-bg); color:var(--text-faint);
@@ -373,7 +405,7 @@ main{max-width:640px; margin:0 auto; padding:18px 16px 40px;}
 .set-check.checked{background:var(--accent-dim); border-color:var(--accent); color:var(--accent); box-shadow:0 0 8px -2px var(--accent-glow);}
 .set-check svg{width:15px; height:15px;}
 .set-headers{
-  display:grid; grid-template-columns:26px 1fr 1fr 1fr 32px; gap:8px;
+  display:grid; grid-template-columns:22px 1fr 1fr 1.3fr 32px; gap:6px;
   margin-bottom:6px;
 }
 .set-headers span{font-size:9px; color:var(--cyan); text-transform:uppercase; text-align:center; font-weight:700; letter-spacing:.04em; opacity:0.75;}
@@ -572,6 +604,11 @@ body.sheet-open{overflow:hidden;}
       </button>
     </div>
 
+    <div id="templatesQuickRow" style="display:none;" class="mb-12">
+      <h2 class="section-label">Templates</h2>
+      <div class="card" style="padding:6px 14px;" id="templatesQuickList"></div>
+    </div>
+
     <h2 class="section-label">Recent sessions</h2>
     <div class="card" style="padding:6px 14px;" id="recentSessionsList">
       <!-- populated -->
@@ -764,12 +801,23 @@ body.sheet-open{overflow:hidden;}
   <div class="sheet-handle"></div>
   <div class="sheet-title">Session complete</div>
   <div id="summaryContent"></div>
-  <button class="btn btn-primary btn-block mt-16" id="btnCloseSummary">Done</button>
+  <button class="btn btn-secondary btn-block mt-16" id="btnSaveAsTemplate">Save as template</button>
+  <button class="btn btn-primary btn-block mt-8" id="btnCloseSummary">Done</button>
 </div>
 
 <div class="sheet" id="sheetExerciseDetail">
   <div class="sheet-handle"></div>
   <div id="exerciseDetailContent"></div>
+</div>
+
+<div class="sheet" id="sheetSaveTemplate">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Save as template</div>
+  <div class="field" style="margin-bottom:16px;">
+    <label>Template name</label>
+    <input type="text" id="templateNameInput" placeholder="e.g. Monday — Push day" autocomplete="off">
+  </div>
+  <button class="btn btn-primary btn-block" id="btnConfirmSaveTemplate">Save template</button>
 </div>
 
 <div class="toast" id="toast">
