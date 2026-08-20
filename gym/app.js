@@ -382,17 +382,31 @@ function renderTemplateEditorExerciseList(){
   list.innerHTML = editingTemplateExIds.map((exId,idx)=>{
     const def = findExercise(exId);
     if(!def) return '';
-    return `<div class="exercise-list-item" style="margin-bottom:6px;">
+    const isFirst = idx===0, isLast = idx===editingTemplateExIds.length-1;
+    return `<div class="reorder-item" data-reorder-idx="${idx}">
+      <div class="reorder-order-num num">${idx+1}</div>
+      <div class="reorder-handle" data-drag-handle="${idx}" aria-label="Drag to reorder">
+        <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>
+      </div>
       <div class="ex-icon">${def.icon}</div>
       <div class="ex-info">
         <div class="ex-name">${def.name}</div>
         <div class="ex-meta">${capitalize(def.muscle)}</div>
+      </div>
+      <div class="reorder-nudge-group">
+        <button class="reorder-nudge-btn" data-nudge="${idx}:up" ${isFirst?'disabled':''} aria-label="Move up">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></svg>
+        </button>
+        <button class="reorder-nudge-btn" data-nudge="${idx}:down" ${isLast?'disabled':''} aria-label="Move down">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
       </div>
       <button class="template-delete" data-remove-template-ex="${idx}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14z"/></svg>
       </button>
     </div>`;
   }).join('');
+
   list.querySelectorAll('[data-remove-template-ex]').forEach(btn=>{
     btn.addEventListener('click', (e)=>{
       const idx = +e.currentTarget.dataset.removeTemplateEx;
@@ -400,6 +414,111 @@ function renderTemplateEditorExerciseList(){
       renderTemplateEditorExerciseList();
     });
   });
+  list.querySelectorAll('[data-nudge]').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      const [idxStr,dir] = e.currentTarget.dataset.nudge.split(':');
+      const idx = +idxStr;
+      const targetIdx = dir==='up' ? idx-1 : idx+1;
+      if(targetIdx<0 || targetIdx>=editingTemplateExIds.length) return;
+      const [moved] = editingTemplateExIds.splice(idx,1);
+      editingTemplateExIds.splice(targetIdx,0,moved);
+      renderTemplateEditorExerciseList();
+    });
+  });
+  list.querySelectorAll('[data-drag-handle]').forEach(handle=>{
+    handle.addEventListener('pointerdown', onReorderPointerDown);
+  });
+}
+
+/* ---------------- DRAG TO REORDER (touch + mouse via Pointer Events) ----------------
+   The dragged item's DOM node follows the pointer directly via a transform
+   (no re-rendering mid-drag, so there's nothing to get out of sync). All
+   other items in the list get a sibling transform to open/close a gap,
+   purely visual. The underlying array is only mutated once, on release,
+   then the whole list re-renders cleanly from that final order.
+------------------------------------------------- */
+let reorderDrag = null; // {startIdx, currentIdx, itemEl, siblings[], itemHeight, startY}
+
+function onReorderPointerDown(e){
+  const handle = e.currentTarget;
+  const startIdx = +handle.dataset.dragHandle;
+  const itemEl = handle.closest('.reorder-item');
+  const listEl = document.getElementById('editTemplateExerciseList');
+  if(!itemEl || !listEl) return;
+
+  e.preventDefault();
+  const itemRect = itemEl.getBoundingClientRect();
+  const styles = getComputedStyle(itemEl);
+  const itemHeight = itemRect.height + parseFloat(styles.marginBottom || 0);
+
+  const siblings = Array.from(listEl.querySelectorAll('.reorder-item')).filter(el=>el!==itemEl);
+
+  reorderDrag = {
+    startIdx,
+    currentIdx: startIdx,
+    itemEl,
+    siblings,
+    itemHeight,
+    startY: e.clientY
+  };
+
+  itemEl.classList.add('dragging');
+  itemEl.style.width = itemRect.width + 'px';
+  if(navigator.vibrate) navigator.vibrate(15);
+
+  handle.setPointerCapture(e.pointerId);
+  handle.addEventListener('pointermove', onReorderPointerMove);
+  handle.addEventListener('pointerup', onReorderPointerUp);
+  handle.addEventListener('pointercancel', onReorderPointerUp);
+}
+
+function onReorderPointerMove(e){
+  if(!reorderDrag) return;
+  const dy = e.clientY - reorderDrag.startY;
+  reorderDrag.itemEl.style.transform = `translateY(${dy}px)`;
+
+  const steps = Math.round(dy / reorderDrag.itemHeight);
+  let targetIdx = reorderDrag.startIdx + steps;
+  targetIdx = Math.max(0, Math.min(reorderDrag.siblings.length, targetIdx));
+
+  if(targetIdx !== reorderDrag.currentIdx){
+    if(navigator.vibrate) navigator.vibrate(8);
+    reorderDrag.currentIdx = targetIdx;
+  }
+
+  // shift siblings to open a gap at targetIdx: items between the drag's
+  // start slot and the current target slot slide by one item-height to
+  // make visual room, everything else stays put
+  reorderDrag.siblings.forEach((sib, sibIdx)=>{
+    // sibIdx is the sibling's position among siblings only (dragged item excluded);
+    // its "real" position in the full list is sibIdx if sibIdx<startIdx, else sibIdx+1
+    const realIdx = sibIdx < reorderDrag.startIdx ? sibIdx : sibIdx+1;
+    let shift = 0;
+    if(realIdx > reorderDrag.startIdx && realIdx <= targetIdx){
+      shift = -reorderDrag.itemHeight; // slides up to fill the gap the dragged item left
+    } else if(realIdx < reorderDrag.startIdx && realIdx >= targetIdx){
+      shift = reorderDrag.itemHeight; // slides down
+    }
+    sib.style.transform = shift ? `translateY(${shift}px)` : '';
+  });
+}
+
+function onReorderPointerUp(e){
+  if(!reorderDrag) return;
+  const handle = e.currentTarget;
+  handle.removeEventListener('pointermove', onReorderPointerMove);
+  handle.removeEventListener('pointerup', onReorderPointerUp);
+  handle.removeEventListener('pointercancel', onReorderPointerUp);
+  try{ handle.releasePointerCapture(e.pointerId); }catch(err){}
+
+  const { startIdx, currentIdx } = reorderDrag;
+  reorderDrag = null;
+
+  if(currentIdx !== startIdx){
+    const [moved] = editingTemplateExIds.splice(startIdx, 1);
+    editingTemplateExIds.splice(currentIdx, 0, moved);
+  }
+  renderTemplateEditorExerciseList(); // clean re-render clears all inline transforms/dragging state
 }
 
 document.getElementById('btnAddExerciseToTemplate').addEventListener('click', ()=>{
