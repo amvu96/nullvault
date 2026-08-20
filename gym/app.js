@@ -25,7 +25,8 @@ function defaultState(){
       useLbs: false,
       lastBackupAt: null
     },
-    customExercises: []
+    customExercises: [],
+    templates: []           // {id, name, exIds:[...], createdAt}
   };
 }
 
@@ -197,6 +198,73 @@ function renderHome(){
   }
 
   renderRecentSessions();
+  renderTemplatesQuickRow();
+}
+
+function renderTemplatesQuickRow(){
+  const wrap = document.getElementById('templatesQuickRow');
+  const list = document.getElementById('templatesQuickList');
+  if(!state.templates || state.templates.length===0){
+    wrap.style.display = 'none';
+    return;
+  }
+  wrap.style.display = 'block';
+  const sorted = [...state.templates].sort((a,b)=>b.createdAt-a.createdAt);
+  list.innerHTML = sorted.map(t=>`
+    <div class="template-item" data-template="${t.id}">
+      <div class="template-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+      </div>
+      <div class="template-info">
+        <div class="template-title">${t.name}</div>
+        <div class="template-meta">${t.exIds.length} exercise${t.exIds.length!==1?'s':''}</div>
+      </div>
+      <button class="template-delete" data-delete-template="${t.id}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14z"/></svg>
+      </button>
+    </div>
+  `).join('');
+
+  list.querySelectorAll('[data-delete-template]').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const id = e.currentTarget.dataset.deleteTemplate;
+      const t = state.templates.find(x=>x.id===id);
+      if(t && confirm(`Delete template "${t.name}"?`)){
+        state.templates = state.templates.filter(x=>x.id!==id);
+        saveState();
+        renderTemplatesQuickRow();
+        toast('Template deleted');
+      }
+    });
+  });
+  list.querySelectorAll('.template-item').forEach(item=>{
+    item.addEventListener('click', ()=>{
+      startWorkoutFromTemplate(item.dataset.template);
+    });
+  });
+}
+
+function startWorkoutFromTemplate(templateId){
+  const template = state.templates.find(t=>t.id===templateId);
+  if(!template) return;
+  if(!activeWorkout){
+    activeWorkout = {startedAt: Date.now(), date: todayISO(), exercises:[]};
+    startWorkoutTimer();
+  }
+  template.exIds.forEach(exId=>{
+    const def = findExercise(exId);
+    if(!def) return; // exercise may have been removed since template was saved
+    activeWorkout.exercises.push({
+      exId: def.id,
+      name: def.name,
+      sets: [{weight:'', reps:'', difficulty:'medium', done:false}],
+      notes:''
+    });
+  });
+  toast(`Loaded "${template.name}"`);
+  showView('workout');
+  renderWorkoutView();
 }
 
 function startOfWeek(d){
@@ -377,14 +445,18 @@ function renderWorkoutView(){
       </div>
       ${sparkline ? `<div class="sparkline-row">${sparkline}<span class="sparkline-label">last ${sparkPoints.length} sessions</span>${isPR?'<span class="pr-badge">PR</span>':''}</div>` : ''}
       <div class="set-headers">
-        <span>#</span><span>${unitLabel()}</span><span>Reps</span><span>RPE</span><span></span>
+        <span>#</span><span>${unitLabel()}</span><span>Reps</span><span>Difficulty</span><span></span>
       </div>
       ${ex.sets.map((set,setIdx)=>`
         <div class="set-row">
           <div class="set-num num">${setIdx+1}</div>
           <input type="number" inputmode="decimal" placeholder="0" value="${set.weight||''}" data-set-field="weight" data-ex-idx="${exIdx}" data-set-idx="${setIdx}">
           <input type="number" inputmode="numeric" placeholder="0" value="${set.reps||''}" data-set-field="reps" data-ex-idx="${exIdx}" data-set-idx="${setIdx}">
-          <input type="number" inputmode="numeric" placeholder="–" min="1" max="10" value="${set.rpe||''}" data-set-field="rpe" data-ex-idx="${exIdx}" data-set-idx="${setIdx}">
+          <div class="difficulty-group" data-ex-idx="${exIdx}" data-set-idx="${setIdx}">
+            <button type="button" class="difficulty-btn ${(set.difficulty||'medium')==='easy'?'active':''}" data-diff="easy">E</button>
+            <button type="button" class="difficulty-btn ${(set.difficulty||'medium')==='medium'?'active':''}" data-diff="medium">M</button>
+            <button type="button" class="difficulty-btn ${(set.difficulty||'medium')==='hard'?'active':''}" data-diff="hard">H</button>
+          </div>
           <button class="set-check ${set.done?'checked':''}" data-toggle-done="${exIdx}:${setIdx}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
           </button>
@@ -425,6 +497,14 @@ function attachWorkoutCardListeners(){
       activeWorkout.exercises[exIdx].sets[setIdx][field] = e.target.value;
     });
   });
+  document.querySelectorAll('.difficulty-btn').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      const group = e.currentTarget.closest('.difficulty-group');
+      const exIdx = +group.dataset.exIdx, setIdx = +group.dataset.setIdx;
+      activeWorkout.exercises[exIdx].sets[setIdx].difficulty = e.currentTarget.dataset.diff;
+      group.querySelectorAll('.difficulty-btn').forEach(b=>b.classList.toggle('active', b===e.currentTarget));
+    });
+  });
   document.querySelectorAll('[data-toggle-done]').forEach(btn=>{
     btn.addEventListener('click', (e)=>{
       const [exIdx,setIdx] = e.currentTarget.dataset.toggleDone.split(':').map(Number);
@@ -438,7 +518,7 @@ function attachWorkoutCardListeners(){
       const exIdx = +e.currentTarget.dataset.addSet;
       const sets = activeWorkout.exercises[exIdx].sets;
       const last = sets[sets.length-1];
-      sets.push({weight:last?last.weight:'', reps:last?last.reps:'', rpe:'', done:false});
+      sets.push({weight:last?last.weight:'', reps:last?last.reps:'', difficulty:'medium', done:false});
       renderWorkoutView();
     });
   });
@@ -533,7 +613,7 @@ function finishWorkout(){
       sets: ex.sets.filter(s=>s.weight||s.reps||s.done).map(s=>({
         weight: displayToKgIfNeeded(s.weight),
         reps: s.reps||'',
-        rpe: s.rpe||'',
+        difficulty: s.difficulty||'medium',
         done: !!s.done
       })),
       notes: ex.notes||''
@@ -579,7 +659,10 @@ function displayToKgIfNeeded(val){
   return state.settings.useLbs ? Math.round((n/LB_PER_KG)*100)/100 : n;
 }
 
+let lastFinishedSession = null;
+
 function showSessionSummary(session){
+  lastFinishedSession = session;
   const content = document.getElementById('summaryContent');
   const totalSets = session.exercises.reduce((a,e)=>a+e.sets.length,0);
   const d = parseISO(session.date);
@@ -611,6 +694,53 @@ document.getElementById('btnCloseSummary').addEventListener('click', ()=>{
   } else {
     showView('home');
   }
+});
+
+document.getElementById('btnSaveAsTemplate').addEventListener('click', ()=>{
+  if(!lastFinishedSession) return;
+  closeSheet('sheetSessionSummary');
+  document.getElementById('templateNameInput').value = suggestTemplateName();
+  openSheet('sheetSaveTemplate');
+});
+
+function suggestTemplateName(){
+  if(!lastFinishedSession) return '';
+  const d = parseISO(lastFinishedSession.date);
+  const weekday = d.toLocaleDateString(undefined,{weekday:'long'});
+  return `${weekday} session`;
+}
+
+document.getElementById('btnConfirmSaveTemplate').addEventListener('click', ()=>{
+  if(!lastFinishedSession) return;
+  const name = (document.getElementById('templateNameInput').value||'').trim();
+  if(!name){ toast('Enter a template name'); return; }
+
+  // dedupe exercise IDs while preserving order; skip walk-type entries
+  // since they capture live session data (speed/incline/duration), not a
+  // repeatable set structure.
+  const exIds = [];
+  lastFinishedSession.exercises.forEach(ex=>{
+    const isWalk = ex.sets.length===1 && ex.sets[0].isWalk;
+    if(isWalk) return;
+    if(!exIds.includes(ex.exId)) exIds.push(ex.exId);
+  });
+
+  if(exIds.length===0){
+    toast('Nothing to save — no strength exercises in this session');
+    closeSheet('sheetSaveTemplate');
+    return;
+  }
+
+  state.templates.push({
+    id: uid(),
+    name,
+    exIds,
+    createdAt: Date.now()
+  });
+  saveState();
+  closeSheet('sheetSaveTemplate');
+  toast(`Template "${name}" saved`);
+  showView('home');
 });
 
 /* ---------------- EXERCISE LIBRARY (picker) ---------------- */
@@ -692,7 +822,7 @@ function addExerciseToWorkout(exId){
   activeWorkout.exercises.unshift({
     exId: def.id,
     name: def.name,
-    sets: [{weight:'', reps:'', rpe:'', done:false}],
+    sets: [{weight:'', reps:'', difficulty:'medium', done:false}],
     notes:''
   });
   toast(`Added ${def.name}`);
@@ -743,7 +873,7 @@ document.getElementById('btnSaveWalk').addEventListener('click', ()=>{
   const walkExercise = {
     exId: 'incline-walk',
     name: `Incline Walk (${incline}% @ ${speed} km/h)`,
-    sets: [{weight:incline, reps:dur, rpe:'', done:true, isWalk:true, speed, incline, duration:dur}],
+    sets: [{weight:incline, reps:dur, done:true, isWalk:true, speed, incline, duration:dur}],
     notes: ''
   };
 
@@ -1061,6 +1191,13 @@ function mergeState(incoming){
       if(!existingCustomIds.has(e.id)) state.customExercises.push(e);
     });
   }
+  if(incoming.templates){
+    if(!state.templates) state.templates = [];
+    const existingTemplateIds = new Set(state.templates.map(t=>t.id));
+    incoming.templates.forEach(t=>{
+      if(!existingTemplateIds.has(t.id)) state.templates.push(t);
+    });
+  }
 }
 
 document.getElementById('btnResetAll').addEventListener('click', ()=>{
@@ -1116,7 +1253,8 @@ function showSessionDetail(session){
             return `<div class="text-sm text-muted">${s.duration} min @ ${s.speed} km/h, ${s.incline}% incline</div>`;
           }
           const w = kgToDisplay(parseFloat(s.weight)||0);
-          return `<div class="text-sm text-muted num">Set ${i+1}: ${w||'–'} ${unitLabel()} × ${s.reps||'–'} reps${s.rpe?' · RPE '+s.rpe:''}</div>`;
+          const diffLabel = {easy:'Easy', medium:'Medium', hard:'Hard'}[s.difficulty] || 'Medium';
+          return `<div class="text-sm text-muted num">Set ${i+1}: ${w||'–'} ${unitLabel()} × ${s.reps||'–'} reps · ${diffLabel}</div>`;
         }).join('')}
         ${ex.notes ? `<div class="text-sm text-faint mt-4">"${ex.notes}"</div>` : ''}
       </div>
