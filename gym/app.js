@@ -337,6 +337,28 @@ function renderWorkoutView(){
   empty.style.display='none';
 
   wrap.innerHTML = activeWorkout.exercises.map((ex,exIdx)=>{
+    const isWalk = ex.sets.length===1 && ex.sets[0].isWalk;
+
+    if(isWalk){
+      const w = ex.sets[0];
+      const bw = state.settings.bodyWeightKg || 75;
+      const kcal = Math.round(estimateInclineWalkKcal(w.speed, w.incline, w.duration, bw));
+      return `<div class="logging-exercise-card" data-ex-idx="${exIdx}">
+        <div class="logging-exercise-header">
+          <h3>${ex.name}</h3>
+          <button class="remove-ex-btn" data-remove-ex="${exIdx}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14z"/></svg>
+          </button>
+        </div>
+        <div class="stat-grid" style="grid-template-columns:repeat(4,1fr); margin-bottom:0;">
+          <div class="stat-box"><div class="v num">${w.speed}</div><div class="l">km/h</div></div>
+          <div class="stat-box"><div class="v num">${w.incline}%</div><div class="l">Incline</div></div>
+          <div class="stat-box"><div class="v num">${w.duration}</div><div class="l">Minutes</div></div>
+          <div class="stat-box"><div class="v num" style="color:var(--positive);">${kcal}</div><div class="l">Kcal</div></div>
+        </div>
+      </div>`;
+    }
+
     const exDef = findExercise(ex.exId) || {name:ex.name, met:4.5};
     const history = getExerciseHistory(ex.exId);
     const best = history.length ? Math.max(...history.map(h=>h.maxWeight)) : 0;
@@ -488,6 +510,20 @@ function finishWorkout(){
 
   let totalKcal = 0;
   const exercisesOut = activeWorkout.exercises.map(ex=>{
+    const isWalk = ex.sets.length===1 && ex.sets[0].isWalk;
+
+    if(isWalk){
+      const w = ex.sets[0];
+      const kcal = estimateInclineWalkKcal(w.speed, w.incline, w.duration, bodyWeightKg);
+      totalKcal += kcal;
+      return {
+        exId: ex.exId,
+        name: ex.name,
+        sets: [{...w}],
+        notes: ex.notes||''
+      };
+    }
+
     const def = findExercise(ex.exId) || {met:4.5};
     const kcal = estimateStrengthExerciseKcal(def, ex.sets, bodyWeightKg);
     totalKcal += kcal;
@@ -645,11 +681,15 @@ function capitalize(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
 function addExerciseToWorkout(exId){
   const def = findExercise(exId);
   if(!def) return;
+  if(def.special==='incline_walk'){
+    openWalkSheet('session');
+    return;
+  }
   if(!activeWorkout){
-    activeWorkout = {startedAt: Date.now(), exercises:[]};
+    activeWorkout = {startedAt: Date.now(), date: todayISO(), exercises:[]};
     startWorkoutTimer();
   }
-  activeWorkout.exercises.push({
+  activeWorkout.exercises.unshift({
     exId: def.id,
     name: def.name,
     sets: [{weight:'', reps:'', rpe:'', done:false}],
@@ -663,13 +703,21 @@ function addExerciseToWorkout(exId){
 document.getElementById('exerciseSearchInput').addEventListener('input', renderExerciseLibrary);
 
 /* ---------------- QUICK WALK LOGGING ---------------- */
+let walkSheetMode = 'standalone'; // 'standalone' saves directly; 'session' adds to activeWorkout
+
 document.getElementById('btnQuickWalk').addEventListener('click', ()=>{
+  openWalkSheet('standalone');
+});
+
+function openWalkSheet(mode){
+  walkSheetMode = mode;
   document.getElementById('walkDuration').value = 30;
   document.getElementById('walkSpeed').value = 5.5;
   document.getElementById('walkIncline').value = 8;
+  document.getElementById('btnSaveWalk').textContent = mode==='session' ? 'Add to session' : "Save to today's log";
   updateWalkPreview();
   openSheet('sheetQuickWalk');
-});
+}
 
 ['walkDuration','walkSpeed','walkIncline'].forEach(id=>{
   document.getElementById(id).addEventListener('input', updateWalkPreview);
@@ -692,15 +740,30 @@ document.getElementById('btnSaveWalk').addEventListener('click', ()=>{
   const bw = state.settings.bodyWeightKg || 75;
   const kcal = Math.round(estimateInclineWalkKcal(speed, incline, dur, bw));
 
+  const walkExercise = {
+    exId: 'incline-walk',
+    name: `Incline Walk (${incline}% @ ${speed} km/h)`,
+    sets: [{weight:incline, reps:dur, rpe:'', done:true, isWalk:true, speed, incline, duration:dur}],
+    notes: ''
+  };
+
+  if(walkSheetMode==='session'){
+    if(!activeWorkout){
+      activeWorkout = {startedAt: Date.now(), date: todayISO(), exercises:[]};
+      startWorkoutTimer();
+    }
+    activeWorkout.exercises.unshift(walkExercise);
+    closeSheet('sheetQuickWalk');
+    toast(`Added · ${kcal} kcal`);
+    showView('workout');
+    renderWorkoutView();
+    return;
+  }
+
   const session = {
     id: uid(),
     date: todayISO(),
-    exercises: [{
-      exId: 'incline-walk',
-      name: `Incline Walk (${incline}% @ ${speed} km/h)`,
-      sets: [{weight:incline, reps:dur, rpe:'', done:true, isWalk:true, speed, incline, duration:dur}],
-      notes: ''
-    }],
+    exercises: [walkExercise],
     durationMin: dur,
     kcal,
     type: 'walk'
@@ -840,6 +903,7 @@ function renderProgressList(){
   state.sessions.forEach(s=>{
     s.exercises.forEach(ex=>{
       if(!ex.sets || !ex.sets.length) return;
+      if(ex.sets[0].isWalk) return; // walks tracked separately, not in strength progression
       if(!map[ex.exId]) map[ex.exId] = {name:ex.name, entries:[]};
       const weights = ex.sets.map(st=>parseFloat(st.weight)||0).filter(w=>w>0);
       const maxW = weights.length ? Math.max(...weights) : 0;
