@@ -128,6 +128,7 @@ function showView(name){
     tabbar.classList.remove('hidden');
     document.body.classList.remove('workout-active');
   }
+  syncFabState();
 
   if(name==='home') renderHome();
   if(name==='calendar') renderCalendar();
@@ -137,19 +138,22 @@ function showView(name){
   window.scrollTo(0,0);
 }
 
+function syncFabState(){
+  const fab = document.getElementById('btnFabStart');
+  if(!fab) return;
+  fab.classList.toggle('active-session', !!activeWorkout);
+  fab.setAttribute('aria-label', activeWorkout ? 'Resume session' : 'Start session');
+}
+
 document.querySelectorAll('.tab-btn').forEach(btn=>{
   btn.addEventListener('click', ()=>{
-    if(btn.dataset.view==='log' && activeWorkout){
-      pickerMode = 'session';
-      showView('workout');
-      renderWorkoutView();
-      return;
-    }
-    if(btn.dataset.view==='log'){
-      pickerMode = 'session';
-    }
     showView(btn.dataset.view);
   });
+});
+
+document.getElementById('btnFabStart').addEventListener('click', ()=>{
+  pickerMode = 'session';
+  startWorkout(todayISO());
 });
 
 document.getElementById('btnSettings').addEventListener('click', ()=>{
