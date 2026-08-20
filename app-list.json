@@ -305,5 +305,47 @@
       "No ads, no subscription paywall"
     ],
     "featured": true
+  },
+  {
+    "id": "gym-tracker",
+    "name": "Gym Tracker",
+    "icon": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%230a0e0f'/%3E%3Cpath d='M32 28 L32 72 M32 50 L68 50 M68 28 L68 72' fill='none' stroke='%2339ff9a' stroke-width='7' stroke-linecap='round'/%3E%3C/svg%3E",
+    "developer": "NullVault",
+    "shortDescription": "Offline-first gym session tracker with routines, rest timers, and calorie estimates.",
+    "fullDescription": "Gym Tracker is a terminal-styled training log built for actually using at the gym, not just browsing afterward. Log sets with weight, reps, and difficulty, track warm-ups separately from working sets, and see your estimated 1RM and PRs update live as you train. Save routines once and start a session pre-loaded with the right exercises in the right order, drag-and-drop to reorder them, and let a configurable rest timer count down between sets with an audio alert so you don't have to keep checking your phone. Incline treadmill walks, assisted machine exercises, and a full exercise picker with your last-logged weight shown inline round out the day-to-day flow. Everything works fully offline first, with optional Google sign-in for cross-device sync.",
+    "version": "1.0.0",
+    "category": "Health & Fitness",
+    "tags": [
+      "gym",
+      "fitness",
+      "workout",
+      "strength training",
+      "tracker"
+    ],
+    "screenshots": [
+      "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&q=80",
+      "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800&q=80"
+    ],
+    "downloadUrl": "https://gym.nullvault.eu/gymtracker.apk",
+    "type": "TWA",
+    "appUrl": "https://gym.nullvault.eu",
+    "rating": 4.5,
+    "ratingCount": 0,
+    "releaseDate": "2026-08-20",
+    "lastUpdated": "2026-08-20",
+    "platforms": [
+      "Android",
+      "Web"
+    ],
+    "features": [
+      "Rest timer with audio alert, configurable per session",
+      "Drag-and-drop routines you can start with one tap",
+      "Live PR detection and estimated 1RM",
+      "Warm-up sets tracked separately from working sets",
+      "Assisted-machine exercises (lower is better) and incline walk tracking",
+      "Calorie estimates per session",
+      "Offline-first, with optional Google sign-in for cross-device sync"
+    ],
+    "featured": true
   }
 ]
