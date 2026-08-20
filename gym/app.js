@@ -384,7 +384,6 @@ function renderTemplateEditorExerciseList(){
     if(!def) return '';
     const isFirst = idx===0, isLast = idx===editingTemplateExIds.length-1;
     return `<div class="reorder-item" data-reorder-idx="${idx}">
-      <div class="reorder-order-num num">${idx+1}</div>
       <div class="reorder-handle" data-drag-handle="${idx}" aria-label="Drag to reorder">
         <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>
       </div>
