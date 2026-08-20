@@ -1,6 +1,6 @@
 {
-  "name": "nullvault — training log",
-  "short_name": "nullvault",
+  "name": "Gym Tracker",
+  "short_name": "Gym Tracker",
   "description": "Offline-first gym session tracker with sets, calendar, and calorie estimates.",
   "start_url": "./index.html",
   "scope": "./",
