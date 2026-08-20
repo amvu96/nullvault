@@ -443,6 +443,41 @@ main{max-width:640px; margin:0 auto; padding:18px 16px 40px;}
   flex-shrink:0;
 }
 
+/* Reorderable exercise list inside the routine editor */
+.reorder-item{
+  display:flex; align-items:center; gap:10px;
+  padding:11px 12px; background:var(--panel); border:1px solid var(--border);
+  border-radius:10px; margin-bottom:8px;
+  touch-action:none; /* we handle vertical dragging ourselves via pointer events */
+  position:relative;
+  transition:transform .18s ease;
+}
+.reorder-item.dragging{
+  z-index:60; border-color:var(--accent); box-shadow:0 10px 24px -6px rgba(0,0,0,0.55), 0 0 0 1px var(--accent-dim);
+  background:var(--panel-raised);
+  transition:none; /* dragged item must track the finger with zero lag */
+}
+.reorder-handle{
+  width:28px; height:36px; flex-shrink:0; display:flex; align-items:center; justify-content:center;
+  color:var(--text-faint); cursor:grab; border-radius:6px;
+  touch-action:none;
+}
+.reorder-handle:active{cursor:grabbing; color:var(--accent); background:var(--panel-raised);}
+.reorder-handle svg{width:16px; height:16px; pointer-events:none;}
+.reorder-order-num{
+  width:20px; flex-shrink:0; text-align:center; font-size:11px; font-weight:700;
+  color:var(--text-faint); font-variant-numeric:tabular-nums;
+}
+.reorder-nudge-group{display:flex; flex-direction:column; gap:2px; flex-shrink:0;}
+.reorder-nudge-btn{
+  width:24px; height:17px; border-radius:5px; background:var(--panel-raised);
+  border:1px solid var(--border); color:var(--text-faint);
+  display:flex; align-items:center; justify-content:center;
+}
+.reorder-nudge-btn:active{border-color:var(--accent-dim); color:var(--accent);}
+.reorder-nudge-btn:disabled{opacity:0.3; pointer-events:none;}
+.reorder-nudge-btn svg{width:11px; height:11px;}
+
 /* In-progress exercise card during logging */
 .logging-exercise-card{
   background:var(--panel); border:1px solid var(--border);
