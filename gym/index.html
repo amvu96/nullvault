@@ -648,7 +648,14 @@ body.workout-active{padding-bottom:calc(96px + env(safe-area-inset-bottom));}
   transform:translateY(100%); transition:transform .28s cubic-bezier(.32,.72,0,1);
 }
 .sheet.open{transform:translateY(0);}
-.sheet-handle{width:36px; height:4px; background:var(--border); border-radius:99px; margin:0 auto 16px;}
+.sheet.dragging{transition:none;}
+.sheet-handle-hitarea{
+  padding:6px 0 14px; margin:-6px 0 0; cursor:grab; touch-action:none;
+  display:flex; justify-content:center;
+}
+.sheet-handle-hitarea:active{cursor:grabbing;}
+.sheet-handle{width:36px; height:4px; background:var(--border); border-radius:99px; transition:background .15s;}
+.sheet-handle-hitarea:active .sheet-handle{background:var(--accent);}
 .sheet-title{font-size:16px; font-weight:700; margin-bottom:16px; color:var(--cyan);}
 
 .sheet.sheet-fixed-height{
@@ -966,7 +973,7 @@ body.sheet-open{overflow:hidden;}
 <div class="sheet-backdrop" id="sheetBackdrop"></div>
 
 <div class="sheet" id="sheetQuickWalk">
-  <div class="sheet-handle"></div>
+  <div class="sheet-handle-hitarea"><div class="sheet-handle"></div></div>
   <div class="sheet-title">Log incline walk</div>
   <div class="field">
     <label>Duration (minutes)</label>
@@ -993,7 +1000,7 @@ body.sheet-open{overflow:hidden;}
 </div>
 
 <div class="sheet" id="sheetSessionSummary">
-  <div class="sheet-handle"></div>
+  <div class="sheet-handle-hitarea"><div class="sheet-handle"></div></div>
   <div class="sheet-title">Session complete</div>
   <div id="summaryContent"></div>
   <button class="btn btn-secondary btn-block mt-16" id="btnSaveAsTemplate">Save as routine</button>
@@ -1001,12 +1008,12 @@ body.sheet-open{overflow:hidden;}
 </div>
 
 <div class="sheet" id="sheetExerciseDetail">
-  <div class="sheet-handle"></div>
+  <div class="sheet-handle-hitarea"><div class="sheet-handle"></div></div>
   <div id="exerciseDetailContent"></div>
 </div>
 
 <div class="sheet" id="sheetSaveTemplate">
-  <div class="sheet-handle"></div>
+  <div class="sheet-handle-hitarea"><div class="sheet-handle"></div></div>
   <div class="sheet-title">Save as routine</div>
   <div class="field" style="margin-bottom:16px;">
     <label>Routine name</label>
@@ -1016,7 +1023,7 @@ body.sheet-open{overflow:hidden;}
 </div>
 
 <div class="sheet sheet-fixed-height" id="sheetEditTemplate">
-  <div class="sheet-handle"></div>
+  <div class="sheet-handle-hitarea"><div class="sheet-handle"></div></div>
   <div class="row mb-16">
     <div class="sheet-title" style="margin-bottom:0;" id="editTemplateTitle">Edit routine</div>
     <button class="icon-btn" id="btnDeleteTemplateFromEditor">
