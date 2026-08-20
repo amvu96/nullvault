@@ -49,6 +49,38 @@ function saveState(){
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
+/* ---------------- ACTIVE WORKOUT PERSISTENCE ----------------
+   activeWorkout lives in memory during a session, but must survive page
+   refreshes/crashes, so every mutation is mirrored to localStorage under
+   its own key and restored on load.
+------------------------------------------------- */
+const ACTIVE_WORKOUT_KEY = 'gymtracker_active_workout_v1';
+
+function persistActiveWorkout(){
+  try{
+    if(activeWorkout){
+      localStorage.setItem(ACTIVE_WORKOUT_KEY, JSON.stringify(activeWorkout));
+    } else {
+      localStorage.removeItem(ACTIVE_WORKOUT_KEY);
+    }
+  }catch(e){
+    console.error('Failed to persist active workout', e);
+  }
+}
+
+function loadActiveWorkout(){
+  try{
+    const raw = localStorage.getItem(ACTIVE_WORKOUT_KEY);
+    if(!raw) return null;
+    const parsed = JSON.parse(raw);
+    if(!parsed || !Array.isArray(parsed.exercises) || !parsed.date || !parsed.startedAt) return null;
+    return parsed;
+  }catch(e){
+    console.error('Failed to load active workout', e);
+    return null;
+  }
+}
+
 /* ---------------- HELPERS ---------------- */
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 function fmtDateISO(d){
@@ -518,6 +550,7 @@ function renderWorkoutView(){
     document.getElementById('workoutEmptyState').style.display='block';
     return;
   }
+  persistActiveWorkout();
   document.getElementById('workoutExCount').textContent = `${activeWorkout.exercises.length} exercise${activeWorkout.exercises.length!==1?'s':''}`;
 
   const isToday = activeWorkout.date===todayISO();
@@ -539,6 +572,7 @@ function renderWorkoutView(){
     durInput.oninput = (e)=>{
       const v = parseInt(e.target.value);
       activeWorkout.manualDurationMin = isNaN(v) ? undefined : v;
+      debouncedPersistActiveWorkout();
     };
   }
 
@@ -660,6 +694,7 @@ function attachWorkoutCardListeners(){
     input.addEventListener('input', (e)=>{
       const exIdx = +e.target.dataset.exIdx, setIdx = +e.target.dataset.setIdx, field = e.target.dataset.setField;
       activeWorkout.exercises[exIdx].sets[setIdx][field] = e.target.value;
+      debouncedPersistActiveWorkout();
     });
   });
   document.querySelectorAll('.difficulty-btn').forEach(btn=>{
@@ -668,6 +703,7 @@ function attachWorkoutCardListeners(){
       const exIdx = +group.dataset.exIdx, setIdx = +group.dataset.setIdx;
       activeWorkout.exercises[exIdx].sets[setIdx].difficulty = e.currentTarget.dataset.diff;
       group.querySelectorAll('.difficulty-btn').forEach(b=>b.classList.toggle('active', b===e.currentTarget));
+      persistActiveWorkout();
     });
   });
   document.querySelectorAll('[data-toggle-done]').forEach(btn=>{
@@ -697,8 +733,15 @@ function attachWorkoutCardListeners(){
   document.querySelectorAll('[data-notes-ex]').forEach(ta=>{
     ta.addEventListener('input',(e)=>{
       activeWorkout.exercises[+e.target.dataset.notesEx].notes = e.target.value;
+      debouncedPersistActiveWorkout();
     });
   });
+}
+
+let persistDebounceTimer = null;
+function debouncedPersistActiveWorkout(){
+  clearTimeout(persistDebounceTimer);
+  persistDebounceTimer = setTimeout(persistActiveWorkout, 400);
 }
 
 function buildSparkline(points, invert){
@@ -755,6 +798,7 @@ function cancelWorkout(){
     if(!confirm('Discard this session? All logged sets will be lost.')) return;
   }
   activeWorkout = null;
+  persistActiveWorkout();
   clearInterval(workoutTimerInterval);
   removeFinishBar();
   showView('home');
@@ -830,6 +874,7 @@ function finishWorkout(){
   saveState();
 
   activeWorkout = null;
+  persistActiveWorkout();
   clearInterval(workoutTimerInterval);
   removeFinishBar();
   showSessionSummary(session);
@@ -1513,6 +1558,11 @@ if('serviceWorker' in navigator){
 
 /* ---------------- INIT ---------------- */
 function init(){
+  const restored = loadActiveWorkout();
+  if(restored){
+    activeWorkout = restored;
+    startWorkoutTimer();
+  }
   showView('home');
   loadSettingsIntoForm();
 }
