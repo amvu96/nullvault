@@ -250,23 +250,28 @@ function renderRecentSessions(){
 
 /* ---------------- START SESSION / WORKOUT LOGGING ---------------- */
 document.getElementById('btnStartSession').addEventListener('click', ()=>{
+  startWorkout(todayISO());
+});
+
+function startWorkout(dateISO){
   if(!activeWorkout){
     activeWorkout = {
       startedAt: Date.now(),
+      date: dateISO || todayISO(),
       exercises: []
     };
     startWorkoutTimer();
   }
   showView('workout');
   renderWorkoutView();
-});
+}
 
 function startWorkoutTimer(){
   clearInterval(workoutTimerInterval);
   workoutTimerInterval = setInterval(()=>{
     if(!activeWorkout) return;
     const el = document.getElementById('workoutTimerLabel');
-    if(el) el.textContent = formatElapsed(Date.now()-activeWorkout.startedAt);
+    if(el && activeWorkout.date===todayISO()) el.textContent = formatElapsed(Date.now()-activeWorkout.startedAt);
   }, 1000);
 }
 
@@ -289,7 +294,28 @@ function renderWorkoutView(){
     return;
   }
   document.getElementById('workoutExCount').textContent = `${activeWorkout.exercises.length} exercise${activeWorkout.exercises.length!==1?'s':''}`;
-  document.getElementById('workoutTimerLabel').textContent = formatElapsed(Date.now()-activeWorkout.startedAt);
+
+  const isToday = activeWorkout.date===todayISO();
+  const timerEl = document.getElementById('workoutTimerLabel');
+  if(isToday){
+    timerEl.textContent = formatElapsed(Date.now()-activeWorkout.startedAt);
+  } else {
+    const d = parseISO(activeWorkout.date);
+    timerEl.textContent = d.toLocaleDateString(undefined,{weekday:'short', month:'short', day:'numeric'});
+  }
+
+  const banner = document.getElementById('backdateBanner');
+  banner.style.display = isToday ? 'none' : 'block';
+  if(!isToday){
+    const durInput = document.getElementById('backdateDuration');
+    if(document.activeElement !== durInput){
+      durInput.value = activeWorkout.manualDurationMin || '';
+    }
+    durInput.oninput = (e)=>{
+      const v = parseInt(e.target.value);
+      activeWorkout.manualDurationMin = isNaN(v) ? undefined : v;
+    };
+  }
 
   const wrap = document.getElementById('workoutExerciseCards');
   const empty = document.getElementById('workoutEmptyState');
@@ -446,7 +472,10 @@ function finishWorkout(){
     toast('Add at least one exercise first');
     return;
   }
-  const durationMin = Math.max(1, Math.round((Date.now()-activeWorkout.startedAt)/60000));
+  const isToday = activeWorkout.date===todayISO();
+  const durationMin = isToday
+    ? Math.max(1, Math.round((Date.now()-activeWorkout.startedAt)/60000))
+    : (activeWorkout.manualDurationMin || 45);
   const bodyWeightKg = state.settings.bodyWeightKg || 75;
 
   let totalKcal = 0;
@@ -475,14 +504,14 @@ function finishWorkout(){
 
   const session = {
     id: uid(),
-    date: todayISO(),
+    date: activeWorkout.date,
     exercises: exercisesOut,
     durationMin,
     kcal: Math.round(totalKcal),
     type: 'strength'
   };
 
-  // merge with existing session today if present
+  // merge with existing session on that date if present
   const existingIdx = state.sessions.findIndex(s=>s.date===session.date && s.type==='strength');
   if(existingIdx>=0){
     const existing = state.sessions[existingIdx];
@@ -510,7 +539,10 @@ function displayToKgIfNeeded(val){
 function showSessionSummary(session){
   const content = document.getElementById('summaryContent');
   const totalSets = session.exercises.reduce((a,e)=>a+e.sets.length,0);
+  const d = parseISO(session.date);
+  const isToday = session.date===todayISO();
   content.innerHTML = `
+    ${!isToday ? `<p class="text-sm text-muted mb-12">Logged for ${d.toLocaleDateString(undefined,{weekday:'long', month:'long', day:'numeric'})}</p>` : ''}
     <div class="stat-grid" style="grid-template-columns:repeat(3,1fr);">
       <div class="stat-box"><div class="v num">${session.exercises.length}</div><div class="l">Exercises</div></div>
       <div class="stat-box"><div class="v num">${totalSets}</div><div class="l">Sets</div></div>
@@ -523,12 +555,19 @@ function showSessionSummary(session){
       </div>`).join('')}
     </div>
   `;
+  document.getElementById('sheetSessionSummary').dataset.returnDate = session.date;
   openSheet('sheetSessionSummary');
 }
 
 document.getElementById('btnCloseSummary').addEventListener('click', ()=>{
   closeSheet('sheetSessionSummary');
-  showView('home');
+  const returnDate = document.getElementById('sheetSessionSummary').dataset.returnDate;
+  if(returnDate && returnDate!==todayISO()){
+    calCursor = parseISO(returnDate);
+    showView('calendar');
+  } else {
+    showView('home');
+  }
 });
 
 /* ---------------- EXERCISE LIBRARY (picker) ---------------- */
@@ -703,12 +742,17 @@ function renderCalendar(){
   grid.innerHTML = cells.map(d=>{
     if(d===null) return `<div class="cal-cell empty"></div>`;
     const trained = sessionDatesInMonth[d]!==undefined;
-    const isToday = sameDay(new Date(year,month,d), today);
-    return `<div class="cal-cell ${trained?'trained':''} ${isToday?'today':''}" data-day="${d}">
+    const cellDate = new Date(year,month,d);
+    const isToday = sameDay(cellDate, today);
+    const iso = fmtDateISO(cellDate);
+    return `<div class="cal-cell ${trained?'trained':''} ${isToday?'today':''}" data-day="${d}" data-date="${iso}">
       <span class="num">${d}</span>
       ${trained?'<span class="dot"></span>':''}
     </div>`;
   }).join('');
+  grid.querySelectorAll('.cal-cell[data-date]').forEach(cell=>{
+    cell.addEventListener('click', ()=>onCalendarDayTap(cell.dataset.date));
+  });
 
   // month summary
   const monthSessions = state.sessions.filter(s=>{
@@ -751,6 +795,34 @@ document.getElementById('calNextMonth').addEventListener('click', ()=>{
   calCursor = new Date(calCursor.getFullYear(), calCursor.getMonth()+1, 1);
   renderCalendar();
 });
+
+function onCalendarDayTap(dateISO){
+  const daySessions = state.sessions.filter(s=>s.date===dateISO);
+  if(daySessions.length>0){
+    // multiple sessions possible (strength + walk) — show the first, user can
+    // also tap individual rows in the "Sessions this month" list below.
+    showSessionDetail(daySessions[0]);
+    return;
+  }
+  openAddPastSessionPrompt(dateISO);
+}
+
+function openAddPastSessionPrompt(dateISO){
+  const d = parseISO(dateISO);
+  const isFuture = d > new Date(new Date().setHours(23,59,59,999));
+  const label = d.toLocaleDateString(undefined,{weekday:'long', month:'long', day:'numeric', year:'numeric'});
+  const content = document.getElementById('exerciseDetailContent');
+  content.innerHTML = `
+    <div class="sheet-title">${label}</div>
+    <p class="text-sm text-muted mb-12">${isFuture ? 'No session logged yet.' : 'Nothing logged for this day.'}</p>
+    <button class="btn btn-primary btn-block" id="btnStartPastSession">+ Log a session for this day</button>
+  `;
+  openSheet('sheetExerciseDetail');
+  document.getElementById('btnStartPastSession').addEventListener('click', ()=>{
+    closeSheet('sheetExerciseDetail');
+    startWorkout(dateISO);
+  });
+}
 
 /* ---------------- PROGRESS VIEW ---------------- */
 function renderProgressList(){
