@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nullvault-cache-v1';
+const CACHE_NAME = 'gym-tracker-cache-v1';
 const ASSETS = [
   './',
   './index.html',
