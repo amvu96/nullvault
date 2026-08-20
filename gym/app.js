@@ -767,6 +767,15 @@ function renderWorkoutView(){
 
     const sparkline = sparkPoints.length>=2 ? buildSparkline(sparkPoints, isAssisted) : '';
 
+    let lastTimeText = null;
+    if(!isWalk && history.length){
+      const last = history[history.length-1];
+      if(last.bestSetWeight!=null && last.bestSetReps!=null){
+        const assistLabel = isAssisted ? ' assist' : '';
+        lastTimeText = `${kgToDisplay(last.bestSetWeight)}${unitLabel()}${assistLabel} × ${last.bestSetReps}`;
+      }
+    }
+
     return `<div class="logging-exercise-card" data-ex-idx="${exIdx}">
       <div class="logging-exercise-header">
         <h3>${ex.name}</h3>
@@ -778,6 +787,7 @@ function renderWorkoutView(){
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
         Lower assistance is better
       </div>` : ''}
+      ${lastTimeText ? `<div class="last-time-label">Last time: <span class="num">${lastTimeText}</span></div>` : ''}
       ${sparkline ? `<div class="sparkline-row">${sparkline}<span class="sparkline-label">last ${sparkPoints.length} sessions</span>${isPR?'<span class="pr-badge">PR</span>':''}${oneRM!==null?`<span class="one-rm-badge ${isOneRmPR?'is-pr':''}">~${kgToDisplay(Math.round(oneRM*10)/10)}${unitLabel()} 1RM</span>`:''}</div>` : ''}
       <div class="set-headers">
         <span>#</span><span>${unitLabel()}${isAssisted?' assist':''}</span><span>Reps</span><span>Difficulty</span><span></span>
