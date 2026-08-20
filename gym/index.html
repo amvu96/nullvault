@@ -656,6 +656,17 @@ body.workout-active{padding-bottom:calc(96px + env(safe-area-inset-bottom));}
 .sheet-handle{width:36px; height:4px; background:var(--border); border-radius:99px; margin:0 auto 16px;}
 .sheet-title{font-size:16px; font-weight:700; margin-bottom:16px; color:var(--cyan);}
 
+.sheet.sheet-fixed-height{
+  max-height:85vh; display:flex; flex-direction:column; overflow:hidden;
+}
+.sheet-fixed-height .sheet-scroll-body{
+  overflow-y:auto; flex:1; min-height:0;
+  -webkit-overflow-scrolling:touch;
+}
+.sheet-fixed-height .sheet-footer{
+  flex-shrink:0; padding-top:12px;
+}
+
 .toast{
   position:fixed; bottom:calc(88px + env(safe-area-inset-bottom)); left:50%;
   transform:translateX(-50%) translateY(20px); z-index:99;
@@ -1008,7 +1019,7 @@ body.sheet-open{overflow:hidden;}
   <button class="btn btn-primary btn-block" id="btnConfirmSaveTemplate">Save routine</button>
 </div>
 
-<div class="sheet" id="sheetEditTemplate">
+<div class="sheet sheet-fixed-height" id="sheetEditTemplate">
   <div class="sheet-handle"></div>
   <div class="row mb-16">
     <div class="sheet-title" style="margin-bottom:0;" id="editTemplateTitle">Edit routine</div>
@@ -1021,12 +1032,16 @@ body.sheet-open{overflow:hidden;}
     <input type="text" id="editTemplateNameInput" placeholder="e.g. Monday — Push day" autocomplete="off">
   </div>
   <div class="section-label">Exercises</div>
-  <div id="editTemplateExerciseList" class="mb-12"></div>
-  <button class="btn btn-secondary btn-block mb-16" id="btnAddExerciseToTemplate">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-    Add exercise
-  </button>
-  <button class="btn btn-primary btn-block" id="btnSaveTemplateEdits">Save changes</button>
+  <div class="sheet-scroll-body">
+    <div id="editTemplateExerciseList" class="mb-12"></div>
+  </div>
+  <div class="sheet-footer">
+    <button class="btn btn-secondary btn-block mb-16" id="btnAddExerciseToTemplate">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      Add exercise
+    </button>
+    <button class="btn btn-primary btn-block" id="btnSaveTemplateEdits">Save changes</button>
+  </div>
 </div>
 
 <div class="toast" id="toast">
