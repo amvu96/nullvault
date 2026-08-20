@@ -1922,6 +1922,83 @@ document.getElementById('sheetBackdrop').addEventListener('click', ()=>{
   document.body.classList.remove('sheet-open');
 });
 
+/* ---------------- SWIPE-DOWN-TO-DISMISS (generic, works on any .sheet via its handle) ---------------- */
+let sheetSwipe = null; // {sheetEl, startY, lastY, lastT, velocity}
+
+function initSheetSwipeToDismiss(){
+  document.querySelectorAll('.sheet-handle-hitarea').forEach(handle=>{
+    handle.addEventListener('pointerdown', onSheetSwipeStart);
+  });
+}
+
+function onSheetSwipeStart(e){
+  const sheetEl = e.currentTarget.closest('.sheet');
+  if(!sheetEl) return;
+  e.preventDefault();
+
+  sheetSwipe = {
+    sheetEl,
+    startY: e.clientY,
+    lastY: e.clientY,
+    lastT: performance.now(),
+    velocity: 0
+  };
+  sheetEl.classList.add('dragging');
+
+  const handle = e.currentTarget;
+  handle.setPointerCapture(e.pointerId);
+  handle.addEventListener('pointermove', onSheetSwipeMove);
+  handle.addEventListener('pointerup', onSheetSwipeEnd);
+  handle.addEventListener('pointercancel', onSheetSwipeEnd);
+}
+
+function onSheetSwipeMove(e){
+  if(!sheetSwipe) return;
+  const dy = e.clientY - sheetSwipe.startY;
+  const clamped = Math.max(0, dy); // only allow dragging downward, not past the open position
+  sheetSwipe.sheetEl.style.transform = `translateY(${clamped}px)`;
+
+  const now = performance.now();
+  const dt = now - sheetSwipe.lastT;
+  if(dt>0){
+    sheetSwipe.velocity = (e.clientY - sheetSwipe.lastY) / dt; // px/ms, positive = moving down
+  }
+  sheetSwipe.lastY = e.clientY;
+  sheetSwipe.lastT = now;
+}
+
+function onSheetSwipeEnd(e){
+  if(!sheetSwipe) return;
+  const handle = e.currentTarget;
+  handle.removeEventListener('pointermove', onSheetSwipeMove);
+  handle.removeEventListener('pointerup', onSheetSwipeEnd);
+  handle.removeEventListener('pointercancel', onSheetSwipeEnd);
+  try{ handle.releasePointerCapture(e.pointerId); }catch(err){}
+
+  const { sheetEl, velocity } = sheetSwipe;
+  const draggedDown = Math.max(0, e.clientY - sheetSwipe.startY);
+  const sheetHeight = sheetEl.getBoundingClientRect().height;
+  const pastThreshold = draggedDown > sheetHeight*0.25 || draggedDown > 120;
+  const fastFlick = velocity > 0.6; // quick downward flick, even if short distance
+
+  sheetEl.classList.remove('dragging');
+  sheetEl.style.transform = ''; // let the CSS class-driven transform (open/closed) take back over
+
+  if(pastThreshold || fastFlick){
+    sheetEl.classList.remove('open');
+    // if no other sheet is open, also hide the shared backdrop
+    if(!document.querySelector('.sheet.open')){
+      document.getElementById('sheetBackdrop').classList.remove('open');
+      document.body.classList.remove('sheet-open');
+    }
+  }
+  // else: removing the inline transform naturally snaps it back to .open's translateY(0)
+
+  sheetSwipe = null;
+}
+
+initSheetSwipeToDismiss();
+
 /* ---------------- SESSION DETAIL (tap from list) ---------------- */
 document.addEventListener('click', (e)=>{
   const item = e.target.closest('[data-session]');
