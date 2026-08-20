@@ -1,10 +1,12 @@
-const CACHE_NAME = 'gym-tracker-cache-v4';
+const CACHE_NAME = 'gym-tracker-cache-v2';
 const ASSETS = [
   './',
   './index.html',
   './app.js',
   './exercises.js',
-  './manifest.json'
+  './manifest.json',
+  './firebase-config.js',
+  './firebase-sync.js'
 ];
 
 self.addEventListener('install', (event) => {

@@ -47,6 +47,7 @@ function loadState(){
 
 function saveState(){
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  if(window.GymSync) window.GymSync.push(state);
 }
 
 /* ---------------- ACTIVE WORKOUT PERSISTENCE ----------------
@@ -1359,6 +1360,68 @@ function loadSettingsIntoForm(){
   updateLastBackupLabel();
 }
 
+/* ---------------- CLOUD SYNC (Firebase) ---------------- */
+function initCloudSync(){
+  if(!window.GymSync) return; // firebase-sync.js not loaded yet or not configured
+  window.GymSync.init(handleAuthChange, handleRemoteChange);
+}
+
+function handleAuthChange({signedIn, user, remoteState}){
+  const signedOutCard = document.getElementById('syncSignedOutCard');
+  const signedInCard = document.getElementById('syncSignedInCard');
+  if(!signedOutCard || !signedInCard) return; // settings view not in DOM yet, fine
+
+  if(signedIn){
+    signedOutCard.style.display = 'none';
+    signedInCard.style.display = 'block';
+    document.getElementById('syncUserName').textContent = user.name || user.email || 'Signed in';
+    document.getElementById('syncUserPhoto').src = user.photo || '';
+    document.getElementById('syncStatusLabel').textContent = 'Synced';
+
+    if(remoteState){
+      // merge remote into local by id, additive and non-destructive, same
+      // strategy as manual backup import so no data is silently dropped
+      mergeState(remoteState);
+      if(remoteState.settings){
+        state.settings = Object.assign({}, state.settings, remoteState.settings);
+      }
+      saveState();
+      renderHome();
+      loadSettingsIntoForm();
+    } else {
+      // first time this account has synced — push current local data up
+      saveState();
+    }
+    toast('Signed in — syncing across devices');
+  } else {
+    signedOutCard.style.display = 'block';
+    signedInCard.style.display = 'none';
+  }
+}
+
+function handleRemoteChange(remoteState){
+  // fired when another device pushes changes; merge additively and re-render
+  if(!remoteState) return;
+  mergeState(remoteState);
+  if(remoteState.settings){
+    state.settings = Object.assign({}, state.settings, remoteState.settings);
+  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); // local write only, don't re-push
+  if(currentView==='home') renderHome();
+  if(currentView==='calendar') renderCalendar();
+  if(currentView==='progress') renderProgressList();
+  if(currentView==='templates') renderTemplatesFullList();
+  loadSettingsIntoForm();
+  toast('Synced from another device');
+}
+
+document.getElementById('btnGoogleSignIn').addEventListener('click', ()=>{
+  if(window.GymSync) window.GymSync.signIn();
+});
+document.getElementById('btnGoogleSignOut').addEventListener('click', ()=>{
+  if(window.GymSync) window.GymSync.signOut();
+});
+
 document.getElementById('settingBodyWeight').addEventListener('input', (e)=>{
   const v = parseFloat(e.target.value);
   if(!isNaN(v) && v>0){ state.settings.bodyWeightKg = v; saveState(); }
@@ -1565,7 +1628,19 @@ function init(){
   }
   showView('home');
   loadSettingsIntoForm();
+  waitForGymSyncThenInit();
 }
+
+function waitForGymSyncThenInit(attempts){
+  attempts = attempts || 0;
+  if(window.GymSync){
+    initCloudSync();
+    return;
+  }
+  if(attempts > 100) return; // give up after ~10s, sync module likely failed to load
+  setTimeout(()=>waitForGymSyncThenInit(attempts+1), 100);
+}
+
 init();
 
 })();
