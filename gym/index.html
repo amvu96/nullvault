@@ -290,6 +290,14 @@ main{max-width:640px; margin:0 auto; padding:18px 16px 40px;}
 .active-session-bar .l{font-size:13px; font-weight:700;}
 .active-session-bar .t{font-size:11.5px; color:var(--text-muted);}
 .exercise-picker-search{margin-bottom:14px;}
+.exercise-picker-search input{
+  width:100%; background:var(--input-bg); border:1px solid var(--border);
+  color:var(--text); border-radius:8px; padding:12px 14px;
+  outline:none; transition:border-color .15s, box-shadow .15s;
+  font-size:14px;
+}
+.exercise-picker-search input::placeholder{color:var(--text-faint);}
+.exercise-picker-search input:focus{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent-dim);}
 .muscle-filter-scroll{
   display:flex; gap:7px; overflow-x:auto; padding-bottom:4px; margin-bottom:14px;
   scrollbar-width:none;
@@ -390,7 +398,7 @@ main{max-width:640px; margin:0 auto; padding:18px 16px 40px;}
 }
 .finish-bar .btn{flex:1;}
 .tabbar.hidden{display:none;}
-body.workout-active{padding-bottom:calc(76px + env(safe-area-inset-bottom));}
+body.workout-active{padding-bottom:calc(96px + env(safe-area-inset-bottom));}
 
 /* ============ CALENDAR VIEW ============ */
 .cal-header{display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;}
