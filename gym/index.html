@@ -347,6 +347,58 @@ main{max-width:640px; margin:0 auto; padding:18px 16px 40px;}
 }
 .active-session-bar .l{font-size:13px; font-weight:700;}
 .active-session-bar .t{font-size:11.5px; color:var(--text-muted);}
+
+.rest-config-row{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:10px; margin-bottom:16px; flex-wrap:wrap;
+}
+.rest-config-label{font-size:11.5px; color:var(--text-faint); font-weight:600; text-transform:uppercase; letter-spacing:0.03em; white-space:nowrap;}
+.rest-chip-group{display:flex; gap:6px; flex-wrap:wrap;}
+.rest-chip{
+  padding:6px 12px; border-radius:99px; font-size:12px; font-weight:700;
+  background:var(--panel); border:1px solid var(--border); color:var(--text-muted);
+  transition:background .15s, color .15s, border-color .15s;
+}
+.rest-chip.active{background:var(--accent-dim); color:var(--accent); border-color:var(--accent);}
+
+.rest-timer-bar{
+  position:fixed; left:0; right:0; z-index:46;
+  bottom:calc(96px + env(safe-area-inset-bottom));
+  margin:0 16px; max-width:608px; left:50%; transform:translateX(-50%);
+  background:var(--panel); border:1px solid var(--accent);
+  border-radius:16px; padding:14px 16px;
+  display:flex; align-items:center; gap:14px;
+  box-shadow:0 10px 28px -6px rgba(0,0,0,0.55), 0 0 20px -6px var(--accent-glow);
+  animation:rest-timer-in .25s cubic-bezier(.32,.72,0,1);
+}
+@keyframes rest-timer-in{
+  from{opacity:0; transform:translateX(-50%) translateY(12px);}
+  to{opacity:1; transform:translateX(-50%) translateY(0);}
+}
+.rest-timer-ring{position:relative; width:48px; height:48px; flex-shrink:0;}
+.rest-timer-ring svg{transform:rotate(-90deg);}
+.rest-timer-ring .bg-ring{stroke:var(--border);}
+.rest-timer-ring .fg-ring{stroke:var(--accent); stroke-linecap:round; transition:stroke-dashoffset 1s linear;}
+.rest-timer-ring-label{
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-size:13px; font-weight:700; font-variant-numeric:tabular-nums;
+}
+.rest-timer-info{flex:1; min-width:0;}
+.rest-timer-title{font-size:13px; font-weight:700; color:var(--text);}
+.rest-timer-sub{font-size:11px; color:var(--text-faint); margin-top:1px;}
+.rest-timer-actions{display:flex; gap:6px; flex-shrink:0;}
+.rest-timer-btn{
+  width:34px; height:34px; border-radius:9px; background:var(--panel-raised);
+  border:1px solid var(--border); color:var(--text-muted);
+  display:flex; align-items:center; justify-content:center;
+}
+.rest-timer-btn:active{border-color:var(--accent-dim); color:var(--accent);}
+.rest-timer-btn svg{width:16px; height:16px;}
+.rest-timer-bar.done{border-color:var(--positive); box-shadow:0 10px 28px -6px rgba(0,0,0,0.55), 0 0 20px -6px var(--positive-dim);}
+.rest-timer-bar.done .rest-timer-ring .fg-ring{stroke:var(--positive);}
+.rest-timer-bar.done .rest-timer-ring-label{color:var(--positive);}
+.rest-timer-bar.done .rest-timer-title{color:var(--positive);}
+
 .exercise-picker-search{margin-bottom:14px;}
 .exercise-picker-search input{
   width:100%; background:var(--input-bg); border:1px solid var(--border);
@@ -672,6 +724,17 @@ body.sheet-open{overflow:hidden;}
         <div class="t" id="workoutExCount">0 exercises</div>
       </div>
       <button class="btn btn-sm" style="background:rgba(255,255,255,0.18); color:#fff;" id="btnAddExercise">+ Add exercise</button>
+    </div>
+
+    <div class="rest-config-row">
+      <span class="rest-config-label">Rest between sets</span>
+      <div class="rest-chip-group" id="restDurationChips">
+        <button class="rest-chip" data-rest="30">30s</button>
+        <button class="rest-chip" data-rest="60">60s</button>
+        <button class="rest-chip active" data-rest="90">90s</button>
+        <button class="rest-chip" data-rest="120">2m</button>
+        <button class="rest-chip" data-rest="180">3m</button>
+      </div>
     </div>
 
     <div id="backdateBanner" style="display:none;" class="card mb-12">
