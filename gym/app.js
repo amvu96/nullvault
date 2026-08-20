@@ -617,20 +617,35 @@ function renderWorkoutView(){
     const exDef = findExercise(ex.exId) || {name:ex.name, met:4.5};
     const isAssisted = !!exDef.assisted;
     const history = getExerciseHistory(ex.exId);
+    const workingSets = ex.sets.filter(s=>!s.warmup);
 
-    let isPR = false, best = 0, sparkPoints = [];
+    let isPR = false, best = 0, sparkPoints = [], oneRM = null, isOneRmPR = false;
     if(isAssisted){
       const bests = history.map(h=>h.minWeight);
       best = bests.length ? Math.min(...bests) : null;
-      const currentAssistValues = ex.sets.map(s=>parseFloat(s.weight)).filter(w=>!isNaN(w) && w>=0);
+      const currentAssistValues = workingSets.map(s=>parseFloat(s.weight)).filter(w=>!isNaN(w) && w>=0);
       const currentMin = currentAssistValues.length ? Math.min(...currentAssistValues) : null;
       isPR = best!==null && currentMin!==null && currentMin<best;
       sparkPoints = history.slice(-6).map(h=>h.minWeight);
     } else {
       best = history.length ? Math.max(...history.map(h=>h.maxWeight)) : 0;
-      const currentMax = Math.max(0,...ex.sets.map(s=>parseFloat(s.weight)||0));
+      const currentMax = Math.max(0,...workingSets.map(s=>parseFloat(s.weight)||0));
       isPR = best>0 && currentMax>best;
       sparkPoints = history.slice(-6).map(h=>h.maxWeight);
+
+      // 1RM estimate from the current session's heaviest working set
+      const bestCurrentSet = workingSets.reduce((a,b)=>{
+        const aw = parseFloat(a && a.weight)||0, bw = parseFloat(b.weight)||0;
+        return bw>aw ? b : a;
+      }, null);
+      if(bestCurrentSet){
+        oneRM = estimate1RM(parseFloat(bestCurrentSet.weight)||0, parseFloat(bestCurrentSet.reps)||0);
+      }
+      if(oneRM!==null && history.length){
+        const historicalBest1RMs = history.map(h=>estimate1RM(h.bestSetWeight, h.bestSetReps)).filter(v=>v!==null);
+        const best1RM = historicalBest1RMs.length ? Math.max(...historicalBest1RMs) : 0;
+        isOneRmPR = best1RM>0 && oneRM>best1RM;
+      }
     }
 
     const sparkline = sparkPoints.length>=2 ? buildSparkline(sparkPoints, isAssisted) : '';
@@ -646,13 +661,13 @@ function renderWorkoutView(){
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
         Lower assistance is better
       </div>` : ''}
-      ${sparkline ? `<div class="sparkline-row">${sparkline}<span class="sparkline-label">last ${sparkPoints.length} sessions</span>${isPR?'<span class="pr-badge">PR</span>':''}</div>` : ''}
+      ${sparkline ? `<div class="sparkline-row">${sparkline}<span class="sparkline-label">last ${sparkPoints.length} sessions</span>${isPR?'<span class="pr-badge">PR</span>':''}${oneRM!==null?`<span class="one-rm-badge ${isOneRmPR?'is-pr':''}">~${kgToDisplay(Math.round(oneRM*10)/10)}${unitLabel()} 1RM</span>`:''}</div>` : ''}
       <div class="set-headers">
         <span>#</span><span>${unitLabel()}${isAssisted?' assist':''}</span><span>Reps</span><span>Difficulty</span><span></span>
       </div>
       ${ex.sets.map((set,setIdx)=>`
-        <div class="set-row">
-          <div class="set-num num">${setIdx+1}</div>
+        <div class="set-row ${set.warmup?'warmup':''}">
+          <div class="set-num num" data-toggle-warmup="${exIdx}:${setIdx}" title="Tap to mark as warm-up">${set.warmup?'W':setIdx+1}</div>
           <input type="number" inputmode="decimal" placeholder="0" value="${set.weight===0?'0':(set.weight||'')}" data-set-field="weight" data-ex-idx="${exIdx}" data-set-idx="${setIdx}">
           <input type="number" inputmode="numeric" placeholder="0" value="${set.reps||''}" data-set-field="reps" data-ex-idx="${exIdx}" data-set-idx="${setIdx}">
           <div class="difficulty-group" data-ex-idx="${exIdx}" data-set-idx="${setIdx}">
@@ -883,6 +898,14 @@ function attachWorkoutCardListeners(){
       persistActiveWorkout();
     });
   });
+  document.querySelectorAll('[data-toggle-warmup]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      const [exIdx,setIdx] = e.currentTarget.dataset.toggleWarmup.split(':').map(Number);
+      const set = activeWorkout.exercises[exIdx].sets[setIdx];
+      set.warmup = !set.warmup;
+      renderWorkoutView();
+    });
+  });
   document.querySelectorAll('[data-toggle-done]').forEach(btn=>{
     btn.addEventListener('click', (e)=>{
       const [exIdx,setIdx] = e.currentTarget.dataset.toggleDone.split(':').map(Number);
@@ -955,22 +978,42 @@ function getExerciseHistory(exId){
   sorted.forEach(s=>{
     const ex = s.exercises.find(e=>e.exId===exId);
     if(ex && ex.sets && ex.sets.length){
+      // warm-up sets don't count toward PRs, "best", or 1RM estimates
+      const workingSets = ex.sets.filter(st=>!st.warmup);
       // For assisted exercises, 0kg assistance is a real, meaningful value
       // (full bodyweight, no help) so it must not be filtered out. For normal
       // lifts, 0 means "not entered" and should be excluded.
-      const weights = ex.sets
-        .map(st=>parseFloat(st.weight))
-        .filter(w=>!isNaN(w) && (isAssisted ? w>=0 : w>0));
-      if(weights.length){
+      const validSets = workingSets.filter(st=>{
+        const w = parseFloat(st.weight);
+        return !isNaN(w) && (isAssisted ? w>=0 : w>0);
+      });
+      if(validSets.length){
+        const weights = validSets.map(st=>parseFloat(st.weight));
+        const maxWeight = Math.max(...weights);
+        const minWeight = Math.min(...weights);
+        // best set = heaviest (or least-assisted) working set, used for 1RM
+        const bestSet = isAssisted
+          ? validSets.reduce((a,b)=> parseFloat(b.weight)<parseFloat(a.weight) ? b : a)
+          : validSets.reduce((a,b)=> parseFloat(b.weight)>parseFloat(a.weight) ? b : a);
         out.push({
           date:s.date,
-          maxWeight:Math.max(...weights),
-          minWeight:Math.min(...weights)
+          maxWeight,
+          minWeight,
+          bestSetWeight: parseFloat(bestSet.weight),
+          bestSetReps: parseFloat(bestSet.reps)||0
         });
       }
     }
   });
   return out;
+}
+
+// Epley formula: 1RM = weight × (1 + reps/30). Reps of 1 returns the weight
+// itself; accuracy degrades past ~12 reps but it's the standard estimate.
+function estimate1RM(weight, reps){
+  if(!weight || !reps || reps<=0) return null;
+  if(reps===1) return weight;
+  return weight * (1 + reps/30);
 }
 
 function cancelWorkout(){
@@ -1022,6 +1065,7 @@ function finishWorkout(){
         weight: displayToKgIfNeeded(s.weight),
         reps: s.reps||'',
         difficulty: s.difficulty||'medium',
+        warmup: !!s.warmup,
         done: !!s.done
       })),
       notes: ex.notes||''
@@ -1475,15 +1519,29 @@ function renderProgressList(){
       const exDef = findExercise(ex.exId);
       const isAssisted = !!(exDef && exDef.assisted);
       if(!map[ex.exId]) map[ex.exId] = {name:ex.name, entries:[], assisted:isAssisted};
+      // warm-up sets don't count toward best/PR/1RM tracking
+      const workingSets = ex.sets.filter(st=>!st.warmup);
       // for assisted exercises 0kg assistance is a real, meaningful value
       // (no help at all) and must not be filtered out like a blank entry.
-      const weights = ex.sets
-        .map(st=>parseFloat(st.weight))
-        .filter(w=>!isNaN(w) && (isAssisted ? w>=0 : w>0));
+      const validSets = workingSets.filter(st=>{
+        const w = parseFloat(st.weight);
+        return !isNaN(w) && (isAssisted ? w>=0 : w>0);
+      });
+      const weights = validSets.map(st=>parseFloat(st.weight));
       const maxW = weights.length ? Math.max(...weights) : null;
       const minW = weights.length ? Math.min(...weights) : null;
-      const totalReps = ex.sets.reduce((a,st)=>a+(parseFloat(st.reps)||0),0);
-      map[ex.exId].entries.push({date:s.date, maxWeight:maxW, minWeight:minW, sets:ex.sets.length, totalReps});
+      const bestSet = validSets.length
+        ? (isAssisted
+            ? validSets.reduce((a,b)=> parseFloat(b.weight)<parseFloat(a.weight) ? b : a)
+            : validSets.reduce((a,b)=> parseFloat(b.weight)>parseFloat(a.weight) ? b : a))
+        : null;
+      const totalReps = workingSets.reduce((a,st)=>a+(parseFloat(st.reps)||0),0);
+      map[ex.exId].entries.push({
+        date:s.date, maxWeight:maxW, minWeight:minW,
+        bestSetWeight: bestSet ? parseFloat(bestSet.weight) : null,
+        bestSetReps: bestSet ? (parseFloat(bestSet.reps)||0) : null,
+        sets:workingSets.length, totalReps
+      });
     });
   });
 
@@ -1512,6 +1570,13 @@ function renderProgressList(){
     const latest = sorted[sorted.length-1];
     const spark = points.length>=2 ? buildSparkline(points.slice(-10), isAssisted) : '<span class="text-faint text-sm">Not enough data</span>';
     const displayBest = best!==null ? kgToDisplay(best) : null;
+
+    let best1RM = null;
+    if(!isAssisted){
+      const oneRMs = sorted.map(e=>estimate1RM(e.bestSetWeight, e.bestSetReps)).filter(v=>v!==null);
+      best1RM = oneRMs.length ? Math.max(...oneRMs) : null;
+    }
+
     return `<div class="progress-ex-card">
       <div class="progress-ex-header">
         <h3>${v.name}</h3>
@@ -1521,7 +1586,7 @@ function renderProgressList(){
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
         Lower assistance is better
       </div>` : ''}
-      <div class="sparkline-row mt-8">${spark}<span class="sparkline-label">progression</span></div>
+      <div class="sparkline-row mt-8">${spark}<span class="sparkline-label">progression</span>${best1RM!==null?`<span class="one-rm-badge">~${kgToDisplay(Math.round(best1RM*10)/10)}${unitLabel()} 1RM</span>`:''}</div>
       <div class="progress-ex-stats">
         <div class="progress-ex-stat"><div class="v num">${displayBest!==null ? displayBest : '–'}</div><div class="l">${isAssisted ? 'Least assist' : 'Best'} ${unitLabel()}</div></div>
         <div class="progress-ex-stat"><div class="v num">${latest.sets}</div><div class="l">Last sets</div></div>
@@ -1773,7 +1838,7 @@ function showSessionDetail(session){
           const w = kgToDisplay(isNaN(wNum) ? 0 : wNum);
           const wDisplay = (s.weight===0 || s.weight==='0' || w>0) ? w : '–';
           const diffLabel = {easy:'Easy', medium:'Medium', hard:'Hard'}[s.difficulty] || 'Medium';
-          return `<div class="text-sm text-muted num">Set ${i+1}: ${wDisplay} ${unitLabel()}${isAssisted?' assist':''} × ${s.reps||'–'} reps · ${diffLabel}</div>`;
+          return `<div class="text-sm text-muted num">Set ${i+1}: ${wDisplay} ${unitLabel()}${isAssisted?' assist':''} × ${s.reps||'–'} reps · ${diffLabel}${s.warmup?' · <span style="color:var(--cyan);">Warm-up</span>':''}</div>`;
         }).join('')}
         ${ex.notes ? `<div class="text-sm text-faint mt-4">"${ex.notes}"</div>` : ''}
       </div>
