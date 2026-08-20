@@ -292,7 +292,7 @@ function startWorkoutFromTemplate(templateId){
   const template = state.templates.find(t=>t.id===templateId);
   if(!template) return;
   if(!activeWorkout){
-    activeWorkout = {startedAt: Date.now(), date: todayISO(), exercises:[]};
+    activeWorkout = {startedAt: Date.now(), date: todayISO(), exercises:[], restDuration: 90};
     startWorkoutTimer();
   }
   template.exIds.forEach(exId=>{
@@ -515,7 +515,8 @@ function startWorkout(dateISO){
     activeWorkout = {
       startedAt: Date.now(),
       date: dateISO || todayISO(),
-      exercises: []
+      exercises: [],
+      restDuration: 90
     };
     startWorkoutTimer();
   }
@@ -576,6 +577,8 @@ function renderWorkoutView(){
       debouncedPersistActiveWorkout();
     };
   }
+
+  renderRestDurationChips();
 
   const wrap = document.getElementById('workoutExerciseCards');
   const empty = document.getElementById('workoutEmptyState');
@@ -671,6 +674,179 @@ function renderWorkoutView(){
   attachWorkoutCardListeners();
 }
 
+/* ---------------- REST DURATION PICKER ---------------- */
+function renderRestDurationChips(){
+  const current = activeWorkout.restDuration || 90;
+  document.querySelectorAll('#restDurationChips .rest-chip').forEach(chip=>{
+    chip.classList.toggle('active', +chip.dataset.rest===current);
+  });
+}
+
+document.getElementById('restDurationChips').addEventListener('click', (e)=>{
+  const chip = e.target.closest('.rest-chip');
+  if(!chip || !activeWorkout) return;
+  activeWorkout.restDuration = +chip.dataset.rest;
+  persistActiveWorkout();
+  renderRestDurationChips();
+});
+
+/* ---------------- REST TIMER ----------------
+   Starts automatically whenever a set is checked off. Runs independently
+   of renderWorkoutView() re-renders (its own interval + DOM node) so
+   typing in other fields or adding sets doesn't interrupt the countdown.
+------------------------------------------------- */
+let restTimer = {
+  active: false,
+  totalSeconds: 0,
+  remainingSeconds: 0,
+  intervalId: null,
+  audioCtx: null
+};
+
+function startRestTimer(seconds){
+  stopRestTimer(); // clear any existing one first
+  primeAudioContext(); // must happen inside this user-gesture call stack so the
+                        // browser allows audio playback later when the timer fires
+  restTimer.active = true;
+  restTimer.totalSeconds = seconds;
+  restTimer.remainingSeconds = seconds;
+  ensureRestTimerBar();
+  renderRestTimerBar();
+  restTimer.intervalId = setInterval(()=>{
+    restTimer.remainingSeconds--;
+    if(restTimer.remainingSeconds <= 0){
+      restTimer.remainingSeconds = 0;
+      renderRestTimerBar();
+      onRestTimerComplete();
+      return;
+    }
+    renderRestTimerBar();
+  }, 1000);
+}
+
+function primeAudioContext(){
+  try{
+    if(!restTimer.audioCtx){
+      restTimer.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if(restTimer.audioCtx.state === 'suspended') restTimer.audioCtx.resume();
+  }catch(e){
+    console.warn('Could not initialize audio context', e);
+  }
+}
+
+function stopRestTimer(){
+  if(restTimer.intervalId) clearInterval(restTimer.intervalId);
+  restTimer.intervalId = null;
+  restTimer.active = false;
+  removeRestTimerBar();
+}
+
+function addRestTime(deltaSeconds){
+  if(!restTimer.active) return;
+  restTimer.remainingSeconds = Math.max(0, restTimer.remainingSeconds + deltaSeconds);
+  restTimer.totalSeconds = Math.max(restTimer.totalSeconds, restTimer.remainingSeconds);
+  renderRestTimerBar();
+}
+
+function onRestTimerComplete(){
+  clearInterval(restTimer.intervalId);
+  restTimer.intervalId = null;
+  playRestTimerAlert();
+  const bar = document.getElementById('restTimerBar');
+  if(bar) bar.classList.add('done');
+  const title = document.getElementById('restTimerTitle');
+  if(title) title.textContent = 'Rest complete';
+  const sub = document.getElementById('restTimerSub');
+  if(sub) sub.textContent = 'Tap to dismiss';
+  // auto-dismiss a few seconds after completion if the user doesn't interact
+  setTimeout(()=>{
+    if(restTimer.active && restTimer.remainingSeconds<=0) stopRestTimer();
+  }, 6000);
+}
+
+function ensureRestTimerBar(){
+  if(document.getElementById('restTimerBar')) return;
+  const bar = document.createElement('div');
+  bar.className = 'rest-timer-bar';
+  bar.id = 'restTimerBar';
+  bar.innerHTML = `
+    <div class="rest-timer-ring">
+      <svg width="48" height="48" viewBox="0 0 48 48">
+        <circle class="bg-ring" cx="24" cy="24" r="20" fill="none" stroke-width="4"/>
+        <circle class="fg-ring" id="restRingFg" cx="24" cy="24" r="20" fill="none" stroke-width="4" stroke-dasharray="126" stroke-dashoffset="0"/>
+      </svg>
+      <div class="rest-timer-ring-label num" id="restRingLabel">0:00</div>
+    </div>
+    <div class="rest-timer-info">
+      <div class="rest-timer-title" id="restTimerTitle">Resting</div>
+      <div class="rest-timer-sub" id="restTimerSub">Next set coming up</div>
+    </div>
+    <div class="rest-timer-actions">
+      <button class="rest-timer-btn" id="btnRestMinus15" aria-label="Subtract 15 seconds">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14"/></svg>
+      </button>
+      <button class="rest-timer-btn" id="btnRestSkip" aria-label="Skip rest">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4l10 8-10 8V4zM19 5v14"/></svg>
+      </button>
+    </div>
+  `;
+  document.body.appendChild(bar);
+  document.getElementById('btnRestMinus15').addEventListener('click', ()=>addRestTime(-15));
+  document.getElementById('btnRestSkip').addEventListener('click', stopRestTimer);
+  bar.addEventListener('click', (e)=>{
+    // tapping the bar itself (not the action buttons) dismisses once complete
+    if(restTimer.remainingSeconds<=0 && !restTimer.intervalId) stopRestTimer();
+  });
+}
+
+function removeRestTimerBar(){
+  const bar = document.getElementById('restTimerBar');
+  if(bar) bar.remove();
+}
+
+function renderRestTimerBar(){
+  const label = document.getElementById('restRingLabel');
+  const ring = document.getElementById('restRingFg');
+  if(!label || !ring) return;
+  const m = Math.floor(restTimer.remainingSeconds/60);
+  const s = (restTimer.remainingSeconds%60).toString().padStart(2,'0');
+  label.textContent = `${m}:${s}`;
+  const circumference = 126;
+  const pct = restTimer.totalSeconds>0 ? restTimer.remainingSeconds/restTimer.totalSeconds : 0;
+  ring.style.strokeDashoffset = circumference*(1-pct);
+}
+
+function playRestTimerAlert(){
+  // vibration for haptic feedback, if supported
+  if(navigator.vibrate) navigator.vibrate([200,100,200,100,300]);
+  // Web Audio tone so it's audible over music without needing an audio
+  // asset file; three ascending beeps, distinct from typical notification sounds.
+  try{
+    if(!restTimer.audioCtx){
+      restTimer.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    const ctx = restTimer.audioCtx;
+    if(ctx.state === 'suspended') ctx.resume();
+    const notes = [880, 1046.5, 1318.5]; // A5, C6, E6 — bright, cuts through mixes
+    notes.forEach((freq, i)=>{
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      const startTime = ctx.currentTime + i*0.18;
+      gain.gain.setValueAtTime(0, startTime);
+      gain.gain.linearRampToValueAtTime(0.35, startTime+0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime+0.32);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(startTime);
+      osc.stop(startTime+0.35);
+    });
+  }catch(e){
+    console.warn('Rest timer audio alert failed', e);
+  }
+}
+
 function ensureFinishBar(){
   if(document.getElementById('finishBar')) return;
   const bar = document.createElement('div');
@@ -712,6 +888,9 @@ function attachWorkoutCardListeners(){
       const [exIdx,setIdx] = e.currentTarget.dataset.toggleDone.split(':').map(Number);
       const set = activeWorkout.exercises[exIdx].sets[setIdx];
       set.done = !set.done;
+      if(set.done){
+        startRestTimer(activeWorkout.restDuration || 90);
+      }
       renderWorkoutView();
     });
   });
@@ -802,6 +981,7 @@ function cancelWorkout(){
   persistActiveWorkout();
   clearInterval(workoutTimerInterval);
   removeFinishBar();
+  stopRestTimer();
   showView('home');
 }
 
@@ -878,6 +1058,7 @@ function finishWorkout(){
   persistActiveWorkout();
   clearInterval(workoutTimerInterval);
   removeFinishBar();
+  stopRestTimer();
   showSessionSummary(session);
 }
 
@@ -1073,7 +1254,7 @@ function addExerciseToWorkout(exId){
     return;
   }
   if(!activeWorkout){
-    activeWorkout = {startedAt: Date.now(), date: todayISO(), exercises:[]};
+    activeWorkout = {startedAt: Date.now(), date: todayISO(), exercises:[], restDuration: 90};
     startWorkoutTimer();
   }
   activeWorkout.exercises.unshift({
@@ -1136,7 +1317,7 @@ document.getElementById('btnSaveWalk').addEventListener('click', ()=>{
 
   if(walkSheetMode==='session'){
     if(!activeWorkout){
-      activeWorkout = {startedAt: Date.now(), date: todayISO(), exercises:[]};
+      activeWorkout = {startedAt: Date.now(), date: todayISO(), exercises:[], restDuration: 90};
       startWorkoutTimer();
     }
     activeWorkout.exercises.unshift(walkExercise);
