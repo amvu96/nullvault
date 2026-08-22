@@ -98,20 +98,52 @@
     <div class="section-label">// LINK SCANNING ENGINE</div>
     <div class="card">
       <p class="muted-text small-text">
-        Scanned links can be checked against VirusTotal's threat engines. Bring your own free API key — it's stored only in this browser, never sent anywhere but VirusTotal.
+        Choose which engine checks scanned links. Keys are stored only in this browser, never sent anywhere but the engine you pick below.
       </p>
-      <label class="field-label" for="vtApiKey">VIRUSTOTAL API KEY</label>
-      <input class="text-input" type="password" id="vtApiKey" placeholder="PASTE API KEY" autocomplete="off" spellcheck="false">
-      <div class="row-buttons">
-        <button class="btn btn-primary" id="saveVtKey">SAVE KEY</button>
-        <button class="btn btn-ghost" id="clearVtKey">CLEAR</button>
+      <div class="chip-row" id="engineChips" style="margin-top:12px;">
+        <button class="chip active" data-engine="virustotal">VIRUSTOTAL</button>
+        <button class="chip" data-engine="urlscan">URLSCAN.IO</button>
       </div>
-      <div class="badge-row">
-        <span class="badge" id="vtKeyStatus">// NO KEY SET</span>
+
+      <div class="engine-panel" id="enginePanel-virustotal">
+        <label class="field-label" for="vtApiKey" style="margin-top:14px;">VIRUSTOTAL API KEY</label>
+        <input class="text-input" type="password" id="vtApiKey" placeholder="PASTE API KEY" autocomplete="off" spellcheck="false">
+        <div class="row-buttons">
+          <button class="btn btn-primary" id="saveVtKey">SAVE KEY</button>
+          <button class="btn btn-ghost" id="clearVtKey">CLEAR</button>
+        </div>
+        <div class="badge-row">
+          <span class="badge" id="vtKeyStatus">// NO KEY SET</span>
+        </div>
+        <p class="muted-text small-text" id="vtCorsNote">
+          Note: some browsers block direct API calls to VirusTotal (CORS). If checks fail to complete, scanr falls back to a one-tap manual lookup on virustotal.com.
+        </p>
       </div>
-      <p class="muted-text small-text" id="vtCorsNote">
-        Note: some browsers block direct API calls to VirusTotal (CORS). If checks fail to complete, scanr falls back to a one-tap manual lookup on virustotal.com.
-      </p>
+
+      <div class="engine-panel" id="enginePanel-urlscan" hidden>
+        <p class="muted-text small-text" style="margin-top:14px;">
+          urlscan.io works without a key for public scans. Add a free key for private scans and higher limits.
+        </p>
+        <label class="field-label" for="urlscanApiKey">URLSCAN.IO API KEY (OPTIONAL)</label>
+        <input class="text-input" type="password" id="urlscanApiKey" placeholder="PASTE API KEY — OR LEAVE BLANK" autocomplete="off" spellcheck="false">
+        <div class="row-buttons">
+          <button class="btn btn-primary" id="saveUrlscanKey">SAVE KEY</button>
+          <button class="btn btn-ghost" id="clearUrlscanKey">CLEAR</button>
+        </div>
+        <div class="badge-row">
+          <span class="badge" id="urlscanKeyStatus">// NO KEY · PUBLIC SCANS</span>
+        </div>
+        <div class="setting-row" style="margin-top:4px;">
+          <span class="small-text muted-text">SCAN VISIBILITY</span>
+          <div class="chip-row" id="urlscanVisibilityChips" style="margin:0;">
+            <button class="chip active" data-visibility="public">PUBLIC</button>
+            <button class="chip" data-visibility="unlisted">UNLISTED</button>
+          </div>
+        </div>
+        <p class="muted-text small-text">
+          Public scans are visible to anyone on urlscan.io. Unlisted scans require an API key and won't appear in public search.
+        </p>
+      </div>
     </div>
 
     <div class="section-label">// SYSTEM</div>
