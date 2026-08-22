@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'scanr-v1';
+const CACHE_VERSION = 'scanr-v2';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
@@ -40,9 +40,10 @@ self.addEventListener('activate', (event) => {
 });
 
 // Strategy:
-// - App shell (same-origin, in SHELL_ASSETS): cache-first, so the UI works offline instantly.
+// - App shell (same-origin, in SHELL_ASSETS): network-first, so users always get
+//   the latest deployed version when online; falls back to cache when offline.
 // - Third-party runtime deps (e.g. jsQR CDN, fonts): stale-while-revalidate.
-// - Everything else (e.g. VirusTotal API calls, camera): network-only, never cached.
+// - Everything else (e.g. VirusTotal/urlscan.io API calls, camera): network-only, never cached.
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   const url = new URL(req.url);
@@ -51,19 +52,19 @@ self.addEventListener('fetch', (event) => {
 
   // Never cache API calls to scanning engines or anything cross-origin API-like.
   if (url.hostname.includes('virustotal.com')) return;
+  if (url.hostname.includes('urlscan.io')) return;
 
   const isSameOrigin = url.origin === self.location.origin;
 
   if (isSameOrigin) {
     event.respondWith(
-      caches.match(req).then((cached) => {
-        if (cached) return cached;
-        return fetch(req).then((res) => {
+      fetch(req)
+        .then((res) => {
           const copy = res.clone();
           caches.open(SHELL_CACHE).then((cache) => cache.put(req, copy));
           return res;
-        }).catch(() => cached);
-      })
+        })
+        .catch(() => caches.match(req))
     );
     return;
   }
