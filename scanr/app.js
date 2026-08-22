@@ -357,7 +357,8 @@
       clean: '<span class="badge badge-green">CLEAN</span>',
       suspicious: '<span class="badge badge-danger">SUSPICIOUS</span>',
       malicious: '<span class="badge badge-danger">THREAT</span>',
-      unreachable: '<span class="badge">UNVERIFIED</span>'
+      unreachable: '<span class="badge">UNVERIFIED</span>',
+      error: '<span class="badge badge-danger">CHECK FAILED</span>'
     };
     return map[s] || '';
   }
@@ -366,7 +367,7 @@
     if (entry.type !== 'url') return '';
     // Show whichever engine has the most decisive/recent result: a flagged
     // or clean result always wins over an unchecked/pending state.
-    const rank = { malicious: 4, suspicious: 4, clean: 3, unreachable: 2, pending: 1, unchecked: 0 };
+    const rank = { malicious: 4, suspicious: 4, clean: 3, error: 2, unreachable: 2, pending: 1, unchecked: 0 };
     const vt = entry.vt || { status: 'unchecked' };
     const us = entry.urlscan || { status: 'unchecked' };
     const winner = (rank[us.status] || 0) > (rank[vt.status] || 0) ? us : vt;
@@ -594,10 +595,11 @@
 
   function urlscanStatusBoxHTML(entry) {
     const us = entry.urlscan || { status: 'unchecked' };
+    const hasKey = !!getUrlscanKey();
     if (us.status === 'unchecked') {
       return `<div class="vt-status-box">
-        <div class="vt-status-label">Not checked yet<small>Run a security scan with urlscan.io</small></div>
-        <button class="btn btn-secondary btn-sm" id="urlscanRunBtn">CHECK</button>
+        <div class="vt-status-label">Not checked yet<small>${hasKey ? 'Run a security scan with urlscan.io' : 'Add an API key in Settings to enable checks'}</small></div>
+        <button class="btn btn-secondary btn-sm" id="urlscanRunBtn" ${hasKey ? '' : 'disabled'}>CHECK</button>
       </div>`;
     }
     if (us.status === 'pending') {
@@ -609,6 +611,12 @@
       return `<div class="vt-status-box">
         <div class="vt-status-label" style="color:var(--faint)">Engine unreachable from this browser<small>${escapeHtml(us.message || 'Try a manual check instead')}</small></div>
         <button class="btn btn-ghost btn-sm" id="urlscanManualBtn">MANUAL CHECK</button>
+      </div>`;
+    }
+    if (us.status === 'error') {
+      return `<div class="vt-status-box">
+        <div class="vt-status-label" style="color:var(--danger)">urlscan.io returned an error${us.httpStatus ? ` (HTTP ${us.httpStatus})` : ''}<small>${escapeHtml(us.message || 'Something went wrong.')}</small></div>
+        <button class="btn btn-ghost btn-sm" id="urlscanRunBtn">RETRY</button>
       </div>`;
     }
     if (us.status === 'clean') {
@@ -759,7 +767,9 @@
       if (entry.urlscan && entry.urlscan.reportUrl) {
         window.open(entry.urlscan.reportUrl, '_blank', 'noopener,noreferrer');
       } else {
-        window.open('https://urlscan.io/search/#' + encodeURIComponent(entry.parsed.url), '_blank', 'noopener,noreferrer');
+        let hostname = entry.parsed.hostname;
+        try { hostname = new URL(entry.parsed.url).hostname; } catch (e) {}
+        window.open('https://urlscan.io/search/?q=' + encodeURIComponent('domain:' + hostname), '_blank', 'noopener,noreferrer');
       }
     });
 
@@ -913,28 +923,54 @@
   /* =====================================================
      URLSCAN.IO INTEGRATION
      ===================================================== */
+  class UrlscanApiError extends Error {
+    constructor(message, status) {
+      super(message);
+      this.name = 'UrlscanApiError';
+      this.status = status;
+    }
+  }
+
   async function runUrlscanScan(entry) {
     const key = getUrlscanKey();
-    const visibility = key ? getUrlscanVisibility() : 'public';
+    if (!key) { toast('ADD A URLSCAN.IO API KEY IN SETTINGS', 'error'); return; }
+    const visibility = getUrlscanVisibility();
 
     entry.urlscan = { status: 'pending' };
     persistHistory();
     refreshUrlscanUI(entry);
 
     try {
-      const headers = { 'content-type': 'application/json' };
-      if (key) headers['API-Key'] = key;
-
-      const submitRes = await fetch('https://urlscan.io/api/v1/scan/', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ url: entry.parsed.url, visibility })
-      });
-      if (!submitRes.ok) {
-        // 400 with "blacklisted"/"not allowed" happens for some domains — surface it plainly.
-        const errJson = await submitRes.json().catch(() => ({}));
-        throw new Error(errJson.message || ('submit_' + submitRes.status));
+      let submitRes;
+      try {
+        submitRes = await fetch('https://urlscan.io/api/v1/scan/', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'API-Key': key },
+          body: JSON.stringify({ url: entry.parsed.url, visibility })
+        });
+      } catch (networkErr) {
+        // fetch() itself throwing (TypeError) means the request never got a
+        // response at all — DNS failure, offline, CORS block, etc.
+        throw new UrlscanApiError('Network request failed — check your connection or try again.', null);
       }
+
+      if (!submitRes.ok) {
+        // We DID get a real response from urlscan.io — this is an API error,
+        // not a network failure. Surface the server's actual reason.
+        const errJson = await submitRes.json().catch(() => ({}));
+        const reason = errJson.message || errJson.description;
+        if (submitRes.status === 401 || submitRes.status === 403) {
+          throw new UrlscanApiError(reason || 'API key was rejected — check it in Settings.', submitRes.status);
+        }
+        if (submitRes.status === 429) {
+          throw new UrlscanApiError(reason || 'Rate limit or quota exceeded — try again later.', submitRes.status);
+        }
+        if (submitRes.status === 400) {
+          throw new UrlscanApiError(reason || 'This URL was rejected by urlscan.io (blocked, malformed, or on a blocklist).', submitRes.status);
+        }
+        throw new UrlscanApiError(reason || `urlscan.io returned an error (HTTP ${submitRes.status}).`, submitRes.status);
+      }
+
       const submitJson = await submitRes.json();
       const uuid = submitJson.uuid;
       const reportUrl = submitJson.result || `https://urlscan.io/result/${uuid}/`;
@@ -942,15 +978,22 @@
       let resultJson = null;
       for (let attempt = 0; attempt < 8; attempt++) {
         await sleep(3000);
-        const resRes = await fetch(`https://urlscan.io/api/v1/result/${uuid}/`);
+        let resRes;
+        try {
+          resRes = await fetch(`https://urlscan.io/api/v1/result/${uuid}/`, {
+            headers: { 'API-Key': key }
+          });
+        } catch (networkErr) {
+          throw new UrlscanApiError('Lost connection while waiting for results.', null);
+        }
         if (resRes.status === 404) continue; // not ready yet
-        if (!resRes.ok) throw new Error('poll_' + resRes.status);
+        if (!resRes.ok) throw new UrlscanApiError(`urlscan.io returned an error while polling (HTTP ${resRes.status}).`, resRes.status);
         resultJson = await resRes.json();
         break;
       }
 
       if (!resultJson) {
-        entry.urlscan = { status: 'pending', message: 'Still analyzing — check back soon.', reportUrl };
+        entry.urlscan = { status: 'pending', message: 'Still analyzing — check back soon.', reportUrl, uuid };
       } else {
         const verdicts = resultJson.verdicts || {};
         const overall = verdicts.overall || {};
@@ -977,10 +1020,16 @@
         };
       }
     } catch (err) {
-      entry.urlscan = {
-        status: 'unreachable',
-        message: err && err.message ? String(err.message) : 'Could not reach urlscan.io from this browser.'
-      };
+      if (err instanceof UrlscanApiError && err.status) {
+        // A real HTTP response came back — this is an API-level error, not
+        // a network/CORS failure, so label and style it accordingly.
+        entry.urlscan = { status: 'error', message: err.message, httpStatus: err.status };
+      } else {
+        entry.urlscan = {
+          status: 'unreachable',
+          message: err && err.message ? String(err.message) : 'Could not reach urlscan.io from this browser.'
+        };
+      }
     }
 
     persistHistory();
@@ -1127,7 +1176,7 @@
       const engine = getActiveEngine();
       if (engine === 'virustotal' && getVtKey()) {
         runVtScan(entry);
-      } else if (engine === 'urlscan') {
+      } else if (engine === 'urlscan' && getUrlscanKey()) {
         runUrlscanScan(entry);
       }
     }
@@ -1287,7 +1336,7 @@
       el.textContent = '// KEY SAVED · ' + '•'.repeat(Math.min(key.length, 8));
       el.className = 'badge badge-green';
     } else {
-      el.textContent = '// NO KEY · PUBLIC SCANS';
+      el.textContent = '// NO KEY SET';
       el.className = 'badge';
     }
   }
