@@ -6,6 +6,9 @@
      ===================================================== */
   const HISTORY_KEY = 'scanr_history_v1';
   const VT_KEY_STORAGE = 'scanr_vt_api_key_v1';
+  const URLSCAN_KEY_STORAGE = 'scanr_urlscan_api_key_v1';
+  const URLSCAN_VISIBILITY_STORAGE = 'scanr_urlscan_visibility_v1';
+  const ACTIVE_ENGINE_STORAGE = 'scanr_active_engine_v1';
   const MAX_HISTORY = 500;
 
   const els = {};
@@ -108,6 +111,30 @@
   }
   function clearVtKeyStorage() {
     localStorage.removeItem(VT_KEY_STORAGE);
+  }
+
+  function getUrlscanKey() {
+    return localStorage.getItem(URLSCAN_KEY_STORAGE) || '';
+  }
+  function setUrlscanKeyStorage(key) {
+    localStorage.setItem(URLSCAN_KEY_STORAGE, key);
+  }
+  function clearUrlscanKeyStorage() {
+    localStorage.removeItem(URLSCAN_KEY_STORAGE);
+  }
+
+  function getUrlscanVisibility() {
+    return localStorage.getItem(URLSCAN_VISIBILITY_STORAGE) || 'public';
+  }
+  function setUrlscanVisibility(v) {
+    localStorage.setItem(URLSCAN_VISIBILITY_STORAGE, v);
+  }
+
+  function getActiveEngine() {
+    return localStorage.getItem(ACTIVE_ENGINE_STORAGE) || 'virustotal';
+  }
+  function setActiveEngine(engine) {
+    localStorage.setItem(ACTIVE_ENGINE_STORAGE, engine);
   }
 
   /* =====================================================
@@ -284,7 +311,8 @@
       type,
       parsed,
       timestamp: Date.now(),
-      vt: type === 'url' ? { status: 'unchecked' } : null
+      vt: type === 'url' ? { status: 'unchecked' } : null,
+      urlscan: type === 'url' ? { status: 'unchecked' } : null
     };
     history.unshift(entry);
     persistHistory();
@@ -309,7 +337,11 @@
   function renderStats() {
     const total = history.length;
     const links = history.filter((e) => e.type === 'url').length;
-    const flagged = history.filter((e) => e.vt && (e.vt.status === 'malicious' || e.vt.status === 'suspicious')).length;
+    const flagged = history.filter((e) => {
+      const vtFlag = e.vt && (e.vt.status === 'malicious' || e.vt.status === 'suspicious');
+      const usFlag = e.urlscan && (e.urlscan.status === 'malicious' || e.urlscan.status === 'suspicious');
+      return vtFlag || usFlag;
+    }).length;
     els.statTotal.textContent = total;
     els.statLinks.textContent = links;
     els.statFlagged.textContent = flagged;
@@ -318,9 +350,7 @@
   /* =====================================================
      RENDER: HISTORY LISTS
      ===================================================== */
-  function vtBadgeSnippet(entry) {
-    if (entry.type !== 'url' || !entry.vt) return '';
-    const s = entry.vt.status;
+  function statusBadgeMap(s) {
     const map = {
       unchecked: '',
       pending: '<span class="badge"><span class="spinner"></span>CHECKING</span>',
@@ -330,6 +360,17 @@
       unreachable: '<span class="badge">UNVERIFIED</span>'
     };
     return map[s] || '';
+  }
+
+  function vtBadgeSnippet(entry) {
+    if (entry.type !== 'url') return '';
+    // Show whichever engine has the most decisive/recent result: a flagged
+    // or clean result always wins over an unchecked/pending state.
+    const rank = { malicious: 4, suspicious: 4, clean: 3, unreachable: 2, pending: 1, unchecked: 0 };
+    const vt = entry.vt || { status: 'unchecked' };
+    const us = entry.urlscan || { status: 'unchecked' };
+    const winner = (rank[us.status] || 0) > (rank[vt.status] || 0) ? us : vt;
+    return statusBadgeMap(winner.status);
   }
 
   function historyItemHTML(entry) {
@@ -408,6 +449,7 @@
     els.bottomSheet.hidden = true;
     els.bottomSheet.style.transform = '';
     activeSheetEntryId = null;
+    sheetIsFresh = false;
     document.body.style.overflow = '';
   }
 
@@ -452,9 +494,11 @@
   /* =====================================================
      SHEET CONTENT BUILDERS PER TYPE
      ===================================================== */
+  let sheetIsFresh = false;
   function buildSheetForEntry(entry, opts = {}) {
     activeSheetEntryId = entry.id;
-    const isFresh = !!opts.fresh;
+    if (opts.fresh !== undefined) sheetIsFresh = !!opts.fresh;
+    const isFresh = sheetIsFresh;
     let body = '';
 
     switch (entry.type) {
@@ -484,13 +528,29 @@
 
   function sheetForUrl(entry) {
     const { url, hostname } = entry.parsed;
+    const engine = getActiveEngine();
     return `
       ${sheetHeader('// LINK DETECTED', hostname)}
       <div class="sheet-raw-box">${escapeHtml(url)}</div>
-      <div id="vtBox">${vtStatusBoxHTML(entry)}</div>
+      ${urlscanPreviewHTML(entry)}
+      <div class="chip-row" id="vtEngineSwitch" style="margin-bottom:10px;">
+        <button class="chip ${engine === 'virustotal' ? 'active' : ''}" data-sheet-engine="virustotal">VIRUSTOTAL</button>
+        <button class="chip ${engine === 'urlscan' ? 'active' : ''}" data-sheet-engine="urlscan">URLSCAN.IO</button>
+      </div>
+      <div id="vtBox">${engine === 'urlscan' ? urlscanStatusBoxHTML(entry) : vtStatusBoxHTML(entry)}</div>
       <div class="sheet-actions">
         <button class="btn btn-primary" id="sheetOpenBtn">OPEN LINK</button>
         <button class="btn btn-ghost" id="sheetCopyBtn">COPY LINK</button>
+      </div>`;
+  }
+
+  function urlscanPreviewHTML(entry) {
+    const us = entry.urlscan;
+    if (!us || !us.screenshotUrl) return '';
+    return `
+      <div class="site-preview">
+        <img src="${escapeHtml(us.screenshotUrl)}" alt="Site preview" loading="lazy">
+        <div class="site-preview-label">// SITE PREVIEW · URLSCAN.IO</div>
       </div>`;
   }
 
@@ -527,6 +587,40 @@
       return `<div class="vt-status-box">
         <div class="vt-status-label"><span class="badge badge-danger">${vt.status === 'malicious' ? 'THREAT DETECTED' : 'SUSPICIOUS'}</span><small>${n} of ${(s.malicious||0)+(s.suspicious||0)+(s.harmless||0)+(s.undetected||0)} engines flagged this link</small></div>
         <button class="btn btn-ghost btn-sm" id="vtManualBtn">VIEW REPORT</button>
+      </div>`;
+    }
+    return '';
+  }
+
+  function urlscanStatusBoxHTML(entry) {
+    const us = entry.urlscan || { status: 'unchecked' };
+    if (us.status === 'unchecked') {
+      return `<div class="vt-status-box">
+        <div class="vt-status-label">Not checked yet<small>Run a security scan with urlscan.io</small></div>
+        <button class="btn btn-secondary btn-sm" id="urlscanRunBtn">CHECK</button>
+      </div>`;
+    }
+    if (us.status === 'pending') {
+      return `<div class="vt-status-box">
+        <div class="vt-status-label"><span class="spinner"></span> &nbsp;Scanning with urlscan.io…<small>This usually takes 10–20 seconds</small></div>
+      </div>`;
+    }
+    if (us.status === 'unreachable') {
+      return `<div class="vt-status-box">
+        <div class="vt-status-label" style="color:var(--faint)">Engine unreachable from this browser<small>${escapeHtml(us.message || 'Try a manual check instead')}</small></div>
+        <button class="btn btn-ghost btn-sm" id="urlscanManualBtn">MANUAL CHECK</button>
+      </div>`;
+    }
+    if (us.status === 'clean') {
+      return `<div class="vt-status-box">
+        <div class="vt-status-label"><span class="badge badge-green">CLEAN</span><small>${us.verdictLabel || 'No malicious indicators found'}</small></div>
+        <button class="btn btn-ghost btn-sm" id="urlscanManualBtn">VIEW REPORT</button>
+      </div>`;
+    }
+    if (us.status === 'suspicious' || us.status === 'malicious') {
+      return `<div class="vt-status-box">
+        <div class="vt-status-label"><span class="badge badge-danger">${us.status === 'malicious' ? 'THREAT DETECTED' : 'SUSPICIOUS'}</span><small>${escapeHtml(us.verdictLabel || 'Flagged by urlscan.io')}</small></div>
+        <button class="btn btn-ghost btn-sm" id="urlscanManualBtn">VIEW REPORT</button>
       </div>`;
     }
     return '';
@@ -655,6 +749,26 @@
     const vtManualBtn = byId('vtManualBtn');
     if (vtManualBtn) vtManualBtn.addEventListener('click', () => {
       window.open('https://www.virustotal.com/gui/search/' + encodeURIComponent(entry.parsed.url), '_blank', 'noopener,noreferrer');
+    });
+
+    const urlscanRunBtn = byId('urlscanRunBtn');
+    if (urlscanRunBtn) urlscanRunBtn.addEventListener('click', () => runUrlscanScan(entry));
+
+    const urlscanManualBtn = byId('urlscanManualBtn');
+    if (urlscanManualBtn) urlscanManualBtn.addEventListener('click', () => {
+      if (entry.urlscan && entry.urlscan.reportUrl) {
+        window.open(entry.urlscan.reportUrl, '_blank', 'noopener,noreferrer');
+      } else {
+        window.open('https://urlscan.io/search/#' + encodeURIComponent(entry.parsed.url), '_blank', 'noopener,noreferrer');
+      }
+    });
+
+    const engineSwitch = byId('vtEngineSwitch');
+    if (engineSwitch) engineSwitch.addEventListener('click', (e) => {
+      const chip = e.target.closest('[data-sheet-engine]');
+      if (!chip) return;
+      setActiveEngine(chip.dataset.sheetEngine);
+      buildSheetForEntry(entry);
     });
   }
 
@@ -789,9 +903,97 @@
   function refreshVtUI(entry) {
     if (activeSheetEntryId === entry.id) {
       const box = els.sheetContent.querySelector('#vtBox');
-      if (box) {
+      if (box && getActiveEngine() === 'virustotal') {
         box.innerHTML = vtStatusBoxHTML(entry);
         wireSheetActions(entry);
+      }
+    }
+  }
+
+  /* =====================================================
+     URLSCAN.IO INTEGRATION
+     ===================================================== */
+  async function runUrlscanScan(entry) {
+    const key = getUrlscanKey();
+    const visibility = key ? getUrlscanVisibility() : 'public';
+
+    entry.urlscan = { status: 'pending' };
+    persistHistory();
+    refreshUrlscanUI(entry);
+
+    try {
+      const headers = { 'content-type': 'application/json' };
+      if (key) headers['API-Key'] = key;
+
+      const submitRes = await fetch('https://urlscan.io/api/v1/scan/', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ url: entry.parsed.url, visibility })
+      });
+      if (!submitRes.ok) {
+        // 400 with "blacklisted"/"not allowed" happens for some domains — surface it plainly.
+        const errJson = await submitRes.json().catch(() => ({}));
+        throw new Error(errJson.message || ('submit_' + submitRes.status));
+      }
+      const submitJson = await submitRes.json();
+      const uuid = submitJson.uuid;
+      const reportUrl = submitJson.result || `https://urlscan.io/result/${uuid}/`;
+
+      let resultJson = null;
+      for (let attempt = 0; attempt < 8; attempt++) {
+        await sleep(3000);
+        const resRes = await fetch(`https://urlscan.io/api/v1/result/${uuid}/`);
+        if (resRes.status === 404) continue; // not ready yet
+        if (!resRes.ok) throw new Error('poll_' + resRes.status);
+        resultJson = await resRes.json();
+        break;
+      }
+
+      if (!resultJson) {
+        entry.urlscan = { status: 'pending', message: 'Still analyzing — check back soon.', reportUrl };
+      } else {
+        const verdicts = resultJson.verdicts || {};
+        const overall = verdicts.overall || {};
+        const malicious = !!overall.malicious;
+        const score = overall.score || 0;
+        let status = 'clean';
+        if (malicious) status = 'malicious';
+        else if (score > 0) status = 'suspicious';
+
+        const screenshotUrl = resultJson.task && resultJson.task.screenshotURL
+          ? resultJson.task.screenshotURL
+          : (uuid ? `https://urlscan.io/screenshots/${uuid}.png` : null);
+
+        const categories = (overall.categories || []).join(', ');
+        const verdictLabel = malicious
+          ? (categories || 'Malicious indicators found')
+          : score > 0
+            ? (categories || `Risk score ${score}`)
+            : 'No malicious indicators found';
+
+        entry.urlscan = {
+          status, verdictLabel, screenshotUrl, reportUrl, uuid,
+          score, checkedAt: Date.now()
+        };
+      }
+    } catch (err) {
+      entry.urlscan = {
+        status: 'unreachable',
+        message: err && err.message ? String(err.message) : 'Could not reach urlscan.io from this browser.'
+      };
+    }
+
+    persistHistory();
+    refreshUrlscanUI(entry);
+    renderAll();
+  }
+
+  function refreshUrlscanUI(entry) {
+    if (activeSheetEntryId === entry.id) {
+      // Screenshot only appears once results land, so redraw the whole sheet body
+      // rather than just the status box.
+      if (getActiveEngine() === 'urlscan') {
+        buildSheetForEntry(entry);
       }
     }
   }
@@ -921,8 +1123,13 @@
     closeScanner();
     buildSheetForEntry(entry, { fresh: true });
 
-    if (entry.type === 'url' && getVtKey()) {
-      runVtScan(entry);
+    if (entry.type === 'url') {
+      const engine = getActiveEngine();
+      if (engine === 'virustotal' && getVtKey()) {
+        runVtScan(entry);
+      } else if (engine === 'urlscan') {
+        runUrlscanScan(entry);
+      }
     }
   }
 
@@ -983,6 +1190,27 @@
       toast('API KEY CLEARED');
     });
 
+    $('urlscanApiKey').value = getUrlscanKey();
+    updateUrlscanKeyStatus();
+
+    $('saveUrlscanKey').addEventListener('click', () => {
+      const val = $('urlscanApiKey').value.trim();
+      if (!val) { toast('ENTER A KEY FIRST', 'error'); return; }
+      setUrlscanKeyStorage(val);
+      updateUrlscanKeyStatus();
+      toast('API KEY SAVED');
+    });
+
+    $('clearUrlscanKey').addEventListener('click', () => {
+      clearUrlscanKeyStorage();
+      $('urlscanApiKey').value = '';
+      updateUrlscanKeyStatus();
+      toast('API KEY CLEARED');
+    });
+
+    initEngineSwitch();
+    initUrlscanVisibility();
+
     $('clearHistoryBtn').addEventListener('click', () => {
       if (!history.length) return;
       if (confirm('Delete all scan history? This can\'t be undone.')) {
@@ -1005,14 +1233,63 @@
     });
 
     $('wipeAllBtn').addEventListener('click', () => {
-      if (confirm('Wipe all local data — history and API key? This can\'t be undone.')) {
+      if (confirm('Wipe all local data — history and API keys? This can\'t be undone.')) {
         clearAllHistory();
         clearVtKeyStorage();
+        clearUrlscanKeyStorage();
         $('vtApiKey').value = '';
+        $('urlscanApiKey').value = '';
         updateVtKeyStatus();
+        updateUrlscanKeyStatus();
         toast('ALL DATA WIPED');
       }
     });
+  }
+
+  function initEngineSwitch() {
+    const chips = $('engineChips');
+    if (!chips) return;
+    const applyActiveEngine = (engine) => {
+      chips.querySelectorAll('.chip').forEach((c) => c.classList.toggle('active', c.dataset.engine === engine));
+      $('enginePanel-virustotal').hidden = engine !== 'virustotal';
+      $('enginePanel-urlscan').hidden = engine !== 'urlscan';
+    };
+    applyActiveEngine(getActiveEngine());
+    chips.addEventListener('click', (e) => {
+      const chip = e.target.closest('[data-engine]');
+      if (!chip) return;
+      setActiveEngine(chip.dataset.engine);
+      applyActiveEngine(chip.dataset.engine);
+      toast(chip.dataset.engine === 'virustotal' ? 'ENGINE: VIRUSTOTAL' : 'ENGINE: URLSCAN.IO');
+    });
+  }
+
+  function initUrlscanVisibility() {
+    const chips = $('urlscanVisibilityChips');
+    if (!chips) return;
+    const applyActive = (v) => {
+      chips.querySelectorAll('.chip').forEach((c) => c.classList.toggle('active', c.dataset.visibility === v));
+    };
+    applyActive(getUrlscanVisibility());
+    chips.addEventListener('click', (e) => {
+      const chip = e.target.closest('[data-visibility]');
+      if (!chip) return;
+      setUrlscanVisibility(chip.dataset.visibility);
+      applyActive(chip.dataset.visibility);
+    });
+  }
+
+  function updateUrlscanKeyStatus() {
+    const key = getUrlscanKey();
+    const el = $('urlscanKeyStatus');
+    if (!el) return;
+    if (key) {
+      el.textContent = '// KEY SAVED · ' + '•'.repeat(Math.min(key.length, 8));
+      el.className = 'badge badge-green';
+    } else {
+      el.textContent = '// NO KEY · PUBLIC SCANS';
+      el.className = 'badge';
+    }
   }
 
   function updateVtKeyStatus() {
