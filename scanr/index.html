@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>scanr — QR &amp; Barcode Scanner</title>
+<meta name="description" content="A fast, private, terminal-styled QR and barcode scanner. Scans stay on your device.">
+<meta name="theme-color" content="#0a0e0f">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/favicon.ico" sizes="any">
+<link rel="icon" href="icons/favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="scanr">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="bg-scan-noise" aria-hidden="true"></div>
+
+<!-- ===== HEADER ===== -->
+<header class="app-header">
+  <div class="header-inner">
+    <div class="brand">
+      <span class="prompt">&gt;_</span>
+      <span class="brand-name">scanr</span>
+    </div>
+    <div class="header-right">
+      <span class="status-pill" id="statusPill">
+        <span class="status-dot"></span>SYSTEM READY
+      </span>
+      <button class="icon-btn" id="headerSettingsBtn" aria-label="Open settings" title="Settings">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path d="M19.4 13a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V19a2 2 0 11-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H4a2 2 0 110-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H10a1.65 1.65 0 001-1.51V4a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V10a1.65 1.65 0 001.51 1H20a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- ===== MAIN ===== -->
+<main class="app-main">
+
+  <!-- HOME VIEW -->
+  <section class="view" id="view-home" data-view="home">
+    <div class="section-label">// STATUS</div>
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-value tabular" id="statTotal">0</div>
+        <div class="stat-label">SCANS</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value tabular" id="statLinks">0</div>
+        <div class="stat-label">LINKS</div>
+      </div>
+      <div class="stat-card stat-danger">
+        <div class="stat-value tabular" id="statFlagged">0</div>
+        <div class="stat-label">FLAGGED</div>
+      </div>
+    </div>
+
+    <button class="hero-scan-card" id="heroScanBtn">
+      <div class="hero-scan-left">
+        <div class="hero-scan-title">// NEW SCAN</div>
+        <div class="hero-scan-sub">Point your camera at any QR or barcode</div>
+      </div>
+      <div class="hero-scan-icon">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>
+      </div>
+    </button>
+
+    <div class="section-row">
+      <div class="section-label">// RECENT ACTIVITY</div>
+      <button class="text-link" id="viewAllBtn">VIEW ALL</button>
+    </div>
+    <div class="history-list" id="recentList"></div>
+  </section>
+
+  <!-- HISTORY VIEW -->
+  <section class="view" id="view-history" data-view="history" hidden>
+    <div class="section-label">// SCAN HISTORY</div>
+    <div class="chip-row" id="filterChips">
+      <button class="chip active" data-filter="all">ALL</button>
+      <button class="chip" data-filter="url">LINKS</button>
+      <button class="chip" data-filter="wifi">WIFI</button>
+      <button class="chip" data-filter="contact">CONTACT</button>
+      <button class="chip" data-filter="text">TEXT</button>
+    </div>
+    <div class="history-list" id="fullList"></div>
+    <button class="danger-link" id="clearHistoryBtn">CLEAR ALL HISTORY</button>
+  </section>
+
+  <!-- SETTINGS VIEW -->
+  <section class="view" id="view-settings" data-view="settings" hidden>
+
+    <div class="section-label">// LINK SCANNING ENGINE</div>
+    <div class="card">
+      <p class="muted-text small-text">
+        Scanned links can be checked against VirusTotal's threat engines. Bring your own free API key — it's stored only in this browser, never sent anywhere but VirusTotal.
+      </p>
+      <label class="field-label" for="vtApiKey">VIRUSTOTAL API KEY</label>
+      <input class="text-input" type="password" id="vtApiKey" placeholder="PASTE API KEY" autocomplete="off" spellcheck="false">
+      <div class="row-buttons">
+        <button class="btn btn-primary" id="saveVtKey">SAVE KEY</button>
+        <button class="btn btn-ghost" id="clearVtKey">CLEAR</button>
+      </div>
+      <div class="badge-row">
+        <span class="badge" id="vtKeyStatus">// NO KEY SET</span>
+      </div>
+      <p class="muted-text small-text" id="vtCorsNote">
+        Note: some browsers block direct API calls to VirusTotal (CORS). If checks fail to complete, scanr falls back to a one-tap manual lookup on virustotal.com.
+      </p>
+    </div>
+
+    <div class="section-label">// SYSTEM</div>
+    <div class="card">
+      <div class="setting-row">
+        <span>INSTALL APP</span>
+        <button class="btn btn-secondary btn-sm" id="installBtn" disabled>INSTALL</button>
+      </div>
+      <div class="setting-row">
+        <span>OFFLINE SHELL</span>
+        <span class="badge badge-green" id="offlineBadge">// ENABLED</span>
+      </div>
+      <div class="setting-row">
+        <span>DETECTION API</span>
+        <span class="badge" id="detectorApiBadge">// CHECKING</span>
+      </div>
+      <div class="setting-row">
+        <span>CAMERA ACCESS</span>
+        <span class="badge" id="cameraApiBadge">// NOT REQUESTED</span>
+      </div>
+    </div>
+
+    <div class="section-label">// DATA</div>
+    <div class="card">
+      <p class="muted-text small-text">
+        All scan history lives in this browser's local storage. Nothing leaves this device except link checks you explicitly run.
+      </p>
+      <div class="row-buttons">
+        <button class="btn btn-ghost" id="exportHistoryBtn">EXPORT JSON</button>
+        <button class="btn btn-danger-ghost" id="wipeAllBtn">WIPE ALL DATA</button>
+      </div>
+    </div>
+
+    <div class="section-label">// ABOUT</div>
+    <div class="card muted-text small-text">
+      scanr v1.0.0 — local-first QR &amp; barcode scanner.<br>Built with the BarcodeDetector API, with a jsQR fallback for unsupported browsers.
+    </div>
+  </section>
+
+</main>
+
+<!-- ===== SCANNER OVERLAY ===== -->
+<div class="scanner-overlay" id="scannerOverlay" hidden>
+  <div class="scanner-header">
+    <button class="icon-btn" id="closeScannerBtn" aria-label="Close scanner">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
+    <div class="scanner-title">// SCANNING</div>
+    <button class="icon-btn" id="torchBtn" hidden aria-label="Toggle flashlight">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"/></svg>
+    </button>
+  </div>
+
+  <div class="viewfinder-wrap">
+    <video id="video" playsinline autoplay muted></video>
+    <canvas id="canvas" hidden></canvas>
+    <div class="viewfinder-frame">
+      <span class="corner tl"></span><span class="corner tr"></span>
+      <span class="corner bl"></span><span class="corner br"></span>
+      <div class="scan-line"></div>
+    </div>
+    <div class="scanner-empty" id="scannerEmpty" hidden>
+      <p>// CAMERA UNAVAILABLE</p>
+      <p class="small-text muted-text" id="scannerEmptyDetail">Grant camera access to scan, or paste content manually below.</p>
+    </div>
+  </div>
+
+  <div class="scanner-footer">
+    <p class="scanner-hint" id="scannerHint">// POINT CAMERA AT A CODE</p>
+    <button class="btn btn-ghost btn-block" id="manualEntryBtn">PASTE TEXT INSTEAD</button>
+  </div>
+</div>
+
+<!-- ===== BOTTOM SHEET ===== -->
+<div class="sheet-backdrop" id="sheetBackdrop" hidden></div>
+<div class="bottom-sheet" id="bottomSheet" hidden role="dialog" aria-modal="true">
+  <div class="sheet-handle-wrap" id="sheetHandleWrap">
+    <div class="sheet-handle"></div>
+  </div>
+  <div class="sheet-content" id="sheetContent"></div>
+</div>
+
+<!-- ===== TOAST ===== -->
+<div class="toast" id="toast"></div>
+
+<!-- ===== BOTTOM NAV ===== -->
+<nav class="bottom-nav">
+  <button class="nav-btn active" data-view="home" aria-label="Home">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>
+    <span>HOME</span>
+  </button>
+  <button class="scan-fab" id="scanFab" aria-label="Scan a code">
+    <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2"/><rect x="9" y="9" width="6" height="6" rx="0.5"/></svg>
+  </button>
+  <button class="nav-btn" data-view="settings" aria-label="Settings">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path d="M19.4 13a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V19a2 2 0 11-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H4a2 2 0 110-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H10a1.65 1.65 0 001-1.51V4a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V10a1.65 1.65 0 001.51 1H20a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+    <span>SETTINGS</span>
+  </button>
+</nav>
+
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js" defer></script>
+<script src="app.js" defer></script>
+</body>
+</html>
