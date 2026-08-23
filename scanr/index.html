@@ -98,52 +98,41 @@
     <div class="section-label">// LINK SCANNING ENGINE</div>
     <div class="card">
       <p class="muted-text small-text">
-        Choose which engine checks scanned links. Keys are stored only in this browser, never sent anywhere but the engine you pick below.
+        Scanned links are checked against urlscan.io. Bring your own free API key — it's stored only in this browser, never sent anywhere but urlscan.io (or your proxy below).
       </p>
-      <div class="chip-row" id="engineChips" style="margin-top:12px;">
-        <button class="chip active" data-engine="virustotal">VIRUSTOTAL</button>
-        <button class="chip" data-engine="urlscan">URLSCAN.IO</button>
-      </div>
 
-      <div class="engine-panel" id="enginePanel-virustotal">
-        <label class="field-label" for="vtApiKey" style="margin-top:14px;">VIRUSTOTAL API KEY</label>
-        <input class="text-input" type="password" id="vtApiKey" placeholder="PASTE API KEY" autocomplete="off" spellcheck="false">
-        <div class="row-buttons">
-          <button class="btn btn-primary" id="saveVtKey">SAVE KEY</button>
-          <button class="btn btn-ghost" id="clearVtKey">CLEAR</button>
-        </div>
-        <div class="badge-row">
-          <span class="badge" id="vtKeyStatus">// NO KEY SET</span>
-        </div>
-        <p class="muted-text small-text" id="vtCorsNote">
-          Note: some browsers block direct API calls to VirusTotal (CORS). If checks fail to complete, scanr falls back to a one-tap manual lookup on virustotal.com.
-        </p>
+      <label class="field-label" for="urlscanApiKey" style="margin-top:14px;">URLSCAN.IO API KEY</label>
+      <input class="text-input" type="password" id="urlscanApiKey" placeholder="PASTE API KEY" autocomplete="off" spellcheck="false">
+      <div class="row-buttons">
+        <button class="btn btn-primary" id="saveUrlscanKey">SAVE KEY</button>
+        <button class="btn btn-ghost" id="clearUrlscanKey">CLEAR</button>
       </div>
+      <div class="badge-row">
+        <span class="badge" id="urlscanKeyStatus">// NO KEY SET</span>
+      </div>
+      <div class="setting-row" style="margin-top:4px;">
+        <span class="small-text muted-text">SCAN VISIBILITY</span>
+        <div class="chip-row" id="urlscanVisibilityChips" style="margin:0;">
+          <button class="chip active" data-visibility="public">PUBLIC</button>
+          <button class="chip" data-visibility="unlisted">UNLISTED</button>
+        </div>
+      </div>
+      <p class="muted-text small-text" id="urlscanCorsNote">
+        Note: urlscan.io doesn't send CORS headers on its real API responses, so direct in-browser checks are blocked. Add a proxy URL below to fix this — see the included Worker setup guide.
+      </p>
 
-      <div class="engine-panel" id="enginePanel-urlscan" hidden>
-        <p class="muted-text small-text" style="margin-top:14px;">
-          urlscan.io works without a key for public scans. Add a free key for private scans and higher limits.
-        </p>
-        <label class="field-label" for="urlscanApiKey">URLSCAN.IO API KEY (OPTIONAL)</label>
-        <input class="text-input" type="password" id="urlscanApiKey" placeholder="PASTE API KEY — OR LEAVE BLANK" autocomplete="off" spellcheck="false">
-        <div class="row-buttons">
-          <button class="btn btn-primary" id="saveUrlscanKey">SAVE KEY</button>
-          <button class="btn btn-ghost" id="clearUrlscanKey">CLEAR</button>
-        </div>
-        <div class="badge-row">
-          <span class="badge" id="urlscanKeyStatus">// NO KEY · PUBLIC SCANS</span>
-        </div>
-        <div class="setting-row" style="margin-top:4px;">
-          <span class="small-text muted-text">SCAN VISIBILITY</span>
-          <div class="chip-row" id="urlscanVisibilityChips" style="margin:0;">
-            <button class="chip active" data-visibility="public">PUBLIC</button>
-            <button class="chip" data-visibility="unlisted">UNLISTED</button>
-          </div>
-        </div>
-        <p class="muted-text small-text">
-          Public scans are visible to anyone on urlscan.io. Unlisted scans require an API key and won't appear in public search.
-        </p>
+      <label class="field-label" for="urlscanProxyUrl" style="margin-top:14px;">CORS PROXY URL (RECOMMENDED)</label>
+      <input class="text-input" type="text" id="urlscanProxyUrl" placeholder="https://your-proxy.workers.dev" autocomplete="off" spellcheck="false">
+      <div class="row-buttons">
+        <button class="btn btn-primary" id="saveUrlscanProxy">SAVE PROXY</button>
+        <button class="btn btn-ghost" id="clearUrlscanProxy">CLEAR</button>
       </div>
+      <div class="badge-row">
+        <span class="badge" id="urlscanProxyStatus">// NO PROXY SET</span>
+      </div>
+      <p class="muted-text small-text">
+        Without a proxy, urlscan.io checks will usually fail with a network error due to the CORS gap above. A free Cloudflare Worker fixes this — deploy instructions are in the app's README.
+      </p>
     </div>
 
     <div class="section-label">// SYSTEM</div>
@@ -217,7 +206,7 @@
     <button class="scan-fab scan-fab-close" id="closeScannerBtn" aria-label="Close scanner">
       <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>
     </button>
-    <button class="nav-btn" id="torchBtn" hidden aria-label="Toggle flashlight">
+    <button class="nav-btn" id="torchBtn" disabled aria-label="Toggle flashlight">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"/></svg>
       <span>FLASH</span>
     </button>
@@ -237,7 +226,7 @@
 <div class="toast" id="toast"></div>
 
 <!-- ===== BOTTOM NAV ===== -->
-<nav class="bottom-nav">
+<nav class="bottom-nav" id="homeBottomNav">
   <button class="nav-btn active" data-view="home" aria-label="Home">
     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>
     <span>HOME</span>
