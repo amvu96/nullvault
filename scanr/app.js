@@ -929,7 +929,10 @@
     refreshGsbUI(entry);
 
     try {
-      const endpoint = `https://safebrowsing.googleapis.com/v5alpha1/urls:search?key=${encodeURIComponent(key)}&urls=${encodeURIComponent(entry.parsed.url)}`;
+      // alt=json is required — this endpoint defaults to protobuf wire
+      // format otherwise, which res.json() can't parse (shows up as
+      // "Unexpected token" garbage from binary bytes).
+      const endpoint = `https://safebrowsing.googleapis.com/v5alpha1/urls:search?key=${encodeURIComponent(key)}&urls=${encodeURIComponent(entry.parsed.url)}&alt=json`;
       let res;
       try {
         res = await fetch(endpoint);
@@ -952,7 +955,14 @@
         throw new ScanApiError(reason || `Google Safe Browsing returned an error (HTTP ${res.status}).`, res.status);
       }
 
-      const json = await res.json();
+      let json;
+      try {
+        json = await res.json();
+      } catch (parseErr) {
+        // A 200 response that isn't valid JSON — most likely the API
+        // returned protobuf instead of JSON (alt=json missing/ignored).
+        throw new ScanApiError('Google returned a response in an unexpected format (not JSON). This may be a temporary API issue.', res.status);
+      }
       const threats = json.threats || [];
       if (threats.length === 0) {
         entry.gsb = { status: 'clean', checkedAt: Date.now() };
