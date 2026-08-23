@@ -957,11 +957,22 @@ message FullHash {
 `;
   let gsbProtoRoot = null; // parsed once per session, cached
 
-  function loadGsbProto() {
+  async function loadGsbProto() {
     if (gsbProtoRoot) return gsbProtoRoot;
+
+    // The protobufjs <script defer> tag should have finished loading and
+    // executing by the time any user action can fire, but on a slow
+    // connection there's a small window where it hasn't yet — wait briefly
+    // rather than failing immediately.
+    if (typeof protobuf === 'undefined') {
+      for (let attempt = 0; attempt < 20 && typeof protobuf === 'undefined'; attempt++) {
+        await sleep(150);
+      }
+    }
     if (typeof protobuf === 'undefined') {
       throw new ScanApiError('protobufjs library failed to load — check your connection and try again.', null);
     }
+
     try {
       gsbProtoRoot = protobuf.parse(SAFEBROWSING_PROTO_SOURCE).root;
     } catch (err) {
@@ -1135,7 +1146,7 @@ message FullHash {
 
       let fullHashes;
       try {
-        const root = loadGsbProto();
+        const root = await loadGsbProto();
         const SearchHashesResponse = root.lookupType('google.security.safebrowsing.v5.SearchHashesResponse');
         const buf = new Uint8Array(await res.arrayBuffer());
         const message = SearchHashesResponse.decode(buf);
