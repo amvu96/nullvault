@@ -577,9 +577,12 @@
       </div>`;
     }
     if (us.status === 'timeout') {
-      return `<div class="vt-status-box">
+      return `<div class="vt-status-box vt-status-box-pending">
         <div class="vt-status-label" style="color:var(--faint)">Scan is taking longer than expected<small>${escapeHtml(us.message || 'urlscan.io hasn\u2019t returned a result yet.')}</small></div>
-        <button class="btn btn-ghost btn-sm" id="urlscanRunBtn">RETRY</button>
+        <div class="row-buttons">
+          <button class="btn btn-ghost btn-sm" id="urlscanRunBtn">RETRY</button>
+          <button class="btn btn-ghost btn-sm" id="urlscanSearchBtn">SEE ON URLSCAN.IO</button>
+        </div>
       </div>`;
     }
     if (us.status === 'unreachable') {
@@ -738,6 +741,17 @@
         try { hostname = new URL(entry.parsed.url).hostname; } catch (e) {}
         window.open('https://urlscan.io/search/?q=' + encodeURIComponent('domain:' + hostname), '_blank', 'noopener,noreferrer');
       }
+    });
+
+    const urlscanSearchBtn = byId('urlscanSearchBtn');
+    if (urlscanSearchBtn) urlscanSearchBtn.addEventListener('click', () => {
+      // Always the domain-search view, even if a reportUrl exists — the scan
+      // itself timed out, so its own result page won't have finished
+      // analysis yet. Domain search shows whatever urlscan.io already has,
+      // including past scans of the same site.
+      let hostname = entry.parsed.hostname;
+      try { hostname = new URL(entry.parsed.url).hostname; } catch (e) {}
+      window.open('https://urlscan.io/search/#' + encodeURIComponent('domain:' + hostname), '_blank', 'noopener,noreferrer');
     });
   }
 
