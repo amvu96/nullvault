@@ -92,6 +92,31 @@
     } catch (e) {
       history = [];
     }
+    migrateStalePendingScans();
+  }
+
+  // Any 'pending' urlscan status found at load time is necessarily stale —
+  // a real in-flight scan only exists in memory for the current page
+  // session, so a 'pending' entry surviving into a fresh page load means
+  // its poll loop ended (tab closed, refresh, etc.) without ever writing a
+  // final status. Older versions of this app also had a poll-timeout bug
+  // that wrote 'pending' as its own dead-end outcome — this migrates those
+  // permanently-stuck entries to 'timeout' so they get a retry action
+  // instead of showing a spinner forever.
+  function migrateStalePendingScans() {
+    let changed = false;
+    history.forEach((e) => {
+      if (e.urlscan && e.urlscan.status === 'pending') {
+        e.urlscan = {
+          status: 'timeout',
+          message: 'This scan didn\u2019t finish (interrupted or the app was closed mid-check).',
+          reportUrl: e.urlscan.reportUrl,
+          uuid: e.urlscan.uuid
+        };
+        changed = true;
+      }
+    });
+    if (changed) persistHistory();
   }
 
   function persistHistory() {
@@ -347,7 +372,8 @@
       suspicious: '<span class="badge badge-danger">SUSPICIOUS</span>',
       malicious: '<span class="badge badge-danger">THREAT</span>',
       unreachable: '<span class="badge">UNVERIFIED</span>',
-      error: '<span class="badge badge-danger">CHECK FAILED</span>'
+      error: '<span class="badge badge-danger">CHECK FAILED</span>',
+      timeout: '<span class="badge">TIMED OUT</span>'
     };
     return map[s] || '';
   }
@@ -382,7 +408,7 @@
   }
 
   function renderRecentList() {
-    const recent = history.slice(0, 5);
+    const recent = history.slice(0, 20);
     els.recentList.innerHTML = recent.length
       ? recent.map(historyItemHTML).join('')
       : emptyStateHTML('// NO SCANS YET — TAP THE SCAN BUTTON TO BEGIN');
@@ -544,8 +570,16 @@
       </div>`;
     }
     if (us.status === 'pending') {
+      const pct = Math.max(6, Math.round((us.progress || 0) * 100));
+      return `<div class="vt-status-box vt-status-box-pending">
+        <div class="vt-status-label"><span class="spinner"></span> &nbsp;${escapeHtml(us.stage || 'Scanning with urlscan.io…')}<small>This usually takes 10–20 seconds</small></div>
+        <div class="scan-progress-track"><div class="scan-progress-fill" style="width:${pct}%"></div></div>
+      </div>`;
+    }
+    if (us.status === 'timeout') {
       return `<div class="vt-status-box">
-        <div class="vt-status-label"><span class="spinner"></span> &nbsp;Scanning with urlscan.io…<small>This usually takes 10–20 seconds</small></div>
+        <div class="vt-status-label" style="color:var(--faint)">Scan is taking longer than expected<small>${escapeHtml(us.message || 'urlscan.io hasn\u2019t returned a result yet.')}</small></div>
+        <button class="btn btn-ghost btn-sm" id="urlscanRunBtn">RETRY</button>
       </div>`;
     }
     if (us.status === 'unreachable') {
@@ -795,7 +829,7 @@
     if (!proxy && !key) { toast('ADD A URLSCAN.IO API KEY IN SETTINGS', 'error'); return; }
     const visibility = getUrlscanVisibility();
 
-    entry.urlscan = { status: 'pending' };
+    entry.urlscan = { status: 'pending', stage: 'Submitting URL to urlscan.io…' };
     persistHistory();
     refreshUrlscanUI(entry);
 
@@ -844,9 +878,18 @@
       const uuid = submitJson.uuid;
       const reportUrl = submitJson.result || `https://urlscan.io/result/${uuid}/`;
 
+      const POLL_ATTEMPTS = 8;
       let resultJson = null;
-      for (let attempt = 0; attempt < 8; attempt++) {
+      for (let attempt = 0; attempt < POLL_ATTEMPTS; attempt++) {
+        entry.urlscan = {
+          status: 'pending',
+          stage: `Waiting for urlscan.io to finish analyzing… (${attempt + 1}/${POLL_ATTEMPTS})`,
+          progress: (attempt + 1) / POLL_ATTEMPTS,
+          reportUrl, uuid
+        };
+        refreshUrlscanUI(entry);
         await sleep(3000);
+
         const resultUrl = proxy ? `${proxy}/result/${uuid}` : `https://urlscan.io/api/v1/result/${uuid}/`;
         const resultHeaders = proxy ? {} : { 'API-Key': key };
         let resRes;
@@ -862,7 +905,15 @@
       }
 
       if (!resultJson) {
-        entry.urlscan = { status: 'pending', message: 'Still analyzing — check back soon.', reportUrl, uuid };
+        // urlscan.io didn't finish within our polling window. This is not
+        // the same as "still checking forever" — surface it as a distinct,
+        // actionable state with a retry, rather than leaving the spinner
+        // running with no way out.
+        entry.urlscan = {
+          status: 'timeout',
+          message: 'urlscan.io is taking longer than usual to finish this scan.',
+          reportUrl, uuid
+        };
       } else {
         const verdicts = resultJson.verdicts || {};
         const overall = verdicts.overall || {};
@@ -907,9 +958,16 @@
   }
 
   function refreshUrlscanUI(entry) {
-    if (activeSheetEntryId === entry.id) {
-      // Screenshot only appears once results land, so redraw the whole sheet body
-      // rather than just the status box.
+    if (activeSheetEntryId !== entry.id) return;
+    // While still polling, only the status box changes (no screenshot yet),
+    // so update it in place instead of rebuilding the whole sheet — that
+    // keeps the progress bar smooth instead of flashing/resetting scroll
+    // on every 3-second poll tick.
+    const box = els.sheetContent && els.sheetContent.querySelector('#urlscanBox');
+    if (entry.urlscan && entry.urlscan.status === 'pending' && box) {
+      box.innerHTML = urlscanStatusBoxHTML(entry);
+      wireSheetActions(entry);
+    } else {
       buildSheetForEntry(entry);
     }
   }
@@ -1212,9 +1270,11 @@
       let host = proxy;
       try { host = new URL(proxy).hostname; } catch (e) {}
       el.textContent = '// PROXY ACTIVE · ' + host;
+      el.title = proxy;
       el.className = 'badge badge-green';
     } else {
       el.textContent = '// NO PROXY SET';
+      el.removeAttribute('title');
       el.className = 'badge';
     }
   }
@@ -1265,7 +1325,7 @@
   function cacheEls() {
     [
       'statTotal', 'statLinks', 'statFlagged', 'recentList', 'fullList', 'viewAllBtn',
-      'heroScanBtn', 'clearHistoryBtn', 'filterChips',
+      'heroScanBtn', 'heroPasteBtn', 'clearHistoryBtn', 'filterChips',
       'scannerOverlay', 'video', 'canvas', 'scannerHint', 'scannerEmpty', 'torchBtn',
       'closeScannerBtn', 'manualEntryBtn',
       'sheetBackdrop', 'bottomSheet', 'sheetContent', 'sheetHandleWrap',
@@ -1302,6 +1362,7 @@
   function initScanner() {
     els.scanFab.addEventListener('click', openScanner);
     els.heroScanBtn.addEventListener('click', openScanner);
+    els.heroPasteBtn.addEventListener('click', openManualEntry);
     els.closeScannerBtn.addEventListener('click', () => {
       closeScanner();
       switchView('home');
