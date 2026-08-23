@@ -103,6 +103,22 @@
     <div class="section-label">// LINK SCANNING ENGINE</div>
     <div class="card">
       <p class="muted-text small-text">
+        Fast pre-check against Google's threat lists — usually instant, no proxy needed. Bring your own free API key from Google Cloud Console (enable the "Safe Browsing API" for your project).
+      </p>
+      <label class="field-label" for="gsbApiKey" style="margin-top:14px;">GOOGLE SAFE BROWSING API KEY</label>
+      <input class="text-input" type="password" id="gsbApiKey" placeholder="PASTE API KEY" autocomplete="off" spellcheck="false">
+      <div class="row-buttons">
+        <button class="btn btn-primary" id="saveGsbKey">SAVE KEY</button>
+        <button class="btn btn-ghost" id="clearGsbKey">CLEAR</button>
+      </div>
+      <div class="badge-row">
+        <span class="badge" id="gsbKeyStatus">// NO KEY SET</span>
+      </div>
+    </div>
+
+    <div class="section-label">// DEEP LINK ANALYSIS</div>
+    <div class="card">
+      <p class="muted-text small-text">
         Scanned links are checked against urlscan.io. Bring your own free API key — it's stored only in this browser, never sent anywhere but urlscan.io (or your proxy below).
       </p>
 
