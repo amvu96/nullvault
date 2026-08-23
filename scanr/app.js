@@ -916,10 +916,179 @@
   /* =====================================================
      GOOGLE SAFE BROWSING INTEGRATION
      ===================================================== */
-  // Uses the v5alpha1 urls:search endpoint — a fast, single-request lookup
-  // against Google's threat lists. Unlike urlscan.io, Google's API sends
-  // proper CORS headers on its real responses, so this works directly from
-  // the browser with no proxy needed.
+  // Uses SearchHashes on the STABLE v5 endpoint. Confirmed by direct testing
+  // that this endpoint returns protobuf on success regardless of the alt=json
+  // parameter (a real, repeatable API behavior — not something fixable from
+  // the client side), so responses are decoded with protobufjs against a
+  // trimmed copy of Google's own published v5 schema, bundled inline below
+  // (no runtime fetch — nothing to go stale or become unreachable).
+  //
+  // IMPORTANT CAVEAT: this schema was hand-verified against the wire-format
+  // spec and matches Google's published .proto file field-for-field, but the
+  // actual protobufjs encode/decode round-trip could not be tested in this
+  // build environment (no package registry access). If Safe Browsing checks
+  // fail with a decode error, that's the first place to look.
+  const SAFEBROWSING_PROTO_SOURCE = `
+syntax = "proto3";
+package google.security.safebrowsing.v5;
+enum ThreatType {
+  THREAT_TYPE_UNSPECIFIED = 0;
+  MALWARE = 1;
+  SOCIAL_ENGINEERING = 2;
+  UNWANTED_SOFTWARE = 3;
+  POTENTIALLY_HARMFUL_APPLICATION = 4;
+}
+enum ThreatAttribute {
+  THREAT_ATTRIBUTE_UNSPECIFIED = 0;
+  CANARY = 1;
+  FRAME_ONLY = 2;
+}
+message SearchHashesResponse {
+  repeated FullHash full_hashes = 1;
+}
+message FullHash {
+  message FullHashDetail {
+    ThreatType threat_type = 1;
+    repeated ThreatAttribute attributes = 2;
+  }
+  bytes full_hash = 1;
+  repeated FullHashDetail full_hash_details = 2;
+}
+`;
+  let gsbProtoRoot = null; // parsed once per session, cached
+
+  function loadGsbProto() {
+    if (gsbProtoRoot) return gsbProtoRoot;
+    if (typeof protobuf === 'undefined') {
+      throw new ScanApiError('protobufjs library failed to load — check your connection and try again.', null);
+    }
+    try {
+      gsbProtoRoot = protobuf.parse(SAFEBROWSING_PROTO_SOURCE).root;
+    } catch (err) {
+      throw new ScanApiError('Could not parse the Safe Browsing schema — this is an app bug, not a network issue.', null);
+    }
+    return gsbProtoRoot;
+  }
+
+  function gsbCanonicalizeUrl(rawUrl) {
+    // Strip tab/CR/LF (but not escaped forms like %0a).
+    let url = rawUrl.replace(/[\t\r\n]/g, '');
+
+    // Repeatedly percent-unescape until stable.
+    let prev;
+    do {
+      prev = url;
+      try { url = decodeURIComponent(url); } catch (e) { break; } // stop on malformed escapes
+    } while (url !== prev);
+
+    // Parse with the browser's URL parser for a reliable starting point,
+    // defaulting to http:// if no scheme was given (matches spec examples
+    // like "www.google.com/" -> "http://www.google.com/").
+    let parsed;
+    try {
+      parsed = new URL(url);
+    } catch (e) {
+      try { parsed = new URL('http://' + url); } catch (e2) { return null; }
+    }
+
+    // Remove fragment.
+    parsed.hash = '';
+
+    // Canonicalize hostname: strip leading/trailing dots, collapse repeats, lowercase.
+    let host = parsed.hostname
+      .replace(/^\.+|\.+$/g, '')
+      .replace(/\.{2,}/g, '.')
+      .toLowerCase();
+
+    // Canonicalize path: resolve /./ and /../, collapse repeated slashes.
+    // (URL parsing already resolves most of this, but we normalize slashes
+    // ourselves since the spec explicitly calls it out.)
+    let path = parsed.pathname.replace(/\/{2,}/g, '/');
+    if (!path) path = '/';
+
+    // Re-assemble, then percent-escape characters <=0x20, >=0x7F, '#', '%'
+    // with uppercase hex — applied to the whole URL, not the query string
+    // path-canonicalization rules (those only applied to path segments above).
+    // URL.search drops a bare trailing "?" with nothing after it, but the
+    // spec's canonicalization preserves it (e.g. "…/q?" stays "…/q?", not
+    // "…/q") — detect that case via href, which keeps the literal "?".
+    let query = parsed.search || '';
+    if (!query && parsed.href.includes('?')) query = '?';
+    let assembled = `${parsed.protocol}//${host}${path}${query}`;
+
+    assembled = Array.from(assembled).map((ch) => {
+      const code = ch.codePointAt(0);
+      if (code <= 0x20 || code >= 0x7f || ch === '#' || ch === '%') {
+        // Encode as UTF-8 bytes, each percent-escaped.
+        return Array.from(new TextEncoder().encode(ch))
+          .map((b) => '%' + b.toString(16).toUpperCase().padStart(2, '0'))
+          .join('');
+      }
+      return ch;
+    }).join('');
+
+    return { full: assembled, host, path, query };
+  }
+
+  function gsbHostVariants(host) {
+    // IP addresses: only the exact host, never suffix-stripped.
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return [host];
+    const parts = host.split('.');
+    const variants = [host]; // the exact hostname always included
+    // Take the last 5 components (fewer if the host is shorter), then
+    // successively strip the leading component down to (but not including)
+    // the bare TLD alone — e.g. a.b.c.d.e.f.g -> c.d.e.f.g, d.e.f.g, e.f.g, f.g.
+    const last5 = parts.slice(Math.max(0, parts.length - 5));
+    for (let i = 0; i < last5.length - 1; i++) {
+      variants.push(last5.slice(i).join('.'));
+    }
+    return [...new Set(variants)].slice(0, 5);
+  }
+
+  function gsbPathVariants(path, query) {
+    const variants = [];
+    if (query) variants.push(path + query);
+    variants.push(path);
+    const segments = path.split('/').filter(Boolean);
+    let acc = '/';
+    variants.push(acc);
+    for (let i = 0; i < segments.length - 1 && variants.length < 6; i++) {
+      acc += segments[i] + '/';
+      variants.push(acc);
+    }
+    return [...new Set(variants)].slice(0, 6);
+  }
+
+  async function gsbSha256Hex(str) {
+    const bytes = new TextEncoder().encode(str);
+    const digest = await crypto.subtle.digest('SHA-256', bytes);
+    return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  function hexToBase64Url(hex) {
+    const bytes = hex.match(/.{2}/g).map((h) => parseInt(h, 16));
+    let bin = '';
+    bytes.forEach((b) => { bin += String.fromCharCode(b); });
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  async function gsbComputeHashPrefixes(rawUrl) {
+    const canon = gsbCanonicalizeUrl(rawUrl);
+    if (!canon) return [];
+    const hosts = gsbHostVariants(canon.host);
+    const paths = gsbPathVariants(canon.path, canon.query);
+    const expressions = new Set();
+    hosts.forEach((h) => paths.forEach((p) => expressions.add(`${h}${p}`)));
+
+    const prefixes = [];
+    for (const expr of expressions) {
+      const hex = await gsbSha256Hex(expr);
+      // 4-byte (8 hex char) hash prefix, matching Safe Browsing's default granularity.
+      prefixes.push(hex.slice(0, 8));
+    }
+    return prefixes;
+  }
+
   async function runGsbCheck(entry) {
     const key = getGsbKey();
     if (!key) { toast('ADD A GOOGLE SAFE BROWSING API KEY IN SETTINGS', 'error'); return; }
@@ -929,10 +1098,17 @@
     refreshGsbUI(entry);
 
     try {
-      // alt=json is required — this endpoint defaults to protobuf wire
-      // format otherwise, which res.json() can't parse (shows up as
-      // "Unexpected token" garbage from binary bytes).
-      const endpoint = `https://safebrowsing.googleapis.com/v5alpha1/urls:search?key=${encodeURIComponent(key)}&urls=${encodeURIComponent(entry.parsed.url)}&alt=json`;
+      const prefixesHex = await gsbComputeHashPrefixes(entry.parsed.url);
+      if (prefixesHex.length === 0) {
+        throw new ScanApiError('Could not parse this URL for a Safe Browsing check.', null);
+      }
+      const prefixesB64 = prefixesHex.map((hex) => hexToBase64Url(hex));
+
+      const params = new URLSearchParams();
+      params.set('key', key);
+      prefixesB64.forEach((p) => params.append('hashPrefixes', p));
+      const endpoint = `https://safebrowsing.googleapis.com/v5/hashes:search?${params.toString()}`;
+
       let res;
       try {
         res = await fetch(endpoint);
@@ -941,8 +1117,10 @@
       }
 
       if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        const reason = errJson.error && errJson.error.message;
+        // Confirmed by testing: error responses (4xx) come back as JSON even
+        // though success responses are protobuf.
+        const errJson = await res.clone().json().catch(() => null);
+        const reason = errJson && errJson.error && errJson.error.message;
         if (res.status === 400) {
           throw new ScanApiError(reason || 'The API key appears to be invalid or malformed.', res.status);
         }
@@ -955,19 +1133,49 @@
         throw new ScanApiError(reason || `Google Safe Browsing returned an error (HTTP ${res.status}).`, res.status);
       }
 
-      let json;
+      let fullHashes;
       try {
-        json = await res.json();
-      } catch (parseErr) {
-        // A 200 response that isn't valid JSON — most likely the API
-        // returned protobuf instead of JSON (alt=json missing/ignored).
-        throw new ScanApiError('Google returned a response in an unexpected format (not JSON). This may be a temporary API issue.', res.status);
+        const root = loadGsbProto();
+        const SearchHashesResponse = root.lookupType('google.security.safebrowsing.v5.SearchHashesResponse');
+        const buf = new Uint8Array(await res.arrayBuffer());
+        const message = SearchHashesResponse.decode(buf);
+        const decoded = SearchHashesResponse.toObject(message, { bytes: Array, enums: String, defaults: true });
+        fullHashes = (decoded.fullHashes || []).map((fh) => ({
+          // toObject with bytes:Array gives a plain byte array — convert to hex directly.
+          fullHashHex: (fh.fullHash || []).map((b) => b.toString(16).padStart(2, '0')).join(''),
+          fullHashDetails: fh.fullHashDetails || []
+        }));
+      } catch (decodeErr) {
+        if (decodeErr instanceof ScanApiError) throw decodeErr;
+        throw new ScanApiError('Could not decode the response from Google Safe Browsing.', res.status);
       }
-      const threats = json.threats || [];
-      if (threats.length === 0) {
+
+      // The server may return full hashes matching our 4-byte prefixes but
+      // belonging to a different, longer URL expression (prefix collision).
+      // Confirm real matches by comparing full SHA256 hashes of our actual
+      // expressions against what the server returned.
+      const ourFullHashes = new Set();
+      {
+        const canon = gsbCanonicalizeUrl(entry.parsed.url);
+        if (canon) {
+          const hosts = gsbHostVariants(canon.host);
+          const paths = gsbPathVariants(canon.path, canon.query);
+          for (const h of hosts) {
+            for (const p of paths) {
+              ourFullHashes.add(await gsbSha256Hex(`${h}${p}`));
+            }
+          }
+        }
+      }
+
+      const matches = fullHashes.filter((fh) => ourFullHashes.has(fh.fullHashHex));
+
+      if (matches.length === 0) {
         entry.gsb = { status: 'clean', checkedAt: Date.now() };
       } else {
-        const threatTypes = [...new Set(threats.flatMap((t) => t.threatTypes || []))];
+        const threatTypes = [...new Set(
+          matches.flatMap((fh) => (fh.fullHashDetails || []).map((d) => d.threatType))
+        )];
         entry.gsb = { status: 'malicious', threatTypes, checkedAt: Date.now() };
       }
     } catch (err) {
