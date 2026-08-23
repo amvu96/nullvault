@@ -105,6 +105,9 @@
       <p class="muted-text small-text">
         Fast pre-check against Google's threat lists — usually instant, no proxy needed. Bring your own free API key from Google Cloud Console (enable the "Safe Browsing API" for your project).
       </p>
+      <p class="muted-text small-text">
+        Your full link is never sent to Google — the link is hashed on your device first, and only a short 4-byte hash prefix leaves the browser to check for a match.
+      </p>
       <label class="field-label" for="gsbApiKey" style="margin-top:14px;">GOOGLE SAFE BROWSING API KEY</label>
       <input class="text-input" type="password" id="gsbApiKey" placeholder="PASTE API KEY" autocomplete="off" spellcheck="false">
       <div class="row-buttons">
@@ -262,6 +265,7 @@
 </nav>
 
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/protobufjs@8.7.0/dist/protobuf.min.js" defer></script>
 <script src="app.js" defer></script>
 </body>
 </html>
