@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'scanr-v2';
+const CACHE_VERSION = 'scanr-v3';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
@@ -43,16 +43,16 @@ self.addEventListener('activate', (event) => {
 // - App shell (same-origin, in SHELL_ASSETS): network-first, so users always get
 //   the latest deployed version when online; falls back to cache when offline.
 // - Third-party runtime deps (e.g. jsQR CDN, fonts): stale-while-revalidate.
-// - Everything else (e.g. VirusTotal/urlscan.io API calls, camera): network-only, never cached.
+// - Everything else (e.g. urlscan.io API calls, the CORS proxy, camera): network-only, never cached.
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   const url = new URL(req.url);
 
   if (req.method !== 'GET') return;
 
-  // Never cache API calls to scanning engines or anything cross-origin API-like.
-  if (url.hostname.includes('virustotal.com')) return;
+  // Never cache API calls to the scanning engine or its CORS proxy.
   if (url.hostname.includes('urlscan.io')) return;
+  if (url.hostname.endsWith('.workers.dev')) return;
 
   const isSameOrigin = url.origin === self.location.origin;
 
