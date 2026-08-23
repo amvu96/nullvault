@@ -5,10 +5,9 @@
      CONSTANTS / STATE
      ===================================================== */
   const HISTORY_KEY = 'scanr_history_v1';
-  const VT_KEY_STORAGE = 'scanr_vt_api_key_v1';
   const URLSCAN_KEY_STORAGE = 'scanr_urlscan_api_key_v1';
   const URLSCAN_VISIBILITY_STORAGE = 'scanr_urlscan_visibility_v1';
-  const ACTIVE_ENGINE_STORAGE = 'scanr_active_engine_v1';
+  const URLSCAN_PROXY_STORAGE = 'scanr_urlscan_proxy_url_v1';
   const MAX_HISTORY = 500;
 
   const els = {};
@@ -103,16 +102,6 @@
     }
   }
 
-  function getVtKey() {
-    return localStorage.getItem(VT_KEY_STORAGE) || '';
-  }
-  function setVtKeyStorage(key) {
-    localStorage.setItem(VT_KEY_STORAGE, key);
-  }
-  function clearVtKeyStorage() {
-    localStorage.removeItem(VT_KEY_STORAGE);
-  }
-
   function getUrlscanKey() {
     return localStorage.getItem(URLSCAN_KEY_STORAGE) || '';
   }
@@ -130,11 +119,14 @@
     localStorage.setItem(URLSCAN_VISIBILITY_STORAGE, v);
   }
 
-  function getActiveEngine() {
-    return localStorage.getItem(ACTIVE_ENGINE_STORAGE) || 'virustotal';
+  function getUrlscanProxy() {
+    return (localStorage.getItem(URLSCAN_PROXY_STORAGE) || '').replace(/\/+$/, '');
   }
-  function setActiveEngine(engine) {
-    localStorage.setItem(ACTIVE_ENGINE_STORAGE, engine);
+  function setUrlscanProxy(url) {
+    localStorage.setItem(URLSCAN_PROXY_STORAGE, url.replace(/\/+$/, ''));
+  }
+  function clearUrlscanProxy() {
+    localStorage.removeItem(URLSCAN_PROXY_STORAGE);
   }
 
   /* =====================================================
@@ -311,7 +303,6 @@
       type,
       parsed,
       timestamp: Date.now(),
-      vt: type === 'url' ? { status: 'unchecked' } : null,
       urlscan: type === 'url' ? { status: 'unchecked' } : null
     };
     history.unshift(entry);
@@ -338,9 +329,7 @@
     const total = history.length;
     const links = history.filter((e) => e.type === 'url').length;
     const flagged = history.filter((e) => {
-      const vtFlag = e.vt && (e.vt.status === 'malicious' || e.vt.status === 'suspicious');
-      const usFlag = e.urlscan && (e.urlscan.status === 'malicious' || e.urlscan.status === 'suspicious');
-      return vtFlag || usFlag;
+      return e.urlscan && (e.urlscan.status === 'malicious' || e.urlscan.status === 'suspicious');
     }).length;
     els.statTotal.textContent = total;
     els.statLinks.textContent = links;
@@ -363,20 +352,15 @@
     return map[s] || '';
   }
 
-  function vtBadgeSnippet(entry) {
+  function scanBadgeSnippet(entry) {
     if (entry.type !== 'url') return '';
-    // Show whichever engine has the most decisive/recent result: a flagged
-    // or clean result always wins over an unchecked/pending state.
-    const rank = { malicious: 4, suspicious: 4, clean: 3, error: 2, unreachable: 2, pending: 1, unchecked: 0 };
-    const vt = entry.vt || { status: 'unchecked' };
     const us = entry.urlscan || { status: 'unchecked' };
-    const winner = (rank[us.status] || 0) > (rank[vt.status] || 0) ? us : vt;
-    return statusBadgeMap(winner.status);
+    return statusBadgeMap(us.status);
   }
 
   function historyItemHTML(entry) {
     const meta = TYPE_META[entry.type];
-    const badge = vtBadgeSnippet(entry);
+    const badge = scanBadgeSnippet(entry);
     return `
       <button class="history-item" data-id="${entry.id}">
         <div class="history-icon type-${entry.type}">${meta.glyph}</div>
@@ -428,7 +412,7 @@
   function switchView(view) {
     currentView = view;
     document.querySelectorAll('.view').forEach((v) => { v.hidden = v.dataset.view !== view; });
-    document.querySelectorAll('.nav-btn').forEach((b) => { b.classList.toggle('active', b.dataset.view === view); });
+    document.querySelectorAll('#homeBottomNav .nav-btn').forEach((b) => { b.classList.toggle('active', b.dataset.view === view); });
     window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
     if (view === 'history') renderFullList();
   }
@@ -529,16 +513,11 @@
 
   function sheetForUrl(entry) {
     const { url, hostname } = entry.parsed;
-    const engine = getActiveEngine();
     return `
       ${sheetHeader('// LINK DETECTED', hostname)}
       <div class="sheet-raw-box">${escapeHtml(url)}</div>
       ${urlscanPreviewHTML(entry)}
-      <div class="chip-row" id="vtEngineSwitch" style="margin-bottom:10px;">
-        <button class="chip ${engine === 'virustotal' ? 'active' : ''}" data-sheet-engine="virustotal">VIRUSTOTAL</button>
-        <button class="chip ${engine === 'urlscan' ? 'active' : ''}" data-sheet-engine="urlscan">URLSCAN.IO</button>
-      </div>
-      <div id="vtBox">${engine === 'urlscan' ? urlscanStatusBoxHTML(entry) : vtStatusBoxHTML(entry)}</div>
+      <div id="urlscanBox">${urlscanStatusBoxHTML(entry)}</div>
       <div class="sheet-actions">
         <button class="btn btn-primary" id="sheetOpenBtn">OPEN LINK</button>
         <button class="btn btn-ghost" id="sheetCopyBtn">COPY LINK</button>
@@ -555,51 +534,13 @@
       </div>`;
   }
 
-  function vtStatusBoxHTML(entry) {
-    const vt = entry.vt || { status: 'unchecked' };
-    const hasKey = !!getVtKey();
-    if (vt.status === 'unchecked') {
-      return `<div class="vt-status-box">
-        <div class="vt-status-label">Not checked yet<small>${hasKey ? 'Run a security check against VirusTotal' : 'Add an API key in Settings to enable checks'}</small></div>
-        <button class="btn btn-secondary btn-sm" id="vtRunBtn" ${hasKey ? '' : 'disabled'}>CHECK</button>
-      </div>`;
-    }
-    if (vt.status === 'pending') {
-      return `<div class="vt-status-box">
-        <div class="vt-status-label"><span class="spinner"></span> &nbsp;Scanning with VirusTotal…<small>This usually takes a few seconds</small></div>
-      </div>`;
-    }
-    if (vt.status === 'unreachable') {
-      return `<div class="vt-status-box">
-        <div class="vt-status-label" style="color:var(--faint)">Engine unreachable from this browser<small>${escapeHtml(vt.message || 'Try a manual check instead')}</small></div>
-        <button class="btn btn-ghost btn-sm" id="vtManualBtn">MANUAL CHECK</button>
-      </div>`;
-    }
-    if (vt.status === 'clean') {
-      const s = vt.stats || {};
-      return `<div class="vt-status-box">
-        <div class="vt-status-label"><span class="badge badge-green">CLEAN</span><small>${s.harmless || 0} engines reported no threats</small></div>
-        <button class="btn btn-ghost btn-sm" id="vtRunBtn">RE-CHECK</button>
-      </div>`;
-    }
-    if (vt.status === 'suspicious' || vt.status === 'malicious') {
-      const s = vt.stats || {};
-      const n = (s.malicious || 0) + (s.suspicious || 0);
-      return `<div class="vt-status-box">
-        <div class="vt-status-label"><span class="badge badge-danger">${vt.status === 'malicious' ? 'THREAT DETECTED' : 'SUSPICIOUS'}</span><small>${n} of ${(s.malicious||0)+(s.suspicious||0)+(s.harmless||0)+(s.undetected||0)} engines flagged this link</small></div>
-        <button class="btn btn-ghost btn-sm" id="vtManualBtn">VIEW REPORT</button>
-      </div>`;
-    }
-    return '';
-  }
-
   function urlscanStatusBoxHTML(entry) {
     const us = entry.urlscan || { status: 'unchecked' };
-    const hasKey = !!getUrlscanKey();
+    const canCheck = !!getUrlscanKey() || !!getUrlscanProxy();
     if (us.status === 'unchecked') {
       return `<div class="vt-status-box">
-        <div class="vt-status-label">Not checked yet<small>${hasKey ? 'Run a security scan with urlscan.io' : 'Add an API key in Settings to enable checks'}</small></div>
-        <button class="btn btn-secondary btn-sm" id="urlscanRunBtn" ${hasKey ? '' : 'disabled'}>CHECK</button>
+        <div class="vt-status-label">Not checked yet<small>${canCheck ? 'Run a security scan with urlscan.io' : 'Add an API key or proxy URL in Settings to enable checks'}</small></div>
+        <button class="btn btn-secondary btn-sm" id="urlscanRunBtn" ${canCheck ? '' : 'disabled'}>CHECK</button>
       </div>`;
     }
     if (us.status === 'pending') {
@@ -751,14 +692,6 @@
       openScanner();
     });
 
-    const vtRunBtn = byId('vtRunBtn');
-    if (vtRunBtn) vtRunBtn.addEventListener('click', () => runVtScan(entry));
-
-    const vtManualBtn = byId('vtManualBtn');
-    if (vtManualBtn) vtManualBtn.addEventListener('click', () => {
-      window.open('https://www.virustotal.com/gui/search/' + encodeURIComponent(entry.parsed.url), '_blank', 'noopener,noreferrer');
-    });
-
     const urlscanRunBtn = byId('urlscanRunBtn');
     if (urlscanRunBtn) urlscanRunBtn.addEventListener('click', () => runUrlscanScan(entry));
 
@@ -771,14 +704,6 @@
         try { hostname = new URL(entry.parsed.url).hostname; } catch (e) {}
         window.open('https://urlscan.io/search/?q=' + encodeURIComponent('domain:' + hostname), '_blank', 'noopener,noreferrer');
       }
-    });
-
-    const engineSwitch = byId('vtEngineSwitch');
-    if (engineSwitch) engineSwitch.addEventListener('click', (e) => {
-      const chip = e.target.closest('[data-sheet-engine]');
-      if (!chip) return;
-      setActiveEngine(chip.dataset.sheetEngine);
-      buildSheetForEntry(entry);
     });
   }
 
@@ -854,73 +779,6 @@
   }
 
   /* =====================================================
-     VIRUSTOTAL INTEGRATION
-     ===================================================== */
-  async function runVtScan(entry) {
-    const key = getVtKey();
-    if (!key) { toast('ADD A VIRUSTOTAL API KEY IN SETTINGS', 'error'); return; }
-
-    entry.vt = { status: 'pending' };
-    persistHistory();
-    refreshVtUI(entry);
-
-    try {
-      const submitRes = await fetch('https://www.virustotal.com/api/v3/urls', {
-        method: 'POST',
-        headers: { 'x-apikey': key, 'content-type': 'application/x-www-form-urlencoded' },
-        body: 'url=' + encodeURIComponent(entry.parsed.url)
-      });
-      if (!submitRes.ok) throw new Error('submit_' + submitRes.status);
-      const submitJson = await submitRes.json();
-      const analysisId = submitJson.data.id;
-
-      let result = null;
-      for (let attempt = 0; attempt < 6; attempt++) {
-        await sleep(2500);
-        const anRes = await fetch(`https://www.virustotal.com/api/v3/analyses/${analysisId}`, {
-          headers: { 'x-apikey': key }
-        });
-        if (!anRes.ok) throw new Error('poll_' + anRes.status);
-        const anJson = await anRes.json();
-        if (anJson.data.attributes.status === 'completed') {
-          result = anJson.data.attributes.stats;
-          break;
-        }
-      }
-
-      if (!result) {
-        entry.vt = { status: 'pending', message: 'Still analyzing — check back soon.' };
-      } else {
-        const malicious = result.malicious || 0;
-        const suspicious = result.suspicious || 0;
-        let status = 'clean';
-        if (malicious > 0) status = 'malicious';
-        else if (suspicious > 0) status = 'suspicious';
-        entry.vt = { status, stats: result, checkedAt: Date.now() };
-      }
-    } catch (err) {
-      entry.vt = {
-        status: 'unreachable',
-        message: 'Could not reach VirusTotal from this browser (often blocked by CORS). Use the manual check link instead.'
-      };
-    }
-
-    persistHistory();
-    refreshVtUI(entry);
-    renderAll();
-  }
-
-  function refreshVtUI(entry) {
-    if (activeSheetEntryId === entry.id) {
-      const box = els.sheetContent.querySelector('#vtBox');
-      if (box && getActiveEngine() === 'virustotal') {
-        box.innerHTML = vtStatusBoxHTML(entry);
-        wireSheetActions(entry);
-      }
-    }
-  }
-
-  /* =====================================================
      URLSCAN.IO INTEGRATION
      ===================================================== */
   class UrlscanApiError extends Error {
@@ -932,20 +790,31 @@
   }
 
   async function runUrlscanScan(entry) {
+    const proxy = getUrlscanProxy();
     const key = getUrlscanKey();
-    if (!key) { toast('ADD A URLSCAN.IO API KEY IN SETTINGS', 'error'); return; }
+    if (!proxy && !key) { toast('ADD A URLSCAN.IO API KEY IN SETTINGS', 'error'); return; }
     const visibility = getUrlscanVisibility();
 
     entry.urlscan = { status: 'pending' };
     persistHistory();
     refreshUrlscanUI(entry);
 
+    // When a proxy is configured, calls go through it instead of directly to
+    // urlscan.io — the proxy holds the key server-side and adds the CORS
+    // headers urlscan.io's own API doesn't send on real (non-preflight)
+    // responses. Without a proxy, we call urlscan.io directly, which may hit
+    // that CORS gap and surface as a network error below.
+    const submitUrl = proxy ? `${proxy}/scan` : 'https://urlscan.io/api/v1/scan/';
+    const submitHeaders = proxy
+      ? { 'content-type': 'application/json' }
+      : { 'content-type': 'application/json', 'API-Key': key };
+
     try {
       let submitRes;
       try {
-        submitRes = await fetch('https://urlscan.io/api/v1/scan/', {
+        submitRes = await fetch(submitUrl, {
           method: 'POST',
-          headers: { 'content-type': 'application/json', 'API-Key': key },
+          headers: submitHeaders,
           body: JSON.stringify({ url: entry.parsed.url, visibility })
         });
       } catch (networkErr) {
@@ -955,10 +824,10 @@
       }
 
       if (!submitRes.ok) {
-        // We DID get a real response from urlscan.io — this is an API error,
-        // not a network failure. Surface the server's actual reason.
+        // We DID get a real response — this is an API error, not a network
+        // failure. Surface the server's actual reason.
         const errJson = await submitRes.json().catch(() => ({}));
-        const reason = errJson.message || errJson.description;
+        const reason = errJson.message || errJson.description || errJson.error;
         if (submitRes.status === 401 || submitRes.status === 403) {
           throw new UrlscanApiError(reason || 'API key was rejected — check it in Settings.', submitRes.status);
         }
@@ -978,11 +847,11 @@
       let resultJson = null;
       for (let attempt = 0; attempt < 8; attempt++) {
         await sleep(3000);
+        const resultUrl = proxy ? `${proxy}/result/${uuid}` : `https://urlscan.io/api/v1/result/${uuid}/`;
+        const resultHeaders = proxy ? {} : { 'API-Key': key };
         let resRes;
         try {
-          resRes = await fetch(`https://urlscan.io/api/v1/result/${uuid}/`, {
-            headers: { 'API-Key': key }
-          });
+          resRes = await fetch(resultUrl, { headers: resultHeaders });
         } catch (networkErr) {
           throw new UrlscanApiError('Lost connection while waiting for results.', null);
         }
@@ -1041,9 +910,7 @@
     if (activeSheetEntryId === entry.id) {
       // Screenshot only appears once results land, so redraw the whole sheet body
       // rather than just the status box.
-      if (getActiveEngine() === 'urlscan') {
-        buildSheetForEntry(entry);
-      }
+      buildSheetForEntry(entry);
     }
   }
 
@@ -1078,21 +945,38 @@
   }
 
   function setupTorchButton() {
+    // Always show the flash button — greying it out when unsupported is more
+    // stable than hiding it, since torch capability detection can flicker
+    // across devices/browsers and hiding it reflows the 3-button nav island.
+    els.torchBtn.hidden = false;
+    els.torchBtn.classList.remove('active');
+    els.torchBtn.onclick = null;
+
+    let track = null;
+    let caps = {};
     try {
-      const track = mediaStream.getVideoTracks()[0];
-      const caps = track.getCapabilities ? track.getCapabilities() : {};
-      if (caps.torch) {
-        els.torchBtn.hidden = false;
-        torchOn = false;
-        els.torchBtn.onclick = async () => {
-          torchOn = !torchOn;
-          try { await track.applyConstraints({ advanced: [{ torch: torchOn }] }); } catch (e) {}
-        };
-      } else {
-        els.torchBtn.hidden = true;
-      }
+      track = mediaStream.getVideoTracks()[0];
+      caps = (track && track.getCapabilities) ? track.getCapabilities() : {};
     } catch (e) {
-      els.torchBtn.hidden = true;
+      track = null;
+    }
+
+    if (track && caps.torch) {
+      els.torchBtn.disabled = false;
+      torchOn = false;
+      els.torchBtn.onclick = async () => {
+        torchOn = !torchOn;
+        try {
+          await track.applyConstraints({ advanced: [{ torch: torchOn }] });
+          els.torchBtn.classList.toggle('active', torchOn);
+        } catch (e) {
+          // Constraint application failed (e.g. torch was revoked mid-session) —
+          // reflect that the toggle didn't actually take effect.
+          torchOn = !torchOn;
+        }
+      };
+    } else {
+      els.torchBtn.disabled = true;
     }
   }
 
@@ -1110,7 +994,9 @@
       mediaStream = null;
     }
     els.scannerOverlay.hidden = true;
-    els.torchBtn.hidden = true;
+    els.torchBtn.disabled = true;
+    els.torchBtn.classList.remove('active');
+    els.torchBtn.onclick = null;
   }
 
   function startDetectionLoop() {
@@ -1172,13 +1058,8 @@
     closeScanner();
     buildSheetForEntry(entry, { fresh: true });
 
-    if (entry.type === 'url') {
-      const engine = getActiveEngine();
-      if (engine === 'virustotal' && getVtKey()) {
-        runVtScan(entry);
-      } else if (engine === 'urlscan' && getUrlscanKey()) {
-        runUrlscanScan(entry);
-      }
+    if (entry.type === 'url' && (getUrlscanKey() || getUrlscanProxy())) {
+      runUrlscanScan(entry);
     }
   }
 
@@ -1220,25 +1101,6 @@
      SETTINGS
      ===================================================== */
   function initSettings() {
-    const key = getVtKey();
-    $('vtApiKey').value = key;
-    updateVtKeyStatus();
-
-    $('saveVtKey').addEventListener('click', () => {
-      const val = $('vtApiKey').value.trim();
-      if (!val) { toast('ENTER A KEY FIRST', 'error'); return; }
-      setVtKeyStorage(val);
-      updateVtKeyStatus();
-      toast('API KEY SAVED');
-    });
-
-    $('clearVtKey').addEventListener('click', () => {
-      clearVtKeyStorage();
-      $('vtApiKey').value = '';
-      updateVtKeyStatus();
-      toast('API KEY CLEARED');
-    });
-
     $('urlscanApiKey').value = getUrlscanKey();
     updateUrlscanKeyStatus();
 
@@ -1257,7 +1119,26 @@
       toast('API KEY CLEARED');
     });
 
-    initEngineSwitch();
+    $('urlscanProxyUrl').value = getUrlscanProxy();
+    updateUrlscanProxyStatus();
+
+    $('saveUrlscanProxy').addEventListener('click', () => {
+      const val = $('urlscanProxyUrl').value.trim();
+      if (!val) { toast('ENTER A PROXY URL FIRST', 'error'); return; }
+      if (!/^https?:\/\//i.test(val)) { toast('PROXY URL MUST START WITH HTTPS://', 'error'); return; }
+      setUrlscanProxy(val);
+      $('urlscanProxyUrl').value = getUrlscanProxy();
+      updateUrlscanProxyStatus();
+      toast('PROXY URL SAVED');
+    });
+
+    $('clearUrlscanProxy').addEventListener('click', () => {
+      clearUrlscanProxy();
+      $('urlscanProxyUrl').value = '';
+      updateUrlscanProxyStatus();
+      toast('PROXY URL CLEARED');
+    });
+
     initUrlscanVisibility();
 
     $('clearHistoryBtn').addEventListener('click', () => {
@@ -1284,32 +1165,14 @@
     $('wipeAllBtn').addEventListener('click', () => {
       if (confirm('Wipe all local data — history and API keys? This can\'t be undone.')) {
         clearAllHistory();
-        clearVtKeyStorage();
         clearUrlscanKeyStorage();
-        $('vtApiKey').value = '';
+        clearUrlscanProxy();
         $('urlscanApiKey').value = '';
-        updateVtKeyStatus();
+        $('urlscanProxyUrl').value = '';
         updateUrlscanKeyStatus();
+        updateUrlscanProxyStatus();
         toast('ALL DATA WIPED');
       }
-    });
-  }
-
-  function initEngineSwitch() {
-    const chips = $('engineChips');
-    if (!chips) return;
-    const applyActiveEngine = (engine) => {
-      chips.querySelectorAll('.chip').forEach((c) => c.classList.toggle('active', c.dataset.engine === engine));
-      $('enginePanel-virustotal').hidden = engine !== 'virustotal';
-      $('enginePanel-urlscan').hidden = engine !== 'urlscan';
-    };
-    applyActiveEngine(getActiveEngine());
-    chips.addEventListener('click', (e) => {
-      const chip = e.target.closest('[data-engine]');
-      if (!chip) return;
-      setActiveEngine(chip.dataset.engine);
-      applyActiveEngine(chip.dataset.engine);
-      toast(chip.dataset.engine === 'virustotal' ? 'ENGINE: VIRUSTOTAL' : 'ENGINE: URLSCAN.IO');
     });
   }
 
@@ -1341,15 +1204,18 @@
     }
   }
 
-  function updateVtKeyStatus() {
-    const key = getVtKey();
-    els.vtKeyStatus = $('vtKeyStatus');
-    if (key) {
-      els.vtKeyStatus.textContent = '// KEY SAVED · ' + '•'.repeat(Math.min(key.length, 8));
-      els.vtKeyStatus.className = 'badge badge-green';
+  function updateUrlscanProxyStatus() {
+    const proxy = getUrlscanProxy();
+    const el = $('urlscanProxyStatus');
+    if (!el) return;
+    if (proxy) {
+      let host = proxy;
+      try { host = new URL(proxy).hostname; } catch (e) {}
+      el.textContent = '// PROXY ACTIVE · ' + host;
+      el.className = 'badge badge-green';
     } else {
-      els.vtKeyStatus.textContent = '// NO KEY SET';
-      els.vtKeyStatus.className = 'badge';
+      el.textContent = '// NO PROXY SET';
+      el.className = 'badge';
     }
   }
 
@@ -1409,7 +1275,7 @@
   }
 
   function initNav() {
-    document.querySelectorAll('.nav-btn').forEach((btn) => {
+    document.querySelectorAll('#homeBottomNav .nav-btn[data-view]').forEach((btn) => {
       btn.addEventListener('click', () => switchView(btn.dataset.view));
     });
     els.viewAllBtn.addEventListener('click', () => switchView('history'));
@@ -1436,7 +1302,10 @@
   function initScanner() {
     els.scanFab.addEventListener('click', openScanner);
     els.heroScanBtn.addEventListener('click', openScanner);
-    els.closeScannerBtn.addEventListener('click', closeScanner);
+    els.closeScannerBtn.addEventListener('click', () => {
+      closeScanner();
+      switchView('home');
+    });
     els.manualEntryBtn.addEventListener('click', openManualEntry);
   }
 
