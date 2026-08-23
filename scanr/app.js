@@ -8,6 +8,7 @@
   const URLSCAN_KEY_STORAGE = 'scanr_urlscan_api_key_v1';
   const URLSCAN_VISIBILITY_STORAGE = 'scanr_urlscan_visibility_v1';
   const URLSCAN_PROXY_STORAGE = 'scanr_urlscan_proxy_url_v1';
+  const GSB_KEY_STORAGE = 'scanr_gsb_api_key_v1';
   const MAX_HISTORY = 500;
 
   const els = {};
@@ -115,6 +116,14 @@
         };
         changed = true;
       }
+      // GSB checks are a single fast request with no multi-step polling, so
+      // a stale 'pending' here just means the request never completed
+      // (page closed mid-check) — reset to unchecked so CHECK is available
+      // again, rather than inventing a timeout state this engine never has.
+      if (e.gsb && e.gsb.status === 'pending') {
+        e.gsb = { status: 'unchecked' };
+        changed = true;
+      }
     });
     if (changed) persistHistory();
   }
@@ -152,6 +161,16 @@
   }
   function clearUrlscanProxy() {
     localStorage.removeItem(URLSCAN_PROXY_STORAGE);
+  }
+
+  function getGsbKey() {
+    return localStorage.getItem(GSB_KEY_STORAGE) || '';
+  }
+  function setGsbKeyStorage(key) {
+    localStorage.setItem(GSB_KEY_STORAGE, key);
+  }
+  function clearGsbKeyStorage() {
+    localStorage.removeItem(GSB_KEY_STORAGE);
   }
 
   /* =====================================================
@@ -328,7 +347,8 @@
       type,
       parsed,
       timestamp: Date.now(),
-      urlscan: type === 'url' ? { status: 'unchecked' } : null
+      urlscan: type === 'url' ? { status: 'unchecked' } : null,
+      gsb: type === 'url' ? { status: 'unchecked' } : null
     };
     history.unshift(entry);
     persistHistory();
@@ -354,7 +374,9 @@
     const total = history.length;
     const links = history.filter((e) => e.type === 'url').length;
     const flagged = history.filter((e) => {
-      return e.urlscan && (e.urlscan.status === 'malicious' || e.urlscan.status === 'suspicious');
+      const usFlag = e.urlscan && (e.urlscan.status === 'malicious' || e.urlscan.status === 'suspicious');
+      const gsbFlag = e.gsb && e.gsb.status === 'malicious';
+      return usFlag || gsbFlag;
     }).length;
     els.statTotal.textContent = total;
     els.statLinks.textContent = links;
@@ -380,8 +402,15 @@
 
   function scanBadgeSnippet(entry) {
     if (entry.type !== 'url') return '';
+    // Show whichever engine has the most decisive result: a flagged verdict
+    // from either engine always wins over an unchecked/pending/clean state
+    // from the other, since a threat found anywhere matters more than a
+    // clean result found elsewhere.
+    const rank = { malicious: 4, suspicious: 4, clean: 3, error: 2, unreachable: 2, timeout: 2, pending: 1, unchecked: 0 };
     const us = entry.urlscan || { status: 'unchecked' };
-    return statusBadgeMap(us.status);
+    const gsb = entry.gsb || { status: 'unchecked' };
+    const winner = (rank[gsb.status] || 0) > (rank[us.status] || 0) ? gsb : us;
+    return statusBadgeMap(winner.status);
   }
 
   function historyItemHTML(entry) {
@@ -543,6 +572,7 @@
       ${sheetHeader('// LINK DETECTED', hostname)}
       <div class="sheet-raw-box">${escapeHtml(url)}</div>
       ${urlscanPreviewHTML(entry)}
+      <div id="gsbBox">${gsbStatusBoxHTML(entry)}</div>
       <div id="urlscanBox">${urlscanStatusBoxHTML(entry)}</div>
       <div class="sheet-actions">
         <button class="btn btn-primary" id="sheetOpenBtn">OPEN LINK</button>
@@ -558,6 +588,47 @@
         <img src="${escapeHtml(us.screenshotUrl)}" alt="Site preview" loading="lazy">
         <div class="site-preview-label">// SITE PREVIEW · URLSCAN.IO</div>
       </div>`;
+  }
+
+  const GSB_THREAT_LABELS = {
+    MALWARE: 'Malware',
+    SOCIAL_ENGINEERING: 'Phishing / Social Engineering',
+    UNWANTED_SOFTWARE: 'Unwanted Software',
+    POTENTIALLY_HARMFUL_APPLICATION: 'Potentially Harmful Application'
+  };
+
+  function gsbStatusBoxHTML(entry) {
+    const gsb = entry.gsb || { status: 'unchecked' };
+    const hasKey = !!getGsbKey();
+    if (gsb.status === 'unchecked') {
+      return `<div class="vt-status-box">
+        <div class="vt-status-label">Not checked yet<small>${hasKey ? 'Fast check against Google Safe Browsing' : 'Add a free API key in Settings to enable checks'}</small></div>
+        <button class="btn btn-secondary btn-sm" id="gsbRunBtn" ${hasKey ? '' : 'disabled'}>CHECK</button>
+      </div>`;
+    }
+    if (gsb.status === 'pending') {
+      return `<div class="vt-status-box">
+        <div class="vt-status-label"><span class="spinner"></span> &nbsp;Checking Google Safe Browsing…<small>This is usually instant</small></div>
+      </div>`;
+    }
+    if (gsb.status === 'unreachable' || gsb.status === 'error') {
+      return `<div class="vt-status-box">
+        <div class="vt-status-label" style="color:${gsb.status === 'error' ? 'var(--danger)' : 'var(--faint)'}">Google Safe Browsing check failed${gsb.httpStatus ? ` (HTTP ${gsb.httpStatus})` : ''}<small>${escapeHtml(gsb.message || 'Could not reach the API from this browser.')}</small></div>
+        <button class="btn btn-ghost btn-sm" id="gsbRunBtn">RETRY</button>
+      </div>`;
+    }
+    if (gsb.status === 'clean') {
+      return `<div class="vt-status-box">
+        <div class="vt-status-label"><span class="badge badge-green">CLEAN</span><small>Not found on Google's threat lists</small></div>
+      </div>`;
+    }
+    if (gsb.status === 'malicious') {
+      const labels = (gsb.threatTypes || []).map((t) => GSB_THREAT_LABELS[t] || t).join(', ');
+      return `<div class="vt-status-box">
+        <div class="vt-status-label"><span class="badge badge-danger">THREAT DETECTED</span><small>${escapeHtml(labels || 'Flagged by Google Safe Browsing')}</small></div>
+      </div>`;
+    }
+    return '';
   }
 
   function urlscanStatusBoxHTML(entry) {
@@ -729,6 +800,9 @@
       openScanner();
     });
 
+    const gsbRunBtn = byId('gsbRunBtn');
+    if (gsbRunBtn) gsbRunBtn.addEventListener('click', () => runGsbCheck(entry));
+
     const urlscanRunBtn = byId('urlscanRunBtn');
     if (urlscanRunBtn) urlscanRunBtn.addEventListener('click', () => runUrlscanScan(entry));
 
@@ -827,16 +901,93 @@
   }
 
   /* =====================================================
-     URLSCAN.IO INTEGRATION
+     SHARED: generic API error carrying a real HTTP status,
+     used to distinguish "server responded with an error" from
+     "request never reached a server at all" (network/CORS failure).
      ===================================================== */
-  class UrlscanApiError extends Error {
+  class ScanApiError extends Error {
     constructor(message, status) {
       super(message);
-      this.name = 'UrlscanApiError';
+      this.name = 'ScanApiError';
       this.status = status;
     }
   }
 
+  /* =====================================================
+     GOOGLE SAFE BROWSING INTEGRATION
+     ===================================================== */
+  // Uses the v5alpha1 urls:search endpoint — a fast, single-request lookup
+  // against Google's threat lists. Unlike urlscan.io, Google's API sends
+  // proper CORS headers on its real responses, so this works directly from
+  // the browser with no proxy needed.
+  async function runGsbCheck(entry) {
+    const key = getGsbKey();
+    if (!key) { toast('ADD A GOOGLE SAFE BROWSING API KEY IN SETTINGS', 'error'); return; }
+
+    entry.gsb = { status: 'pending' };
+    persistHistory();
+    refreshGsbUI(entry);
+
+    try {
+      const endpoint = `https://safebrowsing.googleapis.com/v5alpha1/urls:search?key=${encodeURIComponent(key)}&urls=${encodeURIComponent(entry.parsed.url)}`;
+      let res;
+      try {
+        res = await fetch(endpoint);
+      } catch (networkErr) {
+        throw new ScanApiError('Network request failed — check your connection or try again.', null);
+      }
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        const reason = errJson.error && errJson.error.message;
+        if (res.status === 400) {
+          throw new ScanApiError(reason || 'The API key appears to be invalid or malformed.', res.status);
+        }
+        if (res.status === 403) {
+          throw new ScanApiError(reason || 'API key was rejected — check it\u2019s enabled for the Safe Browsing API in Settings.', res.status);
+        }
+        if (res.status === 429) {
+          throw new ScanApiError(reason || 'Rate limit or quota exceeded — try again later.', res.status);
+        }
+        throw new ScanApiError(reason || `Google Safe Browsing returned an error (HTTP ${res.status}).`, res.status);
+      }
+
+      const json = await res.json();
+      const threats = json.threats || [];
+      if (threats.length === 0) {
+        entry.gsb = { status: 'clean', checkedAt: Date.now() };
+      } else {
+        const threatTypes = [...new Set(threats.flatMap((t) => t.threatTypes || []))];
+        entry.gsb = { status: 'malicious', threatTypes, checkedAt: Date.now() };
+      }
+    } catch (err) {
+      if (err instanceof ScanApiError && err.status) {
+        entry.gsb = { status: 'error', message: err.message, httpStatus: err.status };
+      } else {
+        entry.gsb = {
+          status: 'unreachable',
+          message: err && err.message ? String(err.message) : 'Could not reach Google Safe Browsing from this browser.'
+        };
+      }
+    }
+
+    persistHistory();
+    refreshGsbUI(entry);
+    renderAll();
+  }
+
+  function refreshGsbUI(entry) {
+    if (activeSheetEntryId !== entry.id) return;
+    const box = els.sheetContent && els.sheetContent.querySelector('#gsbBox');
+    if (box) {
+      box.innerHTML = gsbStatusBoxHTML(entry);
+      wireSheetActions(entry);
+    }
+  }
+
+  /* =====================================================
+     URLSCAN.IO INTEGRATION
+     ===================================================== */
   async function runUrlscanScan(entry) {
     const proxy = getUrlscanProxy();
     const key = getUrlscanKey();
@@ -868,7 +1019,7 @@
       } catch (networkErr) {
         // fetch() itself throwing (TypeError) means the request never got a
         // response at all — DNS failure, offline, CORS block, etc.
-        throw new UrlscanApiError('Network request failed — check your connection or try again.', null);
+        throw new ScanApiError('Network request failed — check your connection or try again.', null);
       }
 
       if (!submitRes.ok) {
@@ -877,15 +1028,15 @@
         const errJson = await submitRes.json().catch(() => ({}));
         const reason = errJson.message || errJson.description || errJson.error;
         if (submitRes.status === 401 || submitRes.status === 403) {
-          throw new UrlscanApiError(reason || 'API key was rejected — check it in Settings.', submitRes.status);
+          throw new ScanApiError(reason || 'API key was rejected — check it in Settings.', submitRes.status);
         }
         if (submitRes.status === 429) {
-          throw new UrlscanApiError(reason || 'Rate limit or quota exceeded — try again later.', submitRes.status);
+          throw new ScanApiError(reason || 'Rate limit or quota exceeded — try again later.', submitRes.status);
         }
         if (submitRes.status === 400) {
-          throw new UrlscanApiError(reason || 'This URL was rejected by urlscan.io (blocked, malformed, or on a blocklist).', submitRes.status);
+          throw new ScanApiError(reason || 'This URL was rejected by urlscan.io (blocked, malformed, or on a blocklist).', submitRes.status);
         }
-        throw new UrlscanApiError(reason || `urlscan.io returned an error (HTTP ${submitRes.status}).`, submitRes.status);
+        throw new ScanApiError(reason || `urlscan.io returned an error (HTTP ${submitRes.status}).`, submitRes.status);
       }
 
       const submitJson = await submitRes.json();
@@ -910,10 +1061,10 @@
         try {
           resRes = await fetch(resultUrl, { headers: resultHeaders });
         } catch (networkErr) {
-          throw new UrlscanApiError('Lost connection while waiting for results.', null);
+          throw new ScanApiError('Lost connection while waiting for results.', null);
         }
         if (resRes.status === 404) continue; // not ready yet
-        if (!resRes.ok) throw new UrlscanApiError(`urlscan.io returned an error while polling (HTTP ${resRes.status}).`, resRes.status);
+        if (!resRes.ok) throw new ScanApiError(`urlscan.io returned an error while polling (HTTP ${resRes.status}).`, resRes.status);
         resultJson = await resRes.json();
         break;
       }
@@ -954,7 +1105,7 @@
         };
       }
     } catch (err) {
-      if (err instanceof UrlscanApiError && err.status) {
+      if (err instanceof ScanApiError && err.status) {
         // A real HTTP response came back — this is an API-level error, not
         // a network/CORS failure, so label and style it accordingly.
         entry.urlscan = { status: 'error', message: err.message, httpStatus: err.status };
@@ -1130,8 +1281,9 @@
     closeScanner();
     buildSheetForEntry(entry, { fresh: true });
 
-    if (entry.type === 'url' && (getUrlscanKey() || getUrlscanProxy())) {
-      runUrlscanScan(entry);
+    if (entry.type === 'url') {
+      if (getGsbKey()) runGsbCheck(entry);
+      if (getUrlscanKey() || getUrlscanProxy()) runUrlscanScan(entry);
     }
   }
 
@@ -1173,6 +1325,24 @@
      SETTINGS
      ===================================================== */
   function initSettings() {
+    $('gsbApiKey').value = getGsbKey();
+    updateGsbKeyStatus();
+
+    $('saveGsbKey').addEventListener('click', () => {
+      const val = $('gsbApiKey').value.trim();
+      if (!val) { toast('ENTER A KEY FIRST', 'error'); return; }
+      setGsbKeyStorage(val);
+      updateGsbKeyStatus();
+      toast('API KEY SAVED');
+    });
+
+    $('clearGsbKey').addEventListener('click', () => {
+      clearGsbKeyStorage();
+      $('gsbApiKey').value = '';
+      updateGsbKeyStatus();
+      toast('API KEY CLEARED');
+    });
+
     $('urlscanApiKey').value = getUrlscanKey();
     updateUrlscanKeyStatus();
 
@@ -1237,10 +1407,13 @@
     $('wipeAllBtn').addEventListener('click', () => {
       if (confirm('Wipe all local data — history and API keys? This can\'t be undone.')) {
         clearAllHistory();
+        clearGsbKeyStorage();
         clearUrlscanKeyStorage();
         clearUrlscanProxy();
+        $('gsbApiKey').value = '';
         $('urlscanApiKey').value = '';
         $('urlscanProxyUrl').value = '';
+        updateGsbKeyStatus();
         updateUrlscanKeyStatus();
         updateUrlscanProxyStatus();
         toast('ALL DATA WIPED');
@@ -1261,6 +1434,19 @@
       setUrlscanVisibility(chip.dataset.visibility);
       applyActive(chip.dataset.visibility);
     });
+  }
+
+  function updateGsbKeyStatus() {
+    const key = getGsbKey();
+    const el = $('gsbKeyStatus');
+    if (!el) return;
+    if (key) {
+      el.textContent = '// KEY SAVED · ' + '•'.repeat(Math.min(key.length, 8));
+      el.className = 'badge badge-green';
+    } else {
+      el.textContent = '// NO KEY SET';
+      el.className = 'badge';
+    }
   }
 
   function updateUrlscanKeyStatus() {
