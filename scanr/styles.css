@@ -274,6 +274,28 @@ button {
 /* =========================================================
    HERO SCAN CARD
    ========================================================= */
+.hero-paste-card {
+  width: 100%;
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 13px 18px;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  transition: border-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+.hero-paste-card:hover { border-color: #3ad6ff66; color: var(--cyan); }
+.hero-paste-card:active { transform: scale(0.985); }
+
 .hero-scan-card {
   width: 100%;
   margin-top: 16px;
@@ -501,6 +523,20 @@ textarea.text-input {
   background: #ffffff0d;
   color: var(--muted);
   white-space: nowrap;
+  max-width: 100%;
+}
+
+/* Badges that can hold unpredictable long content (e.g. a saved proxy URL
+   hostname) truncate instead of forcing the page to scroll horizontally. */
+.badge-row {
+  max-width: 100%;
+  overflow: hidden;
+}
+.badge-row .badge {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
+  vertical-align: middle;
 }
 
 .badge-green { background: var(--green-soft); color: var(--green); }
@@ -516,6 +552,22 @@ textarea.text-input {
   flex-direction: column;
   gap: 8px;
 }
+
+/* Home's "recent activity" list shows up to 20 scans but only ~6 fit
+   before scrolling, so the card doesn't push the fold-worthy content
+   (new-scan button, etc.) far down the page. */
+#recentList {
+  max-height: 420px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  padding-right: 2px;
+}
+#recentList::-webkit-scrollbar { width: 6px; }
+#recentList::-webkit-scrollbar-track { background: transparent; }
+#recentList::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+#recentList::-webkit-scrollbar-thumb:hover { background: #3a3a3f; }
 
 .history-empty {
   border: 1px dashed var(--border);
@@ -930,6 +982,28 @@ textarea.text-input {
 }
 .vt-status-label { font-size: 12px; color: var(--muted); }
 .vt-status-label small { display: block; color: var(--faint); font-size: 10.5px; margin-top: 2px; }
+
+/* Pending state stacks the label above a thin progress bar instead of the
+   usual label+button row, since there's no action to take mid-scan. */
+.vt-status-box-pending {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.scan-progress-track {
+  width: 100%;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--border);
+  overflow: hidden;
+}
+.scan-progress-fill {
+  height: 100%;
+  background: var(--cyan);
+  border-radius: 2px;
+  transition: width 0.6s ease;
+}
 
 .site-preview {
   margin-bottom: 14px;
