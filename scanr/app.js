@@ -1370,6 +1370,7 @@ message FullHash {
      CAMERA / SCANNING
      ===================================================== */
   async function openScanner() {
+    els.scannerOverlay.classList.remove('closing');
     els.scannerOverlay.hidden = false;
     scanningPaused = false;
     setHint('// STARTING CAMERA…');
@@ -1445,10 +1446,17 @@ message FullHash {
       mediaStream.getTracks().forEach((t) => t.stop());
       mediaStream = null;
     }
-    els.scannerOverlay.hidden = true;
     els.torchBtn.disabled = true;
     els.torchBtn.classList.remove('active');
     els.torchBtn.onclick = null;
+
+    // Play the exit animation before actually hiding the overlay — hidden
+    // pulls it out of layout instantly, which would cut the animation off.
+    els.scannerOverlay.classList.add('closing');
+    setTimeout(() => {
+      els.scannerOverlay.hidden = true;
+      els.scannerOverlay.classList.remove('closing');
+    }, 220);
   }
 
   function startDetectionLoop() {
@@ -1536,7 +1544,7 @@ message FullHash {
     openSheet(`
       <div class="sheet-eyebrow">// MANUAL ENTRY</div>
       <div class="sheet-title">Paste content to analyze</div>
-      <textarea class="text-input" id="manualText" placeholder="Paste a URL, Wi-Fi string, vCard, or any text…" rows="5"></textarea>
+      <textarea class="text-input" id="manualText" placeholder="Paste a URL, Wi-Fi string, vCard, or any text…" rows="5" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
       <div class="sheet-actions single" style="margin-top:14px;">
         <button class="btn btn-primary" id="manualAnalyzeBtn">ANALYZE</button>
       </div>
