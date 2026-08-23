@@ -156,6 +156,7 @@ button {
   border: 1px solid var(--border);
   color: var(--muted);
   cursor: pointer;
+  font-size: 16px;
   transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
 }
 
@@ -295,6 +296,7 @@ button {
 }
 .hero-paste-card:hover { border-color: #3ad6ff66; color: var(--cyan); }
 .hero-paste-card:active { transform: scale(0.985); }
+.hero-paste-card i { font-size: 16px; }
 
 .hero-scan-card {
   width: 100%;
@@ -342,6 +344,7 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
+  font-size: 22px;
 }
 
 /* =========================================================
@@ -553,11 +556,11 @@ textarea.text-input {
   gap: 8px;
 }
 
-/* Home's "recent activity" list shows up to 20 scans but only ~6 fit
+/* Home's "recent activity" list shows up to 20 scans but only ~5 fit
    before scrolling, so the card doesn't push the fold-worthy content
    (new-scan button, etc.) far down the page. */
 #recentList {
-  max-height: 420px;
+  max-height: 350px;
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-width: thin;
@@ -681,6 +684,7 @@ textarea.text-input {
   height: 100%;
   transition: color 0.15s ease;
 }
+.nav-btn i { font-size: 16px; }
 
 .nav-btn.active,
 .nav-btn:hover { color: var(--cyan); }
@@ -698,7 +702,7 @@ textarea.text-input {
   color: var(--green);
   text-shadow: 0 0 12px rgba(57,255,154,0.5);
 }
-#torchBtn.active svg { filter: drop-shadow(0 0 4px rgba(57,255,154,0.6)); }
+#torchBtn.active i { filter: drop-shadow(0 0 4px rgba(57,255,154,0.6)); }
 
 .scan-fab {
   flex-shrink: 0;
@@ -713,6 +717,7 @@ textarea.text-input {
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  font-size: 22px;
   box-shadow: 0 0 0 1px var(--green-mid), 0 6px 24px -4px var(--green), 0 0 30px -6px var(--green);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
@@ -745,10 +750,28 @@ textarea.text-input {
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: #04050580;
+  /* Opaque, matching the app's own background — this reads as a real
+     screen the camera view lives on, not a translucent scrim floating
+     over Home. The camera feed itself provides all the "life" once the
+     stream starts; the scrim was fighting for attention with it. */
+  background: var(--bg);
   display: flex;
   flex-direction: column;
-  animation: fade-in 0.18s ease;
+  animation: scanner-in 0.32s cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+.scanner-overlay.closing {
+  animation: scanner-out 0.22s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+@keyframes scanner-in {
+  from { opacity: 0; transform: translateY(24px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes scanner-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(16px) scale(0.98); }
 }
 
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
@@ -799,11 +822,17 @@ textarea.text-input {
   height: 32px;
   border: 3px solid var(--green);
   filter: drop-shadow(0 0 6px var(--green-mid));
+  animation: corner-breathe 2.4s ease-in-out infinite;
 }
 .corner.tl { top: 0; left: 0; border-right: none; border-bottom: none; border-radius: 8px 0 0 0; }
 .corner.tr { top: 0; right: 0; border-left: none; border-bottom: none; border-radius: 0 8px 0 0; }
 .corner.bl { bottom: 0; left: 0; border-right: none; border-top: none; border-radius: 0 0 0 8px; }
 .corner.br { bottom: 0; right: 0; border-left: none; border-top: none; border-radius: 0 0 8px 0; }
+
+@keyframes corner-breathe {
+  0%, 100% { filter: drop-shadow(0 0 6px var(--green-mid)); }
+  50% { filter: drop-shadow(0 0 11px var(--green)); }
+}
 
 .scan-line {
   position: absolute;
