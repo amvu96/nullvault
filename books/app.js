@@ -4,7 +4,11 @@
 
 /* ---------- IndexedDB wrapper ---------- */
 const DB_NAME = 'shelf-db';
-const DB_VERSION = 1;
+// v2 adds the 'handles' store, which persists the File System Access
+// directory handle for folder sync. The existing stores are all created
+// behind contains() guards, so upgrading an existing v1 database just adds
+// the new store and leaves books/files/bookmarks/highlights untouched.
+const DB_VERSION = 2;
 let db;
 
 function openDB() {
@@ -25,6 +29,11 @@ function openDB() {
       if (!_db.objectStoreNames.contains('highlights')) {
         const hl = _db.createObjectStore('highlights', { keyPath: 'id' });
         hl.createIndex('bookId', 'bookId', { unique: false });
+      }
+      // FileSystemDirectoryHandle objects are structured-cloneable, so the
+      // folder grant survives app restarts without re-prompting.
+      if (!_db.objectStoreNames.contains('handles')) {
+        _db.createObjectStore('handles', { keyPath: 'id' });
       }
     };
     req.onsuccess = (e) => { db = e.target.result; resolve(db); };
@@ -416,8 +425,12 @@ el('fileInput').addEventListener('change', async (e) => {
   }
 });
 
-async function importEpub(file) {
-  showLoading('PARSING EPUB…');
+// opts.quiet suppresses the loading overlay, per-file toast and library
+// re-render so folder sync can import many files and report once at the end.
+// Returns true on success, false on failure, so the caller can tally results.
+async function importEpub(file, opts = {}) {
+  const quiet = !!opts.quiet;
+  if (!quiet) showLoading('PARSING EPUB…');
   try {
     if (typeof ePub === 'undefined') {
       throw new Error('EPUB_LIB_MISSING');
@@ -460,6 +473,10 @@ async function importEpub(file) {
       finished: false,
       fileName: file.name,
       fileSize: file.size,
+      // 'folder' for books picked up by folder sync, undefined for manual
+      // imports. Together with fileName+fileSize this is what lets a rescan
+      // tell "already imported" from "new file".
+      source: opts.source || undefined,
     };
 
     await idbPut('files', { id, data: arrayBuffer });
@@ -468,15 +485,228 @@ async function importEpub(file) {
     tempBook.destroy();
 
     state.books.push(meta);
-    hideLoading();
-    await loadLibrary();
-    showToast(`Imported "${meta.title}"`, 'accent');
+    if (!quiet) {
+      hideLoading();
+      await loadLibrary();
+      showToast(`Imported "${meta.title}"`, 'accent');
+    }
+    return true;
   } catch (err) {
     console.error('EPUB import failed:', err);
-    hideLoading();
-    showToast(describeImportError(err, file), 'danger');
+    if (!quiet) {
+      hideLoading();
+      showToast(describeImportError(err, file), 'danger');
+    }
+    return false;
   }
 }
+
+/* ============================================================
+   FOLDER SYNC (File System Access API)
+
+   Pick a folder once; re-scan it for new EPUBs each time the app opens.
+   This is deliberately not "monitoring" — a PWA can't watch a directory
+   while it's closed, and Periodic Background Sync is too throttled to
+   rely on. What it can do is remember the folder and diff it on launch.
+
+   The handle is stored in IndexedDB because FileSystemDirectoryHandle is
+   structured-cloneable, so the grant survives restarts without re-picking.
+   Permission still isn't guaranteed to persist: queryPermission() can come
+   back 'prompt' after a restart, and re-requesting needs a user gesture.
+   So a silent rescan is best-effort, and anything requiring a prompt is
+   deferred to the person tapping the sync button.
+
+   Availability is narrow: showDirectoryPicker() is Chromium-only, and
+   support on Android is inconsistent. Everything here is feature-detected
+   and the UI stays hidden entirely where it isn't supported, so the normal
+   file picker remains the path that always works.
+   ============================================================ */
+
+const FOLDER_HANDLE_KEY = 'sync-folder';
+
+function folderSyncSupported() {
+  return typeof window.showDirectoryPicker === 'function';
+}
+
+async function getSavedFolderHandle() {
+  try {
+    const rec = await idbGet('handles', FOLDER_HANDLE_KEY);
+    return rec ? rec.handle : null;
+  } catch (e) { return null; }
+}
+
+async function saveFolderHandle(handle) {
+  await idbPut('handles', { id: FOLDER_HANDLE_KEY, handle, name: handle.name });
+}
+
+async function clearFolderHandle() {
+  try { await idbDelete('handles', FOLDER_HANDLE_KEY); } catch (e) {}
+}
+
+// mode 'query' checks silently; 'request' may show a prompt and therefore
+// must be called from a user gesture.
+async function ensureFolderPermission(handle, mode) {
+  if (!handle) return false;
+  try {
+    const opts = { mode: 'read' };
+    const current = await handle.queryPermission(opts);
+    if (current === 'granted') return true;
+    if (mode === 'request') {
+      return (await handle.requestPermission(opts)) === 'granted';
+    }
+    return false;
+  } catch (e) { return false; }
+}
+
+async function pickSyncFolder() {
+  if (!folderSyncSupported()) {
+    showToast('Folder sync needs a Chromium browser', 'danger');
+    return;
+  }
+  let handle;
+  try {
+    handle = await window.showDirectoryPicker({ id: 'shelf-books', mode: 'read' });
+  } catch (e) {
+    return; // person cancelled the picker
+  }
+  if (!(await ensureFolderPermission(handle, 'request'))) {
+    showToast('Folder access was not granted', 'danger');
+    return;
+  }
+  await saveFolderHandle(handle);
+  await refreshFolderSheet();
+  await scanSyncFolder({ silent: false });
+}
+
+// Walks the folder (recursively) and imports any .epub not already in the
+// library. Dedupe is by filename + byte size, which is enough to avoid
+// re-importing the same file while still noticing a genuinely different one.
+async function scanSyncFolder({ silent }) {
+  if (!folderSyncSupported()) return;
+  const handle = await getSavedFolderHandle();
+  if (!handle) return;
+
+  const granted = await ensureFolderPermission(handle, silent ? 'query' : 'request');
+  if (!granted) {
+    // On a silent launch scan we can't prompt (no user gesture), so leave it
+    // for the person to trigger from settings rather than failing loudly.
+    if (!silent) showToast('Folder access was not granted', 'danger');
+    return;
+  }
+
+  const known = new Set(
+    state.books.map(b => `${b.fileName || ''}:${b.fileSize || 0}`)
+  );
+
+  let candidates = [];
+  try {
+    candidates = await collectEpubFiles(handle);
+  } catch (e) {
+    console.error('Folder scan failed:', e);
+    if (!silent) showToast('Could not read that folder', 'danger');
+    return;
+  }
+
+  const fresh = candidates.filter(f => !known.has(`${f.name}:${f.size}`));
+  if (fresh.length === 0) {
+    if (!silent) showToast('No new books found');
+    return;
+  }
+
+  let imported = 0;
+  showLoading(`IMPORTING 0/${fresh.length}…`);
+  for (let i = 0; i < fresh.length; i++) {
+    el('loadingText').textContent = `IMPORTING ${i + 1}/${fresh.length}…`;
+    const ok = await importEpub(fresh[i], { quiet: true, source: 'folder' });
+    if (ok) imported++;
+  }
+  hideLoading();
+  await loadLibrary();
+
+  const failed = fresh.length - imported;
+  showToast(
+    failed
+      ? `Added ${imported}, skipped ${failed} unreadable`
+      : `Added ${imported} book${imported === 1 ? '' : 's'}`,
+    imported ? 'accent' : 'danger'
+  );
+}
+
+// Recursive walk, depth-capped so a deeply nested or symlink-looping tree
+// can't spin forever. Individual unreadable entries are skipped rather than
+// aborting the whole scan.
+async function collectEpubFiles(dirHandle, depth = 0) {
+  const out = [];
+  if (depth > 4) return out;
+  for await (const entry of dirHandle.values()) {
+    try {
+      if (entry.kind === 'file') {
+        if (!/\.epub$/i.test(entry.name)) continue;
+        out.push(await entry.getFile());
+      } else if (entry.kind === 'directory') {
+        out.push(...await collectEpubFiles(entry, depth + 1));
+      }
+    } catch (e) { /* skip entries we can't read */ }
+  }
+  return out;
+}
+
+async function forgetSyncFolder() {
+  await clearFolderHandle();
+  await refreshFolderSheet();
+  showToast('Folder disconnected');
+}
+
+/* ---------- Folder sync UI ---------- */
+
+// The whole feature is hidden where showDirectoryPicker() doesn't exist
+// (Firefox, Safari, and some Android builds), so the normal file picker
+// stays the obvious path rather than sitting next to a button that errors.
+if (folderSyncSupported()) {
+  el('folderBtn').hidden = false;
+}
+
+async function refreshFolderSheet() {
+  const handle = await getSavedFolderHandle();
+  const status = el('folderStatus');
+  const hasFolder = !!handle;
+
+  if (hasFolder) {
+    const granted = await ensureFolderPermission(handle, 'query');
+    status.innerHTML = granted
+      ? `Watching <strong>${escapeHtml(handle.name)}</strong>. New EPUBs are picked up when you open the app.`
+      : `<strong>${escapeHtml(handle.name)}</strong> needs permission again — tap Rescan to re-grant it.`;
+  } else {
+    status.textContent = 'Pick a folder and new EPUBs in it get added automatically each time you open the app. Nothing is scanned while the app is closed.';
+  }
+
+  el('folderPickBtn').textContent = hasFolder ? 'CHANGE FOLDER' : 'CHOOSE FOLDER';
+  el('folderRescanBtn').hidden = !hasFolder;
+  el('folderForgetBtn').hidden = !hasFolder;
+}
+
+el('folderBtn').addEventListener('click', async () => {
+  await refreshFolderSheet();
+  openSheet('folderOverlay');
+});
+
+el('folderPickBtn').addEventListener('click', async () => {
+  closeSheet('folderOverlay');
+  await pickSyncFolder();
+});
+
+el('folderRescanBtn').addEventListener('click', async () => {
+  closeSheet('folderOverlay');
+  // Not silent: this came from a tap, so we're allowed to prompt for
+  // permission if the grant lapsed since last launch.
+  await scanSyncFolder({ silent: false });
+});
+
+el('folderForgetBtn').addEventListener('click', async () => {
+  closeSheet('folderOverlay');
+  await forgetSyncFolder();
+});
+
 
 function withTimeout(promise, ms, reason) {
   return Promise.race([
@@ -595,8 +825,22 @@ async function openBook(id) {
       loadReadingFonts(contents);
     });
 
+    // A saved CFI can be rejected by epub.js if it's malformed or no longer
+    // resolves against this book. Falling back to the start is the only
+    // option, but do it explicitly and log it — an unhandled rejection here
+    // would silently land the reader at page one and look exactly like the
+    // position was never saved.
     const startCfi = meta.cfi || undefined;
-    await rendition.display(startCfi);
+    try {
+      await rendition.display(startCfi);
+    } catch (err) {
+      if (startCfi) {
+        console.error('Saved position could not be restored, starting from the beginning:', err);
+        await rendition.display();
+      } else {
+        throw err;
+      }
+    }
 
     book.ready.then(() => {
       book.locations.generate(1200).then(() => {
@@ -632,15 +876,32 @@ async function openBook(id) {
 // momentarily reflect a mid-transition position. Debouncing to just past the
 // animation window ensures we save and display the page the user actually
 // lands on rather than a transient one.
+// Two separate concerns here, which were previously (wrongly) lumped
+// together behind one debounce:
+//
+//  - SAVING the position. This must happen immediately. It was deferred by
+//    ~440ms along with everything else, which meant any position not
+//    followed by 440ms of idle time was simply never written — including
+//    the page you were on when you left the book, since closing or
+//    backgrounding the app dropped the pending timer on the floor. Saving
+//    a position captured mid-page-turn is harmless (worst case you resume
+//    a page early); losing it entirely is not.
+//
+//  - RECOMPUTING the progress bar / chapter label. This stays debounced,
+//    which is what the delay was actually for: epub.js reports location as
+//    soon as it issues the page-turn scroll, not once that scroll visually
+//    settles, so reading it too early can show a transient in-between page.
 let relocateDebounce = null;
 function onRelocated(location) {
+  persistLocation(location);
   clearTimeout(relocateDebounce);
   relocateDebounce = setTimeout(() => applyRelocated(location), PAGE_TURN_ANIM_MS + 40);
 }
 
-function applyRelocated(location) {
-  if (!state.currentBook || !state.book) return;
+function persistLocation(location) {
+  if (!state.currentBook || !state.book || !location || !location.start) return;
   const cfi = location.start.cfi;
+  if (!cfi) return;
   state.currentBook.cfi = cfi;
 
   let pct = 0;
@@ -652,10 +913,37 @@ function applyRelocated(location) {
   state.currentBook.progress = pct;
   if (pct >= 0.995) state.currentBook.finished = true;
 
-  idbPut('books', state.currentBook);
-  updateProgressUI();
-  updateChapterLabel(cfi);
+  idbPut('books', state.currentBook).catch(err => {
+    console.error('Failed to save reading position:', err);
+  });
 }
+
+function applyRelocated(location) {
+  if (!state.currentBook || !state.book) return;
+  updateProgressUI();
+  updateChapterLabel(location.start.cfi);
+}
+
+// Force any position held only in memory out to storage right now. Called
+// before tearing the reader down and when the app is being backgrounded.
+function flushReadingPosition() {
+  if (!state.currentBook || !state.rendition) return;
+  try {
+    const loc = state.rendition.currentLocation();
+    if (loc && loc.start && loc.start.cfi) persistLocation(loc);
+  } catch (e) { /* rendition already torn down */ }
+}
+
+// On a phone people leave a book by going to the home screen or switching
+// apps far more often than by tapping back, and neither fires anything the
+// reader was listening for. visibilitychange is the one signal that
+// reliably arrives before the page is frozen or discarded; pagehide covers
+// actual teardown. Without these, a session could end with nothing written
+// at all — which is what made books reopen at the beginning.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') flushReadingPosition();
+});
+window.addEventListener('pagehide', flushReadingPosition);
 
 function updateProgressUI() {
   if (!state.currentBook) return;
@@ -806,6 +1094,12 @@ function applyRenditionTheme() {
 }
 
 function closeReader() {
+  // Capture the position BEFORE anything is destroyed or cleared. This used
+  // to run after state.currentBook was already null, so the guard in the
+  // save path silently discarded the final position of every session.
+  flushReadingPosition();
+  clearTimeout(relocateDebounce);
+
   if (state.rendition) {
     try { state.rendition.destroy(); } catch (e) {}
   }
@@ -1511,6 +1805,10 @@ async function init() {
   loadSettings();
   await openDB();
   await loadLibrary();
+  // Best-effort rescan of the synced folder on launch. Silent: if the
+  // permission grant lapsed we can't prompt without a user gesture here, so
+  // it quietly does nothing and waits for the person to tap Rescan.
+  scanSyncFolder({ silent: true });
 }
 
 init();
