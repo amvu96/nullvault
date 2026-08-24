@@ -458,10 +458,9 @@ async function openBook(id) {
       // treats '100%' as numeric (parseFloat('100%') === 100) and appends
       // 'px' to it, producing the invalid CSS value '100%px' on its internal
       // container. That silently fails to size the container at all, so
-      // epub.js falls back to an unreliable measurement that only a real
-      // window resize (e.g. rotating the device) happens to correct. Passing
-      // nothing here makes epub.js measure #epubViewer's actual pixel size
-      // via getBoundingClientRect() instead, which is the robust path.
+      // epub.js falls back to an unreliable measurement. Passing nothing
+      // here makes epub.js measure #epubViewer's actual pixel size via
+      // getBoundingClientRect() instead, which is the robust path.
       flow: state.settings.flow === 'scrolled' ? 'scrolled-doc' : 'paginated',
       spread: 'none',
     });
@@ -469,25 +468,17 @@ async function openBook(id) {
 
     applyRenditionTheme();
 
-    const startCfi = meta.cfi || undefined;
-    await rendition.display(startCfi);
-
-    // Safety net: even with the flush above, some devices/browsers can still
-    // report a transitional size (e.g. a slow CSS transition still settling).
-    // epub.js already listens for window 'resize' internally, so nudging it
-    // shortly after open costs nothing if the size was already correct, and
-    // recovers automatically if it wasn't — without relying on the user
-    // rotating their device to trigger it by accident.
-    setTimeout(() => {
-      try { window.dispatchEvent(new Event('resize')); } catch (e) {}
-    }, 150);
-
-    book.ready.then(() => {
-      book.locations.generate(1200).then(() => {
-        updateProgressUI();
-      });
-    });
-
+    // IMPORTANT: all rendition.on()/hooks.*.register() calls must happen
+    // BEFORE the first rendition.display() below, not after. hooks.content
+    // fires once per section as it's rendered, and awaiting display()
+    // doesn't resolve until that render (and its hook triggers) has already
+    // completed. Registering attachSurfaceTapHandler after display() meant
+    // it silently missed the very first page's content event — the tap
+    // listener was never attached to the page the reader actually lands on,
+    // only to whatever section got rendered *after* it. That's why nothing
+    // was tappable until something else (like rotating the device) forced
+    // epub.js to internally re-render the current section and fire the
+    // hook again, for the first time, on that already-open page.
     rendition.on('relocated', (location) => {
       onRelocated(location);
     });
@@ -498,6 +489,15 @@ async function openBook(id) {
 
     rendition.hooks.content.register((contents) => {
       attachSurfaceTapHandler(contents);
+    });
+
+    const startCfi = meta.cfi || undefined;
+    await rendition.display(startCfi);
+
+    book.ready.then(() => {
+      book.locations.generate(1200).then(() => {
+        updateProgressUI();
+      });
     });
 
     // load nav
@@ -1123,18 +1123,16 @@ $$('.chip-option[data-flow]').forEach(chip => {
       });
       state.rendition = rendition;
       applyRenditionTheme();
-      await rendition.display(cfi || undefined);
+
+      // See openBook() for why these must be registered before display().
       rendition.on('relocated', onRelocated);
       rendition.on('selected', handleTextSelection);
       rendition.hooks.content.register((contents) => {
         attachSurfaceTapHandler(contents);
       });
+
+      await rendition.display(cfi || undefined);
       applyHighlightsToRendition();
-      // Safety net matching openBook(): nudge epub.js's own resize handler
-      // in case #epubViewer's size wasn't fully settled at renderTo() time.
-      setTimeout(() => {
-        try { window.dispatchEvent(new Event('resize')); } catch (e) {}
-      }, 150);
     }
   });
 });
