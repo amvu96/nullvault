@@ -608,36 +608,6 @@ function updateFullscreenStatusBar(pct, currentLoc, totalLoc) {
   el('fsStatusPct').textContent = `${pct}%`;
 }
 
-// Battery Status API: Chromium-based browsers only (Chrome/Brave/Edge/Samsung
-// Internet on Android); Firefox removed it entirely and Safari never shipped
-// it. Feature-detected and treated as a pure bonus — its absence never blocks
-// or alters the rest of the status bar, it just means that one span stays
-// hidden.
-let batteryManager = null;
-async function initBatteryIndicator() {
-  if (!('getBattery' in navigator)) return;
-  try {
-    batteryManager = await navigator.getBattery();
-    renderBatteryIndicator();
-    batteryManager.addEventListener('levelchange', renderBatteryIndicator);
-    batteryManager.addEventListener('chargingchange', renderBatteryIndicator);
-  } catch (e) {
-    // Permissions-Policy or platform block — silently stay without it.
-  }
-}
-
-function renderBatteryIndicator() {
-  const el_ = el('fsStatusBattery');
-  if (!batteryManager) { el_.hidden = true; return; }
-  const pct = Math.round(batteryManager.level * 100);
-  el_.hidden = false;
-  el_.textContent = `${batteryManager.charging ? '⚡' : ''}${pct}%`;
-  el_.classList.toggle('is-low', pct <= 15 && !batteryManager.charging);
-  el_.classList.toggle('is-charging', !!batteryManager.charging);
-}
-
-initBatteryIndicator();
-
 function updateChapterLabel(cfi) {
   if (!state.book) return;
   try {
@@ -1183,6 +1153,44 @@ el('highlightToggle').addEventListener('click', () => {
   }
 });
 
+// epub.js computes its CSS multi-column page boundaries once, against
+// whatever font-size/line-height/margin was in effect at render time. It
+// does not automatically recompute those boundaries when that CSS changes
+// afterward (confirmed: futurepress/epub.js issue #453 — "the chapter frame
+// does not resize dynamically when the chapter content size changed, for
+// example after changing the text size"). Left alone, this means increasing
+// font size can make a paragraph's actual rendered height exceed the OLD
+// column height, and the overflow is silently clipped by the container's
+// overflow:hidden rather than reflowing into the next page — exactly the
+// "text missing until font is set to 12" symptom. The reliable fix is to
+// fully re-render at the current position after any layout-affecting
+// setting changes, forcing epub.js to lay out its columns fresh against the
+// new CSS rather than trying to patch the existing (stale) layout in place.
+async function reRenderRendition() {
+  if (!state.rendition || !state.currentBook || !state.book) return;
+  const cfi = state.currentBook.cfi;
+  const viewerEl = el('epubViewer');
+  state.rendition.destroy();
+  viewerEl.innerHTML = '';
+  const rendition = state.book.renderTo(viewerEl, {
+    // See openBook() for why width/height are intentionally omitted.
+    flow: state.settings.flow === 'scrolled' ? 'scrolled-doc' : 'paginated',
+    spread: 'none',
+  });
+  state.rendition = rendition;
+  applyRenditionTheme();
+
+  // See openBook() for why these must be registered before display().
+  rendition.on('relocated', onRelocated);
+  rendition.on('selected', handleTextSelection);
+  rendition.hooks.content.register((contents) => {
+    attachSurfaceTapHandler(contents);
+  });
+
+  await rendition.display(cfi || undefined);
+  applyHighlightsToRendition();
+}
+
 el('fontIncBtn').addEventListener('click', () => adjustSetting('fontSize', 1, 12, 32));
 el('fontDecBtn').addEventListener('click', () => adjustSetting('fontSize', -1, 12, 32));
 el('lineIncBtn').addEventListener('click', () => adjustSetting('lineHeight', 0.1, 1.2, 2.4));
@@ -1190,22 +1198,32 @@ el('lineDecBtn').addEventListener('click', () => adjustSetting('lineHeight', -0.
 el('marginIncBtn').addEventListener('click', () => adjustSetting('margin', 4, 0, 64));
 el('marginDecBtn').addEventListener('click', () => adjustSetting('margin', -4, 0, 64));
 
-function adjustSetting(key, delta, min, max) {
+async function adjustSetting(key, delta, min, max) {
   let val = state.settings[key] + delta;
   val = Math.round(val * 10) / 10;
   val = Math.max(min, Math.min(max, val));
   state.settings[key] = val;
   saveSettings();
   syncSettingsUI();
-  applyRenditionTheme();
+  scheduleRerender();
+}
+
+// Rapid taps on the font-size/line-height/margin steppers would otherwise
+// trigger a full destroy+re-renderTo per tap; debouncing so only the final
+// value after a burst of clicks actually re-renders keeps the settings
+// sheet responsive.
+let rerenderDebounce = null;
+function scheduleRerender() {
+  clearTimeout(rerenderDebounce);
+  rerenderDebounce = setTimeout(() => { reRenderRendition(); }, 220);
 }
 
 $$('.chip-option[data-font]').forEach(chip => {
-  chip.addEventListener('click', () => {
+  chip.addEventListener('click', async () => {
     state.settings.fontFamily = chip.dataset.font;
     saveSettings();
     syncSettingsUI();
-    applyRenditionTheme();
+    await reRenderRendition();
   });
 });
 
@@ -1214,30 +1232,7 @@ $$('.chip-option[data-flow]').forEach(chip => {
     state.settings.flow = chip.dataset.flow;
     saveSettings();
     syncSettingsUI();
-    // re-render with new flow
-    if (state.rendition && state.currentBook) {
-      const cfi = state.currentBook.cfi;
-      const viewerEl = el('epubViewer');
-      state.rendition.destroy();
-      viewerEl.innerHTML = '';
-      const rendition = state.book.renderTo(viewerEl, {
-        // See openBook() for why width/height are intentionally omitted.
-        flow: state.settings.flow === 'scrolled' ? 'scrolled-doc' : 'paginated',
-        spread: 'none',
-      });
-      state.rendition = rendition;
-      applyRenditionTheme();
-
-      // See openBook() for why these must be registered before display().
-      rendition.on('relocated', onRelocated);
-      rendition.on('selected', handleTextSelection);
-      rendition.hooks.content.register((contents) => {
-        attachSurfaceTapHandler(contents);
-      });
-
-      await rendition.display(cfi || undefined);
-      applyHighlightsToRendition();
-    }
+    await reRenderRendition();
   });
 });
 
