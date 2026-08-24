@@ -281,9 +281,16 @@ function renderLibrary() {
   }
   empty.hidden = true;
 
-  // Continue reading card: most recently opened, unfinished
+  // Continue reading card: most recently opened, unfinished.
+  //
+  // Keyed off lastOpenedAt, NOT progress. Requiring progress > 0 meant a book
+  // you'd opened but hadn't yet paged past the first screen of still counted
+  // as 0% — epub.js legitimately reports 0 at the very start of a book — so
+  // it failed the filter and the card silently disappeared on the next load.
+  // It looked like opening a book deleted it from Currently Reading. Having
+  // opened a book at all is what makes it the thing you're currently reading.
   const inProgress = state.books
-    .filter(b => b.progress > 0 && b.progress < 0.995 && !b.finished)
+    .filter(b => b.lastOpenedAt && !b.finished && (b.progress || 0) < 0.995)
     .sort((a, b) => (b.lastOpenedAt || 0) - (a.lastOpenedAt || 0))[0];
 
   if (inProgress) {
@@ -1408,8 +1415,9 @@ $$('.theme-swatch').forEach(sw => {
    BOTTOM NAV
    ============================================================ */
 el('continueFabBtn').addEventListener('click', () => {
+  // Same criterion as the Currently Reading card — see renderLibrary().
   const inProgress = state.books
-    .filter(b => b.progress > 0 && !b.finished)
+    .filter(b => b.lastOpenedAt && !b.finished && (b.progress || 0) < 0.995)
     .sort((a, b) => (b.lastOpenedAt || 0) - (a.lastOpenedAt || 0))[0];
   if (inProgress) {
     openBook(inProgress.id);
