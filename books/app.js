@@ -113,6 +113,49 @@ const FONT_STACKS = {
   sans: "'Literata', -apple-system, 'Segoe UI', sans-serif"
 };
 
+// The reading font choices above are Google Fonts loaded in the OUTER
+// document's <head> — but epub.js renders each chapter in its own, separate
+// same-origin iframe with its own <head>, which does NOT inherit stylesheets
+// from the parent document. Without explicitly loading fonts inside that
+// iframe too, every book silently fell back to Georgia/system-sans
+// regardless of what was picked in settings. contents.addStylesheet() (the
+// documented epub.js API for injecting CSS into rendered content, called
+// from the content hook) loads the same Google Fonts URL directly inside
+// each section's iframe document, once per section as it renders.
+const READING_FONTS_URL = 'https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;1,7..72,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400&display=swap';
+function loadReadingFonts(contents) {
+  try {
+    const stylesheetPromise = contents.addStylesheet(READING_FONTS_URL);
+    // Loading a font AFTER epub.js has already measured/columnized a page
+    // (which happens as soon as the section's markup and existing styles are
+    // parsed — it doesn't know to wait for a stylesheet added afterward) can
+    // itself reintroduce the very mismatch this whole fix is about: the font
+    // swapping in mid-read shifts line heights/character widths, so the
+    // column boundaries epub.js locked in against the fallback font may no
+    // longer match the real font's layout. document.fonts.ready resolves
+    // once all requested fonts have actually finished loading and the page
+    // has reflowed against them; forcing one re-render at that point (not on
+    // every load — see the guard below) ensures pagination is always
+    // computed against final metrics rather than a transient fallback.
+    const doc = contents.document;
+    if (doc && doc.fonts && doc.fonts.ready) {
+      Promise.resolve(stylesheetPromise).then(() => doc.fonts.ready).then(() => {
+        scheduleFontReflowRerender();
+      }).catch(() => {});
+    }
+  } catch (e) {}
+}
+
+// Fires at most once per book-open/settings-change cycle: multiple sections
+// can each trigger this as they render, but we only need a single
+// re-layout once fonts are actually available, not one per section.
+let fontReflowRerenderDone = false;
+function scheduleFontReflowRerender() {
+  if (fontReflowRerenderDone) return;
+  fontReflowRerenderDone = true;
+  setTimeout(() => { reRenderRendition(); }, 50);
+}
+
 // Page-turn animation timing. `scroll-behavior: smooth` (set in CSS on
 // epub.js's internal .epub-container) doesn't expose its animation duration
 // to JS — it's browser-controlled, typically 250-450ms — so this constant is
@@ -419,6 +462,9 @@ async function openBook(id) {
   const meta = state.books.find(b => b.id === id);
   if (!meta) return;
   showLoading('OPENING BOOK…');
+  // Reset the once-per-session font-reflow guard for this new reading
+  // session; see loadReadingFonts()/scheduleFontReflowRerender().
+  fontReflowRerenderDone = false;
 
   try {
     const fileRec = await idbGet('files', id);
@@ -491,6 +537,7 @@ async function openBook(id) {
 
     rendition.hooks.content.register((contents) => {
       attachSurfaceTapHandler(contents);
+      loadReadingFonts(contents);
     });
 
     const startCfi = meta.cfi || undefined;
@@ -1185,6 +1232,7 @@ async function reRenderRendition() {
   rendition.on('selected', handleTextSelection);
   rendition.hooks.content.register((contents) => {
     attachSurfaceTapHandler(contents);
+    loadReadingFonts(contents);
   });
 
   await rendition.display(cfi || undefined);
