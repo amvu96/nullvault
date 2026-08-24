@@ -1826,6 +1826,28 @@ message FullHash {
     if (params.get('action') === 'scan') {
       setTimeout(openScanner, 200);
     }
+
+    // Web Share Target: Android commonly puts a shared link in the "text"
+    // field rather than "url" (confirmed inconsistent across apps), so
+    // prefer whichever of the two actually looks link-like, and fall back
+    // to whatever text is present otherwise. Title is appended only if it
+    // adds information beyond the link itself.
+    const sharedUrl = params.get('shared_url') || '';
+    const sharedText = params.get('shared_text') || '';
+    const sharedTitle = params.get('shared_title') || '';
+    if (sharedUrl || sharedText || sharedTitle) {
+      const looksLikeLink = (s) => /^https?:\/\//i.test(s.trim());
+      let content = looksLikeLink(sharedUrl) ? sharedUrl
+        : looksLikeLink(sharedText) ? sharedText
+        : (sharedUrl || sharedText || '');
+      if (!content && sharedTitle) content = sharedTitle;
+      if (content) {
+        // Clear the share params from the URL bar so a page refresh doesn't
+        // re-trigger the same shared content as a duplicate scan.
+        window.history.replaceState({}, '', window.location.pathname);
+        setTimeout(() => onCodeDetected(content.trim()), 250);
+      }
+    }
   }
 
   if (document.readyState === 'loading') {
