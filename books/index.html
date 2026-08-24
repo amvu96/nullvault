@@ -132,6 +132,21 @@
         <span>THEME</span>
       </button>
     </footer>
+
+    <!-- Standalone/fullscreen-only status strip: replaces the OS status bar
+         info (clock, battery) that's hidden once the browser/OS chrome is
+         gone. Only shown when running installed/standalone — see
+         updateFullscreenStatusBar() in app.js. Deliberately independent of
+         reader-header/reader-footer's show/hide-on-tap behavior, since its
+         job is to always give a minimal orientation cue. -->
+    <div class="fullscreen-status-bar" id="fullscreenStatusBar" hidden>
+      <span class="fs-status-title" id="fsStatusTitle"></span>
+      <span class="fs-status-sep">·</span>
+      <span class="fs-status-page tnum" id="fsStatusPage"></span>
+      <span class="fs-status-sep">·</span>
+      <span class="fs-status-pct tnum" id="fsStatusPct"></span>
+      <span class="fs-status-battery tnum" id="fsStatusBattery" hidden></span>
+    </div>
   </div>
 
   <!-- ============ BOTTOM NAV (LIBRARY ONLY) ============ -->
