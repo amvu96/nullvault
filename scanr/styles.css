@@ -40,6 +40,10 @@ html, body {
   height: 100%;
 }
 
+html {
+  overscroll-behavior-y: none;
+}
+
 body {
   background-color: var(--bg);
   background-image:
@@ -52,6 +56,10 @@ body {
   text-rendering: optimizeLegibility;
   min-height: 100vh;
   overflow-x: hidden;
+  /* Stops Chrome's pull-to-refresh / rubber-band overscroll bounce at the
+     top and bottom of the page — the "accordion" compress-and-snap-back
+     effect when scrolling past the content edge. */
+  overscroll-behavior-y: none;
 }
 
 .tabular, .stat-value, .badge, input, button {
@@ -563,6 +571,7 @@ textarea.text-input {
   max-height: 350px;
   overflow-y: auto;
   overflow-x: hidden;
+  overscroll-behavior-y: contain;
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
   padding-right: 2px;
@@ -901,6 +910,7 @@ textarea.text-input {
   max-width: 480px;
   max-height: 84vh;
   overflow-y: auto;
+  overscroll-behavior-y: contain;
   background: #131315;
   border: 1px solid var(--border);
   border-bottom: none;
@@ -974,6 +984,7 @@ textarea.text-input {
   margin-bottom: 14px;
   max-height: 130px;
   overflow-y: auto;
+  overscroll-behavior-y: contain;
   line-height: 1.5;
 }
 
