@@ -112,6 +112,14 @@ const FONT_STACKS = {
   sans: "'Literata', -apple-system, 'Segoe UI', sans-serif"
 };
 
+// Page-turn animation timing. `scroll-behavior: smooth` (set in CSS on
+// epub.js's internal .epub-container) doesn't expose its animation duration
+// to JS — it's browser-controlled, typically 250-450ms — so this constant is
+// a conservative upper bound used to (a) gate rapid repeat taps to roughly
+// one turn per animation cycle, and (b) debounce location/progress reporting
+// until just after the animation visually settles.
+const PAGE_TURN_ANIM_MS = 400;
+
 /* ---------- Utility ---------- */
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
@@ -483,7 +491,19 @@ async function openBook(id) {
   }
 }
 
+// `relocated` can fire while the CSS smooth-scroll page-turn animation is
+// still visually in flight (epub.js reports location right after issuing the
+// scroll, not after it visually settles), so the reported CFI/percentage can
+// momentarily reflect a mid-transition position. Debouncing to just past the
+// animation window ensures we save and display the page the user actually
+// lands on rather than a transient one.
+let relocateDebounce = null;
 function onRelocated(location) {
+  clearTimeout(relocateDebounce);
+  relocateDebounce = setTimeout(() => applyRelocated(location), PAGE_TURN_ANIM_MS + 40);
+}
+
+function applyRelocated(location) {
   if (!state.currentBook || !state.book) return;
   const cfi = location.start.cfi;
   state.currentBook.cfi = cfi;
@@ -633,6 +653,20 @@ function hasActiveIframeSelection() {
   } catch (e) { return false; }
 }
 
+// Turning pages while the previous smooth-scroll animation is still running
+// would queue a second scrollLeft change mid-transition, producing a jarring
+// stutter instead of a clean slide. This gates rapid repeat taps to roughly
+// one turn per animation cycle (see PAGE_TURN_ANIM_MS above).
+let pageTurnLocked = false;
+function turnPage(direction) {
+  if (!state.rendition || pageTurnLocked) return;
+  pageTurnLocked = true;
+  const result = direction === 'next' ? state.rendition.next() : state.rendition.prev();
+  Promise.resolve(result).finally(() => {
+    setTimeout(() => { pageTurnLocked = false; }, PAGE_TURN_ANIM_MS);
+  });
+}
+
 el('readerSurface').addEventListener('click', (e) => {
   if (hasActiveIframeSelection()) return;
   const rect = el('readerSurface').getBoundingClientRect();
@@ -640,9 +674,9 @@ el('readerSurface').addEventListener('click', (e) => {
   const edgeStart = rect.width * 0.22;
   const edgeEnd = rect.width * 0.78;
   if (x <= edgeStart) {
-    if (state.rendition) state.rendition.prev();
+    turnPage('prev');
   } else if (x >= edgeEnd) {
-    if (state.rendition) state.rendition.next();
+    turnPage('next');
   } else {
     showReaderChrome(!state.chromeVisible);
   }
@@ -675,9 +709,9 @@ function attachSurfaceTapHandler(contents) {
       const edgeStart = width * 0.22;
       const edgeEnd = width * 0.78;
       if (x <= edgeStart) {
-        if (state.rendition) state.rendition.prev();
+        turnPage('prev');
       } else if (x >= edgeEnd) {
-        if (state.rendition) state.rendition.next();
+        turnPage('next');
       } else {
         showReaderChrome(!state.chromeVisible);
       }
@@ -706,8 +740,8 @@ function getEpubScrollLeft() {
 // keyboard nav
 document.addEventListener('keydown', (e) => {
   if (el('readerView').hidden) return;
-  if (e.key === 'ArrowRight') state.rendition && state.rendition.next();
-  if (e.key === 'ArrowLeft') state.rendition && state.rendition.prev();
+  if (e.key === 'ArrowRight') turnPage('next');
+  if (e.key === 'ArrowLeft') turnPage('prev');
   if (e.key === 'Escape') closeReader();
 });
 
