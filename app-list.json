@@ -347,5 +347,47 @@
       "Offline-first, with optional Google sign-in for cross-device sync"
     ],
     "featured": true
+  },
+  {
+    "id": "scanr",
+    "name": "scanr",
+    "icon": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%230a0e0f'/%3E%3Cpath d='M25 32 L25 25 L32 25' fill='none' stroke='%2339ff9a' stroke-width='6' stroke-linecap='round'/%3E%3Cpath d='M75 32 L75 25 L68 25' fill='none' stroke='%2339ff9a' stroke-width='6' stroke-linecap='round'/%3E%3Cpath d='M25 68 L25 75 L32 75' fill='none' stroke='%2339ff9a' stroke-width='6' stroke-linecap='round'/%3E%3Cpath d='M75 68 L75 75 L68 75' fill='none' stroke='%2339ff9a' stroke-width='6' stroke-linecap='round'/%3E%3Crect x='42' y='42' width='16' height='16' rx='2' fill='%2339ff9a'/%3E%3C/svg%3E",
+    "developer": "NullVault",
+    "shortDescription": "Terminal-styled QR scanner with live link-safety checks before you tap.",
+    "fullDescription": "scanr is a dark, console-themed QR and barcode scanner that goes a step past just reading the code. Every scanned link can be checked against Google Safe Browsing and urlscan.io before you decide to open it, with a full-page preview screenshot when available so you can see where a link actually leads without visiting it blind. Wi-Fi QR codes connect with one tap, contact cards save straight to your address book, and every scan is kept in a searchable local history. No account, no cloud dependency for the core scanner — link-checking API keys are brought-your-own and stored only on your device.",
+    "version": "1.0.0",
+    "category": "Utilities",
+    "tags": [
+      "qr code",
+      "barcode scanner",
+      "security",
+      "link checker",
+      "privacy"
+    ],
+    "screenshots": [
+      "https://images.unsplash.com/photo-1595079676339-1534801ad6cf?w=800&q=80",
+      "https://images.unsplash.com/photo-1516245834210-c4c142787335?w=800&q=80"
+    ],
+    "downloadUrl": "https://scanr.nullvault.eu/scanr.apk",
+    "type": "TWA",
+    "appUrl": "https://scanr.nullvault.eu",
+    "rating": 4.5,
+    "ratingCount": 0,
+    "releaseDate": "2026-08-23",
+    "lastUpdated": "2026-08-23",
+    "platforms": [
+      "Android",
+      "Web"
+    ],
+    "features": [
+      "Live camera scanning with jsQR fallback for unsupported browsers",
+      "Google Safe Browsing and urlscan.io checks before you open a link",
+      "Full-page site preview screenshots via urlscan.io",
+      "Wi-Fi QR one-tap connect and vCard/contact save",
+      "Local scan history with search and filtering",
+      "Bring-your-own API keys, stored only on-device",
+      "Installable, offline-first PWA shell"
+    ],
+    "featured": true
   }
 ]
