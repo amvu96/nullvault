@@ -1,4 +1,4 @@
-const CACHE_NAME = 'shelf-cache-v2';
+const CACHE_NAME = 'shelf-cache-v21';
 const APP_SHELL = [
   './',
   './index.html',
