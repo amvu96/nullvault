@@ -992,7 +992,26 @@ a { color: var(--cyan); }
 
 .epub-viewer {
   width: 100%;
-  height: 100%;
+  /* A small safety margin reserved via a shorter explicit height (not
+     padding — getBoundingClientRect() returns the border-box size
+     regardless of box-sizing, so padding alone doesn't reduce what epub.js
+     actually measures). epub.js measures #epubViewer's real rendered height
+     ONCE via getBoundingClientRect() and locks its internal column height to
+     that exact pixel value for the life of the rendition. If the browser's
+     actual text layout for any given page — line-height rounding,
+     locale-specific character metrics (e.g. Romanian diacritics), justified
+     text reflow — ends up even a few pixels taller than what was measured,
+     the excess has nowhere defined to go: CSS multi-column layout in
+     "continuous media" (i.e. the web, as opposed to print) only overflows
+     columns in the *horizontal* direction, so vertical overflow within an
+     already-assigned page just extends silently past the visible area
+     rather than flowing to a genuine next page. Reserving real headroom
+     here — before epub.js ever measures — means every page's actual content
+     has margin to vary within before it can reach that boundary, closing
+     the gap at its source instead of clipping (and losing) content after
+     the fact. calc() with a fixed px subtraction is deliberately generous:
+     a couple of lines' worth at typical reading font sizes. */
+  height: calc(100% - 16px);
 }
 
 /* Page-turn animation: epub.js's paginated flow turns pages by setting
