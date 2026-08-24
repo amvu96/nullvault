@@ -777,6 +777,10 @@ async function openBook(id) {
     // correct dimensions before epub.js ever measures it.
     void el('readerView').offsetHeight;
     await new Promise(requestAnimationFrame);
+    // Record the surface size now that the reader is visible and laid out,
+    // so the resize watcher treats this as the starting point rather than a
+    // change worth re-rendering for.
+    baselineSurfaceSize();
 
     const book = ePub(fileRec.data.slice(0));
     state.book = book;
@@ -1573,33 +1577,73 @@ el('highlightToggle').addEventListener('click', () => {
 // fully re-render at the current position after any layout-affecting
 // setting changes, forcing epub.js to lay out its columns fresh against the
 // new CSS rather than trying to patch the existing (stale) layout in place.
+// Re-entrancy guard. Several independent things can ask for a re-render
+// (fonts finishing, the surface resizing, a settings change), and they can
+// easily land within milliseconds of each other. Without this, two calls
+// interleave: the second destroys the rendition the first just created and
+// is still awaiting display() on, and the half-built result falls back to
+// the start of the book. That is the flicker-then-jump-to-page-one
+// behaviour. Overlapping requests instead set a flag, and one more
+// re-render runs after the current one finishes.
+let rerenderInFlight = false;
+let rerenderQueued = false;
+
 async function reRenderRendition() {
   if (!state.rendition || !state.currentBook || !state.book) return;
-  const cfi = state.currentBook.cfi;
-  const viewerEl = el('epubViewer');
-  state.rendition.destroy();
-  viewerEl.innerHTML = '';
-  const size = getRenderSize();
-  const rendition = state.book.renderTo(viewerEl, {
-    // See getRenderSize() — explicit numbers, height snapped to line boxes.
-    width: size.width,
-    height: size.height,
-    flow: state.settings.flow === 'scrolled' ? 'scrolled-doc' : 'paginated',
-    spread: 'none',
-  });
-  state.rendition = rendition;
-  applyRenditionTheme();
+  if (rerenderInFlight) { rerenderQueued = true; return; }
+  rerenderInFlight = true;
 
-  // See openBook() for why these must be registered before display().
-  rendition.on('relocated', onRelocated);
-  rendition.on('selected', handleTextSelection);
-  rendition.hooks.content.register((contents) => {
-    attachSurfaceTapHandler(contents);
-    loadReadingFonts(contents);
-  });
+  try {
+    // Prefer where the reader actually is right now over the last value
+    // written to the book record — the record can lag by a page turn, and
+    // after a bookmark jump it hasn't caught up at all yet.
+    let cfi = state.currentBook.cfi;
+    try {
+      const loc = state.rendition.currentLocation();
+      if (loc && loc.start && loc.start.cfi) cfi = loc.start.cfi;
+    } catch (e) { /* fall back to the stored value */ }
 
-  await rendition.display(cfi || undefined);
-  applyHighlightsToRendition();
+    const viewerEl = el('epubViewer');
+    state.rendition.destroy();
+    viewerEl.innerHTML = '';
+    const size = getRenderSize();
+    const rendition = state.book.renderTo(viewerEl, {
+      // See getRenderSize() — explicit numbers, height snapped to line boxes.
+      width: size.width,
+      height: size.height,
+      flow: state.settings.flow === 'scrolled' ? 'scrolled-doc' : 'paginated',
+      spread: 'none',
+    });
+    state.rendition = rendition;
+    applyRenditionTheme();
+
+    // See openBook() for why these must be registered before display().
+    rendition.on('relocated', onRelocated);
+    rendition.on('selected', handleTextSelection);
+    rendition.hooks.content.register((contents) => {
+      attachSurfaceTapHandler(contents);
+      loadReadingFonts(contents);
+    });
+
+    try {
+      await rendition.display(cfi || undefined);
+    } catch (err) {
+      console.error('Re-render could not restore position:', err);
+      await rendition.display();
+    }
+    applyHighlightsToRendition();
+
+    // Re-baseline so the size we just rendered at doesn't itself look like
+    // a change and kick off another round.
+    const r = el('readerSurface').getBoundingClientRect();
+    lastSurfaceSize = { width: Math.round(r.width), height: Math.round(r.height) };
+  } finally {
+    rerenderInFlight = false;
+    if (rerenderQueued) {
+      rerenderQueued = false;
+      setTimeout(() => reRenderRendition(), 0);
+    }
+  }
 }
 
 // epub.js's column layout does not adapt to a resized container on its own
@@ -1621,17 +1665,29 @@ async function reRenderRendition() {
 // re-render after things settle rather than one per frame.
 let surfaceResizeDebounce = null;
 let lastSurfaceSize = { width: 0, height: 0 };
+
+// Called once the reader is visible and laid out, so the hidden(0x0) ->
+// visible transition isn't mistaken for a genuine resize. Without this the
+// baseline was captured at page load with the reader still hidden, so every
+// single book open looked like a size change and fired an unnecessary
+// re-render a quarter-second in — visible as a flicker right after the book
+// appeared, and able to collide with the fonts-ready re-render.
+function baselineSurfaceSize() {
+  const r = el('readerSurface').getBoundingClientRect();
+  lastSurfaceSize = { width: Math.round(r.width), height: Math.round(r.height) };
+  clearTimeout(surfaceResizeDebounce);
+}
+
 function startSurfaceResizeWatch() {
   if (typeof ResizeObserver === 'undefined') return;
   const surface = el('readerSurface');
-  const rect = surface.getBoundingClientRect();
-  lastSurfaceSize = { width: Math.round(rect.width), height: Math.round(rect.height) };
 
   const observer = new ResizeObserver(() => {
     if (el('readerView').hidden || !state.rendition) return;
     const r = el('readerSurface').getBoundingClientRect();
     const w = Math.round(r.width);
     const h = Math.round(r.height);
+    if (w === 0 || h === 0) return;
     if (Math.abs(w - lastSurfaceSize.width) < 2 && Math.abs(h - lastSurfaceSize.height) < 2) return;
     lastSurfaceSize = { width: w, height: h };
     clearTimeout(surfaceResizeDebounce);
