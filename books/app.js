@@ -951,20 +951,30 @@ window.addEventListener('pagehide', flushReadingPosition);
 
 function updateProgressUI() {
   if (!state.currentBook) return;
-  const pct = Math.round((state.currentBook.progress || 0) * 100);
+  const fraction = state.currentBook.progress || 0;
+  const pct = Math.round(fraction * 100);
   el('readerProgressFill').style.width = pct + '%';
   el('readerPercentLabel').textContent = pct + '%';
 
+  // Page numbers are derived from the book-wide percentage, not from
+  // locations.locationFromCfi(). That lookup resolves a CFI against the
+  // spine item it belongs to, so its result depends on chapter structure:
+  // it can jump, repeat or run backwards across a chapter boundary, which
+  // is why the count looked wrong whenever chapters were involved. The
+  // percentage is a single monotonic measure over the whole book, so
+  // scaling it by the total gives a flat 1..N page count that always moves
+  // forward and always agrees with the progress bar next to it.
   let locLabel = '—';
-  let currentLoc = null, totalLoc = null;
+  let currentPage = null, totalPages = null;
   if (state.book && state.book.locations && state.book.locations.length()) {
-    totalLoc = state.book.locations.length();
-    currentLoc = state.book.locations.locationFromCfi(state.currentBook.cfi);
-    locLabel = `LOC ${currentLoc}/${totalLoc}`;
+    totalPages = state.book.locations.length();
+    // Clamped to 1 at the low end so the first page reads "1", not "0".
+    currentPage = Math.min(totalPages, Math.max(1, Math.ceil(fraction * totalPages)));
+    locLabel = `PAGE ${currentPage}/${totalPages}`;
   }
   el('readerLocLabel').textContent = locLabel;
 
-  updateFullscreenStatusBar(pct, currentLoc, totalLoc);
+  updateFullscreenStatusBar(pct, currentPage, totalPages);
 }
 
 /* ============================================================
@@ -988,7 +998,7 @@ function isRunningStandalone() {
   return false;
 }
 
-function updateFullscreenStatusBar(pct, currentLoc, totalLoc) {
+function updateFullscreenStatusBar(pct, currentPage, totalPages) {
   const bar = el('fullscreenStatusBar');
   if (!isRunningStandalone() || !state.currentBook) {
     bar.hidden = true;
@@ -996,8 +1006,8 @@ function updateFullscreenStatusBar(pct, currentLoc, totalLoc) {
   }
   bar.hidden = false;
   el('fsStatusTitle').textContent = state.currentBook.title || '';
-  el('fsStatusPage').textContent = (currentLoc != null && totalLoc != null)
-    ? `PAGE ${currentLoc}/${totalLoc}`
+  el('fsStatusPage').textContent = (currentPage != null && totalPages != null)
+    ? `PAGE ${currentPage}/${totalPages}`
     : '—';
   el('fsStatusPct').textContent = `${pct}%`;
 }
