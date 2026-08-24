@@ -935,6 +935,15 @@ a { color: var(--cyan); }
   height: 100%;
 }
 
+/* Page-turn animation: epub.js's paginated flow turns pages by setting
+   scrollLeft on its internal .epub-container element (an instant jump by
+   default). Enabling native smooth scrolling on that container makes both
+   tap-to-turn and keyboard navigation animate as a slide, without touching
+   epub.js's own logic. */
+.epub-viewer .epub-container {
+  scroll-behavior: smooth;
+}
+
 /* Nav zones are visual/hit-area references only; pointer-events pass through
    to the epub iframe beneath so text selection can start at the page edges.
    Tap-to-turn is instead handled by a click listener on .reader-surface. */
@@ -1127,6 +1136,7 @@ a { color: var(--cyan); }
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  .epub-viewer .epub-container { scroll-behavior: auto !important; }
 }
 
 /* Focus visibility */
