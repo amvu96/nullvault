@@ -123,6 +123,55 @@ const FONT_STACKS = {
 // from the content hook) loads the same Google Fonts URL directly inside
 // each section's iframe document, once per section as it renders.
 const READING_FONTS_URL = 'https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;1,7..72,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400&display=swap';
+// Measure the reading area ourselves and hand epub.js exact pixel numbers,
+// rather than letting it measure a percentage-height div for itself.
+//
+// Two things matter here:
+//
+// 1. WHO MEASURES. epub.js reads its container's size once and locks its
+//    column geometry to it. Leaving that to a CSS percentage chain
+//    (.reader-surface flex:1 > .epub-viewer height:100%) means the number it
+//    gets depends on exactly when in the layout/paint cycle it looked, which
+//    is not something we control. Measuring .reader-surface directly and
+//    passing real numbers removes that whole class of timing risk. (Numbers,
+//    not strings: epub.js's isNumber() check treats '100%' as numeric —
+//    parseFloat('100%') === 100 — and appends 'px', producing the invalid
+//    value '100%px'. A real number like 716 correctly becomes '716px'.)
+//
+// 2. LINE-HEIGHT ALIGNMENT — this is the one that actually causes text to
+//    go missing. CSS columns fill to the column height, then break. If the
+//    column height is not an exact multiple of the line box height, the
+//    final line of each page only partly fits. A partly-fitting line is not
+//    pushed to the next column — it renders in place and is simply cut off
+//    by the container's bounds, and because CSS multi-column layout on the
+//    web only overflows *horizontally*, that remainder has no next page to
+//    flow into. It stays in the DOM (still selectable, which is exactly why
+//    it could be highlighted and copied) but is never displayed anywhere.
+//    Worse, the leftover remainder accumulates down the page, so several
+//    lines can end up stranded rather than just one. Snapping the height
+//    down to a whole number of line boxes means every page ends exactly on
+//    a line boundary and nothing is ever left half-placed.
+function getRenderSize() {
+  const surface = el('readerSurface');
+  const rect = surface.getBoundingClientRect();
+  const width = Math.floor(rect.width);
+  // Round the line box UP to a whole pixel before dividing. Most font-size /
+  // line-height combinations give a fractional line box (18 x 1.6 = 28.8px),
+  // and flooring the final height afterwards would knock it back off the
+  // line boundary we just aligned it to — 24 x 1.6 would land on 18.98 line
+  // boxes rather than 19. Ceiling the box keeps every height an exact whole
+  // multiple of a whole number of pixels, and errs a hair tall per line so
+  // real lines always fit inside their slot rather than a hair short.
+  const lineBox = Math.ceil(state.settings.fontSize * state.settings.lineHeight);
+  // Trim a couple of pixels first so sub-pixel rounding in the surface's own
+  // measurement can't push the last line box past the edge.
+  const usable = Math.floor(rect.height) - 2;
+  const height = lineBox > 0
+    ? Math.max(lineBox, Math.floor(usable / lineBox) * lineBox)
+    : usable;
+  return { width, height };
+}
+
 function loadReadingFonts(contents) {
   try {
     const stylesheetPromise = contents.addStylesheet(READING_FONTS_URL);
@@ -501,14 +550,13 @@ async function openBook(id) {
     const theme = THEMES[state.settings.theme];
     document.documentElement.style.setProperty('--rs-bg', theme.bg);
 
+    const size = getRenderSize();
     const rendition = book.renderTo(viewerEl, {
-      // Deliberately omitting width/height: epub.js's own isNumber() check
-      // treats '100%' as numeric (parseFloat('100%') === 100) and appends
-      // 'px' to it, producing the invalid CSS value '100%px' on its internal
-      // container. That silently fails to size the container at all, so
-      // epub.js falls back to an unreliable measurement. Passing nothing
-      // here makes epub.js measure #epubViewer's actual pixel size via
-      // getBoundingClientRect() instead, which is the robust path.
+      // Explicit measured pixel numbers — see getRenderSize() for why we
+      // measure ourselves and why the height is snapped to a whole number
+      // of line boxes.
+      width: size.width,
+      height: size.height,
       flow: state.settings.flow === 'scrolled' ? 'scrolled-doc' : 'paginated',
       spread: 'none',
     });
@@ -728,8 +776,19 @@ function applyRenditionTheme() {
       'line-height': `${state.settings.lineHeight} !important`,
       'padding': `0 ${state.settings.margin}px !important`,
     },
+    // font-size and line-height are forced here, not just on body, because
+    // EPUBs very often ship their own stylesheet rules targeting p/div/span
+    // directly, which would otherwise win over the body-level rule (a
+    // long-standing epub.js complaint — issue #1039). That matters beyond
+    // appearance: getRenderSize() snaps the page height to a whole number
+    // of line boxes, and that arithmetic is only correct if every line in
+    // the text really is the height we think it is. If the book's own CSS
+    // silently changed it, pages would stop ending on a line boundary and
+    // the last line of each page could be stranded again.
     'p, div, span, li': {
       'font-family': `${fontStack} !important`,
+      'font-size': `${state.settings.fontSize}px !important`,
+      'line-height': `${state.settings.lineHeight} !important`,
     },
     '::selection': {
       background: '#39ff9a55',
@@ -1219,8 +1278,11 @@ async function reRenderRendition() {
   const viewerEl = el('epubViewer');
   state.rendition.destroy();
   viewerEl.innerHTML = '';
+  const size = getRenderSize();
   const rendition = state.book.renderTo(viewerEl, {
-    // See openBook() for why width/height are intentionally omitted.
+    // See getRenderSize() — explicit numbers, height snapped to line boxes.
+    width: size.width,
+    height: size.height,
     flow: state.settings.flow === 'scrolled' ? 'scrolled-doc' : 'paginated',
     spread: 'none',
   });
@@ -1239,23 +1301,44 @@ async function reRenderRendition() {
   applyHighlightsToRendition();
 }
 
-// Real orientation changes (not the frequent, transient visualViewport
-// wobbles a URL bar auto-hiding/showing produces — see
-// syncReaderViewHeightOnce() above) genuinely change the usable area and
-// need both a height resync AND a full re-render, since epub.js's column
-// layout doesn't adapt to a resized container on its own (confirmed:
-// futurepress/epub.js issue #453). Debounced so a burst of resize events
-// during the rotation animation itself only triggers one re-render once
-// things settle, not one per intermediate frame.
-let orientationDebounce = null;
-window.addEventListener('orientationchange', () => {
-  if (el('readerView').hidden) return;
-  clearTimeout(orientationDebounce);
-  orientationDebounce = setTimeout(() => {
-    syncReaderViewHeightOnce();
-    reRenderRendition();
-  }, 300);
-});
+// epub.js's column layout does not adapt to a resized container on its own
+// (confirmed: futurepress/epub.js issue #453), so any real change to the
+// reading area needs a full re-render at the current position.
+//
+// Watching .reader-surface directly with a ResizeObserver is better than
+// listening for orientationchange or window resize: it reacts to whatever
+// actually changed the reading area — rotation, the URL bar showing or
+// hiding, the on-screen keyboard, switching between browser tab and
+// installed app — and, critically, it only fires when the box genuinely
+// changed size. That last part is what makes this safe: the earlier
+// approach of re-paginating on every visualViewport event meant epub.js
+// could relayout against a mid-animation, transiently-wrong height and
+// then keep that stale geometry, stranding text below the fold.
+//
+// Guarded three ways: ignore when the reader is closed, ignore sub-pixel
+// noise, and debounce so a burst during a rotation animation produces one
+// re-render after things settle rather than one per frame.
+let surfaceResizeDebounce = null;
+let lastSurfaceSize = { width: 0, height: 0 };
+function startSurfaceResizeWatch() {
+  if (typeof ResizeObserver === 'undefined') return;
+  const surface = el('readerSurface');
+  const rect = surface.getBoundingClientRect();
+  lastSurfaceSize = { width: Math.round(rect.width), height: Math.round(rect.height) };
+
+  const observer = new ResizeObserver(() => {
+    if (el('readerView').hidden || !state.rendition) return;
+    const r = el('readerSurface').getBoundingClientRect();
+    const w = Math.round(r.width);
+    const h = Math.round(r.height);
+    if (Math.abs(w - lastSurfaceSize.width) < 2 && Math.abs(h - lastSurfaceSize.height) < 2) return;
+    lastSurfaceSize = { width: w, height: h };
+    clearTimeout(surfaceResizeDebounce);
+    surfaceResizeDebounce = setTimeout(() => { reRenderRendition(); }, 250);
+  });
+  observer.observe(surface);
+}
+startSurfaceResizeWatch();
 
 el('fontIncBtn').addEventListener('click', () => adjustSetting('fontSize', 1, 12, 32));
 el('fontDecBtn').addEventListener('click', () => adjustSetting('fontSize', -1, 12, 32));
