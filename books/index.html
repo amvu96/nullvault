@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0">
+<title>shelf — terminal ebook reader</title>
+<meta name="description" content="A dark, terminal-styled EPUB reader. Import books, track progress, highlight, bookmark — all offline.">
+<meta name="theme-color" content="#0a0e0f">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;1,7..72,400&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ============ APP SHELL ============ -->
+<div id="app">
+
+  <!-- ============ HEADER ============ -->
+  <header class="app-header" id="appHeader">
+    <div class="header-inner">
+      <div class="brand">
+        <span class="prompt-prefix">&gt;_</span>
+        <span class="brand-name">shelf</span>
+      </div>
+      <div class="header-actions">
+        <button class="icon-btn" id="searchLibraryBtn" aria-label="Search library" title="Search">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </button>
+        <button class="icon-btn" id="importBtn" aria-label="Import book" title="Import EPUB">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </button>
+      </div>
+    </div>
+    <input type="file" id="fileInput" accept=".epub" hidden multiple>
+  </header>
+
+  <!-- ============ MAIN: LIBRARY VIEW ============ -->
+  <main class="view" id="libraryView">
+
+    <section class="section-block" id="continueSection" hidden>
+      <div class="section-label">// CURRENTLY READING</div>
+      <div class="continue-card" id="continueCard">
+        <!-- populated by JS -->
+      </div>
+    </section>
+
+    <section class="section-block">
+      <div class="section-label-row">
+        <div class="section-label">// LIBRARY</div>
+        <div class="sort-control">
+          <select id="sortSelect" class="chrome-select">
+            <option value="recent">LAST OPENED</option>
+            <option value="title">TITLE</option>
+            <option value="progress">PROGRESS</option>
+            <option value="added">DATE ADDED</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="library-grid" id="libraryGrid">
+        <!-- book cards injected here -->
+      </div>
+
+      <div class="empty-state" id="emptyState" hidden>
+        <div class="empty-glyph">[ ]</div>
+        <div class="empty-title">LIBRARY IS EMPTY</div>
+        <p class="empty-body">Import an EPUB file to start reading. Everything is stored locally on this device — no accounts, no network required once loaded.</p>
+        <button class="btn btn-primary" id="emptyImportBtn">IMPORT BOOK</button>
+      </div>
+    </section>
+
+    <div class="bottom-spacer"></div>
+  </main>
+
+  <!-- ============ READER VIEW ============ -->
+  <div class="view reader-view" id="readerView" hidden>
+    <header class="reader-header" id="readerHeader">
+      <button class="icon-btn" id="closeReaderBtn" aria-label="Back to library">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      </button>
+      <div class="reader-title-block">
+        <div class="reader-book-title" id="readerBookTitle">—</div>
+        <div class="reader-chapter-title" id="readerChapterTitle">—</div>
+      </div>
+      <div class="reader-header-actions">
+        <button class="icon-btn" id="bookmarkBtn" aria-label="Bookmark this page" title="Bookmark">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+        </button>
+        <button class="icon-btn" id="tocBtn" aria-label="Table of contents" title="Contents">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="reader-progress-track" id="readerProgressTrack">
+      <div class="reader-progress-fill" id="readerProgressFill"></div>
+    </div>
+
+    <div class="reader-surface" id="readerSurface">
+      <div id="epubViewer" class="epub-viewer"></div>
+      <div class="selection-toolbar" id="selectionToolbar" hidden>
+        <button class="sel-btn" data-color="#39ff9a" style="--sel-color:#39ff9a" aria-label="Highlight green"></button>
+        <button class="sel-btn" data-color="#3ad6ff" style="--sel-color:#3ad6ff" aria-label="Highlight cyan"></button>
+        <button class="sel-btn" data-color="#f2c14e" style="--sel-color:#f2c14e" aria-label="Highlight yellow"></button>
+        <button class="sel-btn" data-color="#f2555a" style="--sel-color:#f2555a" aria-label="Highlight red"></button>
+        <div class="sel-divider"></div>
+        <button class="sel-action" id="selCopyBtn" aria-label="Copy text">COPY</button>
+        <button class="sel-action" id="selRemoveBtn" aria-label="Remove highlight" hidden>REMOVE</button>
+      </div>
+    </div>
+
+    <footer class="reader-footer" id="readerFooter">
+      <button class="reader-footer-btn" id="openSettingsBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M1 14h6"/><path d="M9 8h6"/><path d="M17 16h6"/></svg>
+        <span>AA</span>
+      </button>
+      <div class="reader-footer-status">
+        <span class="tnum" id="readerLocLabel">LOC —</span>
+        <span class="dot-sep">·</span>
+        <span class="tnum" id="readerPercentLabel">0%</span>
+      </div>
+      <button class="reader-footer-btn" id="openThemeBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <span>THEME</span>
+      </button>
+    </footer>
+  </div>
+
+  <!-- ============ BOTTOM NAV (LIBRARY ONLY) ============ -->
+  <nav class="bottom-nav" id="bottomNav">
+    <div class="bottom-nav-island">
+      <button class="nav-item active" data-tab="library" aria-label="Library">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        <span>LIBRARY</span>
+      </button>
+
+      <button class="nav-item-center" id="continueFabBtn" aria-label="Continue reading">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#04120b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      </button>
+
+      <button class="nav-item" data-tab="stats" aria-label="Stats">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        <span>STATS</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ============ SHEET: TABLE OF CONTENTS ============ -->
+  <div class="sheet-overlay" id="tocOverlay" hidden>
+    <div class="sheet" id="tocSheet">
+      <div class="sheet-handle-row"><div class="sheet-handle"></div></div>
+      <div class="sheet-header">
+        <div class="sheet-title">// CONTENTS</div>
+        <button class="icon-btn sheet-close" data-close="tocOverlay" aria-label="Close">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="sheet-tabs">
+        <button class="sheet-tab active" data-toc-tab="chapters">CHAPTERS</button>
+        <button class="sheet-tab" data-toc-tab="bookmarks">BOOKMARKS</button>
+        <button class="sheet-tab" data-toc-tab="highlights">HIGHLIGHTS</button>
+      </div>
+      <div class="sheet-body" id="tocBody">
+        <div class="toc-panel" id="chaptersPanel"></div>
+        <div class="toc-panel" id="bookmarksPanel" hidden></div>
+        <div class="toc-panel" id="highlightsPanel" hidden></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SHEET: DISPLAY SETTINGS ============ -->
+  <div class="sheet-overlay" id="settingsOverlay" hidden>
+    <div class="sheet" id="settingsSheet">
+      <div class="sheet-handle-row"><div class="sheet-handle"></div></div>
+      <div class="sheet-header">
+        <div class="sheet-title">// DISPLAY</div>
+        <button class="icon-btn sheet-close" data-close="settingsOverlay" aria-label="Close">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="sheet-body">
+        <div class="setting-row">
+          <div class="setting-label">FONT SIZE</div>
+          <div class="stepper">
+            <button class="stepper-btn" id="fontDecBtn" aria-label="Decrease font size">−</button>
+            <span class="stepper-value tnum" id="fontSizeValue">18</span>
+            <button class="stepper-btn" id="fontIncBtn" aria-label="Increase font size">+</button>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-label">LINE HEIGHT</div>
+          <div class="stepper">
+            <button class="stepper-btn" id="lineDecBtn" aria-label="Decrease line height">−</button>
+            <span class="stepper-value tnum" id="lineHeightValue">1.6</span>
+            <button class="stepper-btn" id="lineIncBtn" aria-label="Increase line height">+</button>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-label">MARGIN</div>
+          <div class="stepper">
+            <button class="stepper-btn" id="marginDecBtn" aria-label="Decrease margin">−</button>
+            <span class="stepper-value tnum" id="marginValue">24</span>
+            <button class="stepper-btn" id="marginIncBtn" aria-label="Increase margin">+</button>
+          </div>
+        </div>
+
+        <div class="setting-row setting-row-block">
+          <div class="setting-label">READING FONT</div>
+          <div class="chip-row" id="fontFamilyRow">
+            <button class="chip-option active" data-font="serif">SERIF</button>
+            <button class="chip-option" data-font="sans">SANS</button>
+          </div>
+        </div>
+
+        <div class="setting-row setting-row-block">
+          <div class="setting-label">PAGINATION</div>
+          <div class="chip-row" id="paginationRow">
+            <button class="chip-option active" data-flow="paginated">PAGED</button>
+            <button class="chip-option" data-flow="scrolled">SCROLL</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SHEET: READING THEME ============ -->
+  <div class="sheet-overlay" id="themeOverlay" hidden>
+    <div class="sheet" id="themeSheet">
+      <div class="sheet-handle-row"><div class="sheet-handle"></div></div>
+      <div class="sheet-header">
+        <div class="sheet-title">// READING SURFACE</div>
+        <button class="icon-btn sheet-close" data-close="themeOverlay" aria-label="Close">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="sheet-body">
+        <div class="theme-grid" id="themeGrid">
+          <button class="theme-swatch" data-theme="paper">
+            <span class="swatch-preview swatch-paper">Aa</span>
+            <span class="swatch-label">PAPER</span>
+          </button>
+          <button class="theme-swatch" data-theme="sepia">
+            <span class="swatch-preview swatch-sepia">Aa</span>
+            <span class="swatch-label">SEPIA</span>
+          </button>
+          <button class="theme-swatch" data-theme="dusk">
+            <span class="swatch-preview swatch-dusk">Aa</span>
+            <span class="swatch-label">DUSK</span>
+          </button>
+          <button class="theme-swatch" data-theme="black">
+            <span class="swatch-preview swatch-black">Aa</span>
+            <span class="swatch-label">TRUE BLACK</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SHEET: BOOK DETAIL / OPTIONS ============ -->
+  <div class="sheet-overlay" id="bookOptionsOverlay" hidden>
+    <div class="sheet" id="bookOptionsSheet">
+      <div class="sheet-handle-row"><div class="sheet-handle"></div></div>
+      <div class="sheet-header">
+        <div class="sheet-title">// BOOK OPTIONS</div>
+        <button class="icon-btn sheet-close" data-close="bookOptionsOverlay" aria-label="Close">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="sheet-body">
+        <div class="book-options-list">
+          <button class="option-row" id="optOpenBtn">OPEN BOOK</button>
+          <button class="option-row" id="optMarkFinishedBtn">MARK AS FINISHED</button>
+          <button class="option-row option-row-danger" id="optDeleteBtn">DELETE FROM LIBRARY</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ TOAST ============ -->
+  <div class="toast" id="toast" hidden></div>
+
+  <!-- ============ LOADING OVERLAY ============ -->
+  <div class="loading-overlay" id="loadingOverlay" hidden>
+    <div class="loading-box">
+      <div class="loading-spinner"></div>
+      <div class="loading-text tnum" id="loadingText">PARSING EPUB…</div>
+    </div>
+  </div>
+
+  <!-- ============ INSTALL PROMPT ============ -->
+  <div class="install-banner" id="installBanner" hidden>
+    <span class="install-text">Install shelf for offline reading</span>
+    <div class="install-actions">
+      <button class="btn-text" id="installDismissBtn">DISMISS</button>
+      <button class="btn btn-small btn-primary" id="installBtn">INSTALL</button>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.93/epub.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
