@@ -94,7 +94,8 @@ const state = {
     margin: 24,
     fontFamily: 'serif',
     flow: 'paginated',
-    theme: 'paper'
+    theme: 'paper',
+    highlightingEnabled: false
   },
   chromeVisible: true,
   currentSelection: null,
@@ -429,6 +430,20 @@ async function openBook(id) {
     el('bottomNav').style.display = 'none';
     document.body.style.overflow = 'hidden';
 
+    // epub.js reads #epubViewer's on-screen size once, synchronously, at
+    // renderTo() time and locks in that width for all its pagination math
+    // (page width, column count, tap-zone math downstream). readerView was
+    // just unhidden above; if the browser hasn't finished laying it out yet
+    // (e.g. mid-transition, or this is the very first paint), epub.js can
+    // compute against a stale/zero size and pagination stays broken until
+    // something else forces a real resize — which is why rotating the device
+    // "fixes" it: that's the first legitimate resize event epub.js sees.
+    // Forcing a synchronous layout flush here (reading offsetHeight) and
+    // waiting one animation frame guarantees #epubViewer has its final,
+    // correct dimensions before epub.js ever measures it.
+    void el('readerView').offsetHeight;
+    await new Promise(requestAnimationFrame);
+
     const book = ePub(fileRec.data.slice(0));
     state.book = book;
 
@@ -450,6 +465,16 @@ async function openBook(id) {
 
     const startCfi = meta.cfi || undefined;
     await rendition.display(startCfi);
+
+    // Safety net: even with the flush above, some devices/browsers can still
+    // report a transitional size (e.g. a slow CSS transition still settling).
+    // epub.js already listens for window 'resize' internally, so nudging it
+    // shortly after open costs nothing if the size was already correct, and
+    // recovers automatically if it wasn't — without relying on the user
+    // rotating their device to trigger it by accident.
+    setTimeout(() => {
+      try { window.dispatchEvent(new Event('resize')); } catch (e) {}
+    }, 150);
 
     book.ready.then(() => {
       book.locations.generate(1200).then(() => {
@@ -836,6 +861,8 @@ function renderBookmarks() {
 
 /* ---------- Highlights ---------- */
 function handleTextSelection(cfiRange, contents) {
+  if (!state.settings.highlightingEnabled) return;
+
   const selection = contents.window.getSelection();
   const text = selection ? selection.toString() : '';
   if (!text || !text.trim()) return;
@@ -1032,7 +1059,19 @@ function syncSettingsUI() {
   el('marginValue').textContent = state.settings.margin;
   $$('.chip-option[data-font]').forEach(c => c.classList.toggle('active', c.dataset.font === state.settings.fontFamily));
   $$('.chip-option[data-flow]').forEach(c => c.classList.toggle('active', c.dataset.flow === state.settings.flow));
+  el('highlightToggle').setAttribute('aria-checked', String(!!state.settings.highlightingEnabled));
 }
+
+el('highlightToggle').addEventListener('click', () => {
+  state.settings.highlightingEnabled = !state.settings.highlightingEnabled;
+  saveSettings();
+  syncSettingsUI();
+  // Turning it off should also dismiss any toolbar that's currently showing
+  // and clear the pending selection, so it can't be used a moment later.
+  if (!state.settings.highlightingEnabled) {
+    clearSelectionUI();
+  }
+});
 
 el('fontIncBtn').addEventListener('click', () => adjustSetting('fontSize', 1, 12, 32));
 el('fontDecBtn').addEventListener('click', () => adjustSetting('fontSize', -1, 12, 32));
@@ -1086,6 +1125,11 @@ $$('.chip-option[data-flow]').forEach(chip => {
         attachSurfaceTapHandler(contents);
       });
       applyHighlightsToRendition();
+      // Safety net matching openBook(): nudge epub.js's own resize handler
+      // in case #epubViewer's size wasn't fully settled at renderTo() time.
+      setTimeout(() => {
+        try { window.dispatchEvent(new Event('resize')); } catch (e) {}
+      }, 150);
     }
   });
 });
