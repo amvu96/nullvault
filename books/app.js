@@ -429,6 +429,8 @@ async function openBook(id) {
     el('readerView').hidden = false;
     el('bottomNav').style.display = 'none';
     document.body.style.overflow = 'hidden';
+    startReaderViewportSync();
+    updateFullscreenStatusBar(Math.round((meta.progress || 0) * 100), null, null);
 
     // epub.js reads #epubViewer's on-screen size once, synchronously, at
     // renderTo() time and locks in that width for all its pagination math
@@ -560,13 +562,81 @@ function updateProgressUI() {
   el('readerPercentLabel').textContent = pct + '%';
 
   let locLabel = '—';
+  let currentLoc = null, totalLoc = null;
   if (state.book && state.book.locations && state.book.locations.length()) {
-    const total = state.book.locations.length();
-    const current = state.book.locations.locationFromCfi(state.currentBook.cfi);
-    locLabel = `LOC ${current}/${total}`;
+    totalLoc = state.book.locations.length();
+    currentLoc = state.book.locations.locationFromCfi(state.currentBook.cfi);
+    locLabel = `LOC ${currentLoc}/${totalLoc}`;
   }
   el('readerLocLabel').textContent = locLabel;
+
+  updateFullscreenStatusBar(pct, currentLoc, totalLoc);
 }
+
+/* ============================================================
+   FULLSCREEN/STANDALONE STATUS BAR
+   Only relevant when the app is running with no browser chrome at all
+   (installed as a PWA, "Add to Home Screen", etc.) — a normal browser tab
+   already has its own status bar (clock, battery, signal), so we stay out
+   of the way there. display-mode: standalone/fullscreen/minimal-ui is the
+   standard, cross-browser signal for "no browser UI is showing".
+   ============================================================ */
+function isRunningStandalone() {
+  try {
+    if (window.matchMedia) {
+      if (window.matchMedia('(display-mode: standalone)').matches) return true;
+      if (window.matchMedia('(display-mode: fullscreen)').matches) return true;
+      if (window.matchMedia('(display-mode: minimal-ui)').matches) return true;
+    }
+    // Older iOS Safari "Add to Home Screen" signal.
+    if (window.navigator && window.navigator.standalone) return true;
+  } catch (e) {}
+  return false;
+}
+
+function updateFullscreenStatusBar(pct, currentLoc, totalLoc) {
+  const bar = el('fullscreenStatusBar');
+  if (!isRunningStandalone() || !state.currentBook) {
+    bar.hidden = true;
+    return;
+  }
+  bar.hidden = false;
+  el('fsStatusTitle').textContent = state.currentBook.title || '';
+  el('fsStatusPage').textContent = (currentLoc != null && totalLoc != null)
+    ? `PAGE ${currentLoc}/${totalLoc}`
+    : '—';
+  el('fsStatusPct').textContent = `${pct}%`;
+}
+
+// Battery Status API: Chromium-based browsers only (Chrome/Brave/Edge/Samsung
+// Internet on Android); Firefox removed it entirely and Safari never shipped
+// it. Feature-detected and treated as a pure bonus — its absence never blocks
+// or alters the rest of the status bar, it just means that one span stays
+// hidden.
+let batteryManager = null;
+async function initBatteryIndicator() {
+  if (!('getBattery' in navigator)) return;
+  try {
+    batteryManager = await navigator.getBattery();
+    renderBatteryIndicator();
+    batteryManager.addEventListener('levelchange', renderBatteryIndicator);
+    batteryManager.addEventListener('chargingchange', renderBatteryIndicator);
+  } catch (e) {
+    // Permissions-Policy or platform block — silently stay without it.
+  }
+}
+
+function renderBatteryIndicator() {
+  const el_ = el('fsStatusBattery');
+  if (!batteryManager) { el_.hidden = true; return; }
+  const pct = Math.round(batteryManager.level * 100);
+  el_.hidden = false;
+  el_.textContent = `${batteryManager.charging ? '⚡' : ''}${pct}%`;
+  el_.classList.toggle('is-low', pct <= 15 && !batteryManager.charging);
+  el_.classList.toggle('is-charging', !!batteryManager.charging);
+}
+
+initBatteryIndicator();
 
 function updateChapterLabel(cfi) {
   if (!state.book) return;
@@ -665,7 +735,41 @@ function closeReader() {
   el('readerView').hidden = true;
   el('bottomNav').style.display = '';
   document.body.style.overflow = '';
+  stopReaderViewportSync();
+  el('fullscreenStatusBar').hidden = true;
   loadLibrary();
+}
+
+// Mobile browsers report a "layout viewport" (window.innerHeight / vh units)
+// that assumes the URL bar is fully collapsed, even while it's actually
+// visible on screen. A fixed-position element sized off that layout viewport
+// extends its bottom edge underneath the real, currently-visible browser
+// chrome instead of stopping above it — content there is covered, not
+// clipped by any CSS rule, which is why text at the bottom of a page looked
+// cut off. window.visualViewport reports the actual visible area and fires
+// 'resize' as the URL bar shows/hides (e.g. during a scroll/swipe), so we
+// pin .reader-view's real height to it live and nudge epub.js's own resize
+// handling each time, keeping pagination correct as the usable space changes.
+let viewportSyncHandler = null;
+function startReaderViewportSync() {
+  if (!window.visualViewport) return;
+  const apply = () => {
+    const vv = window.visualViewport;
+    el('readerView').style.height = vv.height + 'px';
+    try { window.dispatchEvent(new Event('resize')); } catch (e) {}
+  };
+  viewportSyncHandler = apply;
+  apply();
+  window.visualViewport.addEventListener('resize', viewportSyncHandler);
+  window.visualViewport.addEventListener('scroll', viewportSyncHandler);
+}
+function stopReaderViewportSync() {
+  if (window.visualViewport && viewportSyncHandler) {
+    window.visualViewport.removeEventListener('resize', viewportSyncHandler);
+    window.visualViewport.removeEventListener('scroll', viewportSyncHandler);
+  }
+  viewportSyncHandler = null;
+  el('readerView').style.height = '';
 }
 
 el('closeReaderBtn').addEventListener('click', closeReader);
