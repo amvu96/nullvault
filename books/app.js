@@ -454,8 +454,14 @@ async function openBook(id) {
     document.documentElement.style.setProperty('--rs-bg', theme.bg);
 
     const rendition = book.renderTo(viewerEl, {
-      width: '100%',
-      height: '100%',
+      // Deliberately omitting width/height: epub.js's own isNumber() check
+      // treats '100%' as numeric (parseFloat('100%') === 100) and appends
+      // 'px' to it, producing the invalid CSS value '100%px' on its internal
+      // container. That silently fails to size the container at all, so
+      // epub.js falls back to an unreliable measurement that only a real
+      // window resize (e.g. rotating the device) happens to correct. Passing
+      // nothing here makes epub.js measure #epubViewer's actual pixel size
+      // via getBoundingClientRect() instead, which is the robust path.
       flow: state.settings.flow === 'scrolled' ? 'scrolled-doc' : 'paginated',
       spread: 'none',
     });
@@ -1111,8 +1117,7 @@ $$('.chip-option[data-flow]').forEach(chip => {
       state.rendition.destroy();
       viewerEl.innerHTML = '';
       const rendition = state.book.renderTo(viewerEl, {
-        width: '100%',
-        height: '100%',
+        // See openBook() for why width/height are intentionally omitted.
         flow: state.settings.flow === 'scrolled' ? 'scrolled-doc' : 'paginated',
         spread: 'none',
       });
