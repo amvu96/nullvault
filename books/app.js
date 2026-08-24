@@ -650,15 +650,30 @@ el('readerSurface').addEventListener('click', (e) => {
 
 // epub.js renders content in a same-origin iframe; clicks inside it don't
 // bubble to the outer document, so listen for its own click/tap too.
+//
+// IMPORTANT (paginated flow): epub.js lays the chapter out as CSS columns and
+// sizes the iframe/section to the FULL scrollable width of all columns
+// combined — only one "page" worth is visible at a time, revealed by
+// scrolling an ancestor container horizontally. That means e.clientX inside
+// the iframe is relative to the iframe's full (multi-page) width, not the
+// single visible page, so naively comparing it against the iframe or document
+// width breaks down as soon as a chapter spans more than one page.
+//
+// Fix: subtract the ancestor scroll container's current scrollLeft from
+// clientX to get the click's position within the *currently visible* page,
+// then compare that against the visible page width (readerSurface's width).
 function attachSurfaceTapHandler(contents) {
   try {
     const doc = contents.document;
     doc.addEventListener('click', (e) => {
       if (hasActiveIframeSelection()) return;
-      const w = doc.defaultView.innerWidth;
-      const x = e.clientX;
-      const edgeStart = w * 0.22;
-      const edgeEnd = w * 0.78;
+
+      const width = el('readerSurface').clientWidth;
+      const scrollLeft = getEpubScrollLeft();
+      const x = e.clientX - scrollLeft;
+
+      const edgeStart = width * 0.22;
+      const edgeEnd = width * 0.78;
       if (x <= edgeStart) {
         if (state.rendition) state.rendition.prev();
       } else if (x >= edgeEnd) {
@@ -668,6 +683,24 @@ function attachSurfaceTapHandler(contents) {
       }
     });
   } catch (e) {}
+}
+
+// epub.js's internal scrolling container tracks how far the current page has
+// scrolled horizontally within the full multi-column chapter. This offset is
+// what needs to be subtracted from an in-iframe click's clientX to land back
+// in the visible page's own coordinate space.
+function getEpubScrollLeft() {
+  try {
+    const manager = state.rendition && state.rendition.manager;
+    if (!manager) return 0;
+    if (manager.settings && manager.settings.fullsize) {
+      return window.scrollX || 0;
+    }
+    if (manager.container && typeof manager.container.scrollLeft === 'number') {
+      return manager.container.scrollLeft;
+    }
+  } catch (e) {}
+  return 0;
 }
 
 // keyboard nav
