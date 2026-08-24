@@ -475,7 +475,7 @@ async function openBook(id) {
     el('readerView').hidden = false;
     el('bottomNav').style.display = 'none';
     document.body.style.overflow = 'hidden';
-    startReaderViewportSync();
+    syncReaderViewHeightOnce();
     updateFullscreenStatusBar(Math.round((meta.progress || 0) * 100), null, null);
 
     // epub.js reads #epubViewer's on-screen size once, synchronously, at
@@ -762,30 +762,30 @@ function closeReader() {
 // visible on screen. A fixed-position element sized off that layout viewport
 // extends its bottom edge underneath the real, currently-visible browser
 // chrome instead of stopping above it — content there is covered, not
-// clipped by any CSS rule, which is why text at the bottom of a page looked
-// cut off. window.visualViewport reports the actual visible area and fires
-// 'resize' as the URL bar shows/hides (e.g. during a scroll/swipe), so we
-// pin .reader-view's real height to it live and nudge epub.js's own resize
-// handling each time, keeping pagination correct as the usable space changes.
-let viewportSyncHandler = null;
-function startReaderViewportSync() {
+// clipped by any CSS rule. window.visualViewport reports the actual visible
+// area, so pinning .reader-view's real height to it at open time fixes that.
+//
+// IMPORTANT: this must only run ONCE per book-open, not live on every
+// visualViewport 'resize'/'scroll' event. Those fire frequently and
+// transiently on real devices — as the URL bar auto-hides/reappears during
+// normal scrolling, for instance — and each firing used to both resize
+// .reader-view AND dispatch a synthetic window 'resize', which epub.js
+// listens for internally to re-measure and re-paginate. If that re-pagination
+// ever happened while the URL bar was temporarily hidden (larger visible
+// area), epub.js would lock in taller pages than what's visible once the bar
+// reappears — and because CSS multi-column layout only overflows
+// horizontally on the web, that excess has no "next page" to flow to; it
+// just sits below the fold, selectable but never shown. That is almost
+// certainly what produced the large, multi-line missing-text reports: not a
+// small rounding error, but epub.js repaginating against a transient,
+// larger-than-final viewport height. Syncing once at open (after layout has
+// settled) avoids the live re-pagination risk entirely while still fixing
+// the original URL-bar-covers-content problem.
+function syncReaderViewHeightOnce() {
   if (!window.visualViewport) return;
-  const apply = () => {
-    const vv = window.visualViewport;
-    el('readerView').style.height = vv.height + 'px';
-    try { window.dispatchEvent(new Event('resize')); } catch (e) {}
-  };
-  viewportSyncHandler = apply;
-  apply();
-  window.visualViewport.addEventListener('resize', viewportSyncHandler);
-  window.visualViewport.addEventListener('scroll', viewportSyncHandler);
+  el('readerView').style.height = window.visualViewport.height + 'px';
 }
 function stopReaderViewportSync() {
-  if (window.visualViewport && viewportSyncHandler) {
-    window.visualViewport.removeEventListener('resize', viewportSyncHandler);
-    window.visualViewport.removeEventListener('scroll', viewportSyncHandler);
-  }
-  viewportSyncHandler = null;
   el('readerView').style.height = '';
 }
 
@@ -1238,6 +1238,24 @@ async function reRenderRendition() {
   await rendition.display(cfi || undefined);
   applyHighlightsToRendition();
 }
+
+// Real orientation changes (not the frequent, transient visualViewport
+// wobbles a URL bar auto-hiding/showing produces — see
+// syncReaderViewHeightOnce() above) genuinely change the usable area and
+// need both a height resync AND a full re-render, since epub.js's column
+// layout doesn't adapt to a resized container on its own (confirmed:
+// futurepress/epub.js issue #453). Debounced so a burst of resize events
+// during the rotation animation itself only triggers one re-render once
+// things settle, not one per intermediate frame.
+let orientationDebounce = null;
+window.addEventListener('orientationchange', () => {
+  if (el('readerView').hidden) return;
+  clearTimeout(orientationDebounce);
+  orientationDebounce = setTimeout(() => {
+    syncReaderViewHeightOnce();
+    reRenderRendition();
+  }, 300);
+});
 
 el('fontIncBtn').addEventListener('click', () => adjustSetting('fontSize', 1, 12, 32));
 el('fontDecBtn').addEventListener('click', () => adjustSetting('fontSize', -1, 12, 32));
