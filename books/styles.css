@@ -916,6 +916,17 @@ a { color: var(--cyan); }
   display: flex;
   flex-direction: column;
   background: var(--rs-bg, #f4f1ea);
+  /* `inset: 0` on a fixed element sizes against the *layout* viewport, which
+     on mobile browsers assumes the URL bar is hidden/collapsed. When the URL
+     bar is actually showing, the bottom slice of that box sits underneath it
+     rather than stopping above it — content there is covered, not clipped by
+     CSS, which is why the last line/paragraph looked cut off. 100svh (small
+     viewport height) reflects the viewport with browser UI visible, giving a
+     static fallback that's correct even before any JS runs. JS further
+     refines this live using the VisualViewport API — see setReaderViewHeight
+     in app.js — since 100svh alone doesn't update as the URL bar
+     shows/hides during a scroll gesture on every engine. */
+  height: 100svh;
 }
 
 .reader-header {
@@ -1044,6 +1055,41 @@ a { color: var(--cyan); }
 }
 .reader-footer-status .dot-sep { color: var(--panel-border); }
 #readerPercentLabel { color: var(--accent); font-weight: 600; }
+
+/* Standalone/fullscreen status strip — replaces OS chrome (clock, battery)
+   that's hidden once the app has no browser UI at all. Deliberately much
+   smaller and quieter than the reader footer above it; this is a system-info
+   substitute, not another piece of reading UI. */
+.fullscreen-status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 4px 16px calc(4px + var(--safe-bottom));
+  background: #0a0e0f;
+  border-top: 1px solid var(--panel-border);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.03em;
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+.fs-status-title {
+  max-width: 40vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fs-status-sep { color: var(--panel-border); }
+.fs-status-pct { color: var(--accent); }
+.fs-status-battery {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.fs-status-battery.is-low { color: var(--danger); }
+.fs-status-battery.is-charging { color: var(--accent); }
 
 /* Selection toolbar */
 .selection-toolbar {
