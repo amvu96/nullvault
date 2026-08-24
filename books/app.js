@@ -311,13 +311,21 @@ el('fileInput').addEventListener('change', async (e) => {
 async function importEpub(file) {
   showLoading('PARSING EPUB…');
   try {
+    if (typeof ePub === 'undefined') {
+      throw new Error('EPUB_LIB_MISSING');
+    }
+
     const arrayBuffer = await file.arrayBuffer();
     const id = uid();
 
     // Parse with epub.js to extract metadata + cover
     const tempBook = ePub(arrayBuffer.slice(0));
-    await tempBook.ready;
-    const metadata = await tempBook.loaded.metadata;
+    await withTimeout(tempBook.opened, 15000, 'TIMEOUT_OPENING');
+    await withTimeout(tempBook.ready, 15000, 'TIMEOUT_READY');
+    let metadata = {};
+    try {
+      metadata = await tempBook.loaded.metadata;
+    } catch (err) { /* malformed metadata block, fall back to filename below */ }
     let coverUrl = null;
     try {
       const coverPath = await tempBook.loaded.cover;
@@ -325,10 +333,12 @@ async function importEpub(file) {
         const coverBlobUrl = await tempBook.archive.createUrl(coverPath, { base64: true });
         coverUrl = coverBlobUrl;
       }
-    } catch (err) { /* no cover */ }
+    } catch (err) { /* no cover, non-fatal */ }
 
-    const navigation = await tempBook.loaded.navigation;
-    const totalLocations = 1; // computed later on generateLocations if needed
+    let navigation = null;
+    try {
+      navigation = await tempBook.loaded.navigation;
+    } catch (err) { /* missing/broken TOC, non-fatal — book can still open */ }
 
     const meta = {
       id,
@@ -354,10 +364,37 @@ async function importEpub(file) {
     await loadLibrary();
     showToast(`Imported "${meta.title}"`, 'accent');
   } catch (err) {
-    console.error(err);
+    console.error('EPUB import failed:', err);
     hideLoading();
-    showToast('Could not parse that EPUB file', 'danger');
+    showToast(describeImportError(err, file), 'danger');
   }
+}
+
+function withTimeout(promise, ms, reason) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(reason)), ms)),
+  ]);
+}
+
+function describeImportError(err, file) {
+  const msg = (err && (err.message || String(err))) || '';
+  if (msg === 'EPUB_LIB_MISSING') {
+    return 'Reader library failed to load — check your connection and reload';
+  }
+  if (msg === 'TIMEOUT_OPENING' || msg === 'TIMEOUT_READY') {
+    return 'That EPUB took too long to parse — it may be malformed';
+  }
+  if (file && !/\.epub$/i.test(file.name)) {
+    return `"${file.name}" isn't an .epub file`;
+  }
+  if (/central directory|end of central directory|not a valid zip|corrupt/i.test(msg)) {
+    return 'That file isn\'t a valid EPUB (bad or corrupted zip)';
+  }
+  if (/container\.xml|mimetype|rootfile|opf/i.test(msg)) {
+    return 'EPUB is missing required internal files (container.xml/OPF)';
+  }
+  return `Could not parse that EPUB file${msg ? ` (${msg.slice(0, 80)})` : ''}`;
 }
 
 function showLoading(text) {
