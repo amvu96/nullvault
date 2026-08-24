@@ -888,6 +888,17 @@ a { color: var(--cyan); }
 .theme-swatch.active .swatch-label { color: var(--accent); }
 
 /* book options sheet */
+.folder-blurb {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-faint);
+  margin: 0 0 4px;
+}
+.folder-blurb strong {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 .book-options-list { display: flex; flex-direction: column; }
 .option-row {
   text-align: left;
