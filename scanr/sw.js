@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'scanr-v3';
+const CACHE_VERSION = 'scanr-v5';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
@@ -64,7 +64,16 @@ self.addEventListener('fetch', (event) => {
           caches.open(SHELL_CACHE).then((cache) => cache.put(req, copy));
           return res;
         })
-        .catch(() => caches.match(req))
+        .catch(async () => {
+          // Exact-URL cache miss (e.g. index.html with share-target query
+          // params was never itself precached) — for navigations, fall back
+          // to the precached bare index.html so the app shell still opens
+          // offline, just without the shared content pre-filled.
+          const exact = await caches.match(req);
+          if (exact) return exact;
+          if (req.mode === 'navigate') return caches.match('./index.html');
+          return undefined;
+        })
     );
     return;
   }
