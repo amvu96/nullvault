@@ -304,17 +304,24 @@
     <div class="sheet" id="folderSheet">
       <div class="sheet-handle-row"><div class="sheet-handle"></div></div>
       <div class="sheet-header">
-        <div class="sheet-title">// FOLDER SYNC</div>
+        <div class="sheet-title">// LIBRARY &amp; STORAGE</div>
         <button class="icon-btn sheet-close" data-close="folderOverlay" aria-label="Close">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
       <div class="sheet-body">
+        <div class="section-label">// FOLDER SYNC</div>
         <p class="folder-blurb" id="folderStatus"></p>
         <div class="book-options-list">
           <button class="option-row" id="folderPickBtn">CHOOSE FOLDER</button>
           <button class="option-row" id="folderRescanBtn">RESCAN NOW</button>
           <button class="option-row option-row-danger" id="folderForgetBtn">DISCONNECT FOLDER</button>
+        </div>
+
+        <div class="section-label sheet-section-gap">// STORAGE</div>
+        <p class="folder-blurb" id="storageStatus"></p>
+        <div class="book-options-list">
+          <button class="option-row" id="exportBtn">EXPORT BOOKMARKS &amp; HIGHLIGHTS</button>
         </div>
       </div>
     </div>
