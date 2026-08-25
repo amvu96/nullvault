@@ -888,6 +888,8 @@ a { color: var(--cyan); }
 .theme-swatch.active .swatch-label { color: var(--accent); }
 
 /* book options sheet */
+.sheet-section-gap { margin-top: 24px; }
+
 .folder-blurb {
   font-size: 12px;
   line-height: 1.6;
