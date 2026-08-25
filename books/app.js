@@ -1455,15 +1455,98 @@ function hasActiveIframeSelection() {
 // Turning pages while the previous smooth-scroll animation is still running
 // would queue a second scrollLeft change mid-transition, producing a jarring
 // stutter instead of a clean slide. This gates rapid repeat taps to roughly
-// one turn per animation cycle (see PAGE_TURN_ANIM_MS above).
+// Set while a page turn is in progress. The lock is held until the scroll
+// animation has genuinely settled (see turnPage), not for a fixed duration —
+// issuing a second turn mid-animation is what leaves the book stranded
+// between two pages.
 let pageTurnLocked = false;
-function turnPage(direction) {
+function getEpubContainer() {
+  try {
+    const manager = state.rendition && state.rendition.manager;
+    if (manager && manager.container) return manager.container;
+  } catch (e) {}
+  return null;
+}
+
+// One page's worth of horizontal scroll, per epub.js's own layout.
+function getPageDelta() {
+  try {
+    const layout = state.rendition && state.rendition.manager && state.rendition.manager.layout;
+    if (layout) {
+      if (layout.delta) return layout.delta;
+      if (layout.pageWidth) return layout.pageWidth;
+    }
+  } catch (e) {}
+  const w = el('readerSurface').clientWidth;
+  return w > 0 ? w : 0;
+}
+
+// Resolves once the container has stopped scrolling. `scroll-behavior:
+// smooth` is animated by the browser over a duration it chooses and doesn't
+// expose, so any fixed timeout is a guess — this waits for the real thing,
+// with a ceiling so a stalled animation can't block page turns forever.
+function waitForScrollSettled(container, maxMs = 1200) {
+  return new Promise((resolve) => {
+    if (!container) return resolve();
+    let last = container.scrollLeft;
+    let stableFrames = 0;
+    const started = Date.now();
+    const tick = () => {
+      const now = container.scrollLeft;
+      if (Math.abs(now - last) < 0.5) {
+        if (++stableFrames >= 3) return resolve();
+      } else {
+        stableFrames = 0;
+        last = now;
+      }
+      if (Date.now() - started > maxMs) return resolve();
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+}
+
+// Realign the container to an exact page boundary.
+//
+// epub.js turns a page with `container.scrollLeft += delta`, reading
+// whatever scrollLeft is at that instant. With smooth scrolling that value
+// is a fractional mid-animation position if another turn is issued while the
+// previous one is still moving, so the book lands permanently between two
+// pages and stays there — which is why only reloading fixed it. Snapping
+// after each turn settles corrects that drift, and because it just rounds to
+// the nearest boundary it also recovers from a stuck state on the next tap
+// rather than needing a reload.
+function snapToPageBoundary() {
+  if (state.settings.flow === 'scrolled') return;
+  const container = getEpubContainer();
+  const delta = getPageDelta();
+  if (!container || !delta) return;
+
+  const current = container.scrollLeft;
+  const target = Math.round(current / delta) * delta;
+  if (Math.abs(current - target) < 1) return;
+
+  // Correct instantly rather than animating the fix, which would look like
+  // a second unwanted page movement.
+  const previous = container.style.scrollBehavior;
+  container.style.scrollBehavior = 'auto';
+  container.scrollLeft = target;
+  container.style.scrollBehavior = previous || '';
+}
+
+async function turnPage(direction) {
   if (!state.rendition || pageTurnLocked) return;
   pageTurnLocked = true;
-  const result = direction === 'next' ? state.rendition.next() : state.rendition.prev();
-  Promise.resolve(result).finally(() => {
-    setTimeout(() => { pageTurnLocked = false; }, PAGE_TURN_ANIM_MS);
-  });
+  try {
+    const result = direction === 'next' ? state.rendition.next() : state.rendition.prev();
+    await Promise.resolve(result).catch(() => {});
+    // Hold the lock until the animation has actually finished, then correct
+    // any sub-pixel drift, so the next turn starts from a clean boundary.
+    await waitForScrollSettled(getEpubContainer());
+    snapToPageBoundary();
+  } finally {
+    pageTurnLocked = false;
+  }
 }
 
 el('readerSurface').addEventListener('click', (e) => {
@@ -1525,12 +1608,12 @@ function attachSurfaceTapHandler(contents) {
 function getEpubScrollLeft() {
   try {
     const manager = state.rendition && state.rendition.manager;
-    if (!manager) return 0;
-    if (manager.settings && manager.settings.fullsize) {
+    if (manager && manager.settings && manager.settings.fullsize) {
       return window.scrollX || 0;
     }
-    if (manager.container && typeof manager.container.scrollLeft === 'number') {
-      return manager.container.scrollLeft;
+    const container = getEpubContainer();
+    if (container && typeof container.scrollLeft === 'number') {
+      return container.scrollLeft;
     }
   } catch (e) {}
   return 0;
