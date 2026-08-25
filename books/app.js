@@ -402,6 +402,7 @@ el('optDeleteBtn').addEventListener('click', async () => {
   const book = state.books.find(b => b.id === optionsTargetId);
   await idbDelete('books', optionsTargetId);
   await idbDelete('files', optionsTargetId);
+  await idbDelete('files', LOCATIONS_KEY(optionsTargetId));
   const bms = await idbGetByIndex('bookmarks', 'bookId', optionsTargetId);
   for (const bm of bms) await idbDelete('bookmarks', bm.id);
   const hls = await idbGetByIndex('highlights', 'bookId', optionsTargetId);
@@ -744,6 +745,56 @@ function hideLoading() { el('loadingOverlay').hidden = true; }
 /* ============================================================
    READER
    ============================================================ */
+// Load the cached locations for a book if we have them, otherwise generate
+// them once and keep the result.
+//
+// Cached under a namespaced key in the existing 'files' store rather than on
+// the book record: the book record is rewritten on every single page turn,
+// and the serialised locations are a sizeable blob that has no business
+// being rewritten with it.
+//
+// Every failure path falls back to generating, and generation failing only
+// costs page numbers — the book still reads fine — so nothing here is
+// allowed to break opening a book.
+const LOCATIONS_KEY = (bookId) => `locations:${bookId}`;
+
+async function ensureLocations(book, bookId) {
+  try {
+    await book.ready;
+  } catch (e) {
+    return;
+  }
+
+  try {
+    const cached = await idbGet('files', LOCATIONS_KEY(bookId));
+    if (cached && cached.data) {
+      book.locations.load(cached.data);
+      if (book.locations.length()) {
+        updateProgressUI();
+        return;
+      }
+    }
+  } catch (e) {
+    // Unreadable or stale cache — fall through and regenerate.
+  }
+
+  try {
+    await book.locations.generate(1200);
+    updateProgressUI();
+  } catch (e) {
+    console.error('Could not generate locations:', e);
+    return;
+  }
+
+  try {
+    await idbPut('files', { id: LOCATIONS_KEY(bookId), data: book.locations.save() });
+  } catch (e) {
+    // Caching is only an optimisation; failing to store it just means this
+    // work gets redone next time.
+    console.error('Could not cache locations:', e);
+  }
+}
+
 async function openBook(id) {
   const meta = state.books.find(b => b.id === id);
   if (!meta) return;
@@ -846,11 +897,12 @@ async function openBook(id) {
       }
     }
 
-    book.ready.then(() => {
-      book.locations.generate(1200).then(() => {
-        updateProgressUI();
-      });
-    });
+    // Locations are what page numbers and percentages are derived from, and
+    // generating them means walking the entire book — several seconds for a
+    // long one, during which the footer just reads "PAGE —". They depend
+    // only on the book's text, not on font size or any display setting, so
+    // the result is stable for the life of the book and worth keeping.
+    ensureLocations(book, id);
 
     // load nav
     const navigation = await book.loaded.navigation;
