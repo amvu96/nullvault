@@ -8,7 +8,10 @@ const DB_NAME = 'shelf-db';
 // directory handle for folder sync. The existing stores are all created
 // behind contains() guards, so upgrading an existing v1 database just adds
 // the new store and leaves books/files/bookmarks/highlights untouched.
-const DB_VERSION = 2;
+// v3 adds the 'covers' store, which holds cover images as Blobs keyed by
+// book id. They used to live as base64 data URLs on the book record itself,
+// which meant every position save rewrote the image too.
+const DB_VERSION = 3;
 let db;
 
 function openDB() {
@@ -34,6 +37,9 @@ function openDB() {
       // folder grant survives app restarts without re-prompting.
       if (!_db.objectStoreNames.contains('handles')) {
         _db.createObjectStore('handles', { keyPath: 'id' });
+      }
+      if (!_db.objectStoreNames.contains('covers')) {
+        _db.createObjectStore('covers', { keyPath: 'id' });
       }
     };
     req.onsuccess = (e) => { db = e.target.result; resolve(db); };
@@ -311,6 +317,7 @@ function renderLibrary() {
 
   const sorted = sortBooks(state.books);
   grid.innerHTML = sorted.map(bookCardHTML).join('');
+  hydrateCovers(grid, sorted);
 
   grid.querySelectorAll('.book-card').forEach(card => {
     const id = card.dataset.id;
@@ -328,7 +335,7 @@ function renderLibrary() {
 function renderContinueCard(b) {
   const pct = Math.round((b.progress || 0) * 100);
   el('continueCard').innerHTML = `
-    <div class="continue-cover">${b.cover ? `<img src="${b.cover}" alt="">` : coverFallback(b.title)}</div>
+    <div class="continue-cover" data-cover="${b.id}">${coverFallback(b.title)}</div>
     <div class="continue-info">
       <div class="continue-title">${escapeHtml(b.title || 'Untitled')}</div>
       <div class="continue-author">${escapeHtml(b.author || 'Unknown author')}</div>
@@ -339,18 +346,63 @@ function renderContinueCard(b) {
     </div>
   `;
   el('continueCard').onclick = () => openBook(b.id);
+  hydrateCovers(el('continueCard'), [b]);
 }
 
 function coverFallback(title) {
   return `<div class="book-cover-fallback">${escapeHtml((title || 'Untitled').slice(0, 60))}</div>`;
 }
 
+// Object URLs for cover blobs, kept for the lifetime of the page so the same
+// cover isn't re-created on every re-render. Revoked when a book is deleted.
+const coverUrlCache = new Map();
+
+async function getCoverUrl(book) {
+  if (!book) return null;
+  // Books imported before covers moved to their own store still carry an
+  // inline base64 data URL; use it directly rather than forcing a re-import.
+  if (book.cover) return book.cover;
+  if (!book.hasCover) return null;
+  if (coverUrlCache.has(book.id)) return coverUrlCache.get(book.id);
+  try {
+    const rec = await idbGet('covers', book.id);
+    if (!rec || !rec.blob) return null;
+    const url = URL.createObjectURL(rec.blob);
+    coverUrlCache.set(book.id, url);
+    return url;
+  } catch (e) { return null; }
+}
+
+function releaseCoverUrl(bookId) {
+  const url = coverUrlCache.get(bookId);
+  if (url) {
+    URL.revokeObjectURL(url);
+    coverUrlCache.delete(bookId);
+  }
+}
+
+// Covers load asynchronously from IndexedDB, so cards render immediately
+// with the text fallback and the image drops in when it's ready. That keeps
+// the library painting instantly rather than blocking on image reads.
+async function hydrateCovers(root, books) {
+  await Promise.all(books.map(async (b) => {
+    const slot = root.querySelector(`[data-cover="${b.id}"]`);
+    if (!slot) return;
+    const url = await getCoverUrl(b);
+    if (!url) return;
+    const img = new Image();
+    img.alt = '';
+    img.src = url;
+    img.onload = () => { slot.innerHTML = ''; slot.appendChild(img); };
+  }));
+}
+
 function bookCardHTML(b) {
   const pct = Math.round((b.progress || 0) * 100);
   return `
     <div class="book-card" data-id="${b.id}">
-      <div class="book-cover-wrap">
-        ${b.cover ? `<img src="${b.cover}" alt="">` : coverFallback(b.title)}
+      <div class="book-cover-wrap" data-cover="${b.id}">
+        ${coverFallback(b.title)}
         ${b.finished ? '<div class="book-finished-badge">DONE</div>' : ''}
         <button class="book-card-menu-btn" aria-label="Options">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
@@ -403,6 +455,8 @@ el('optDeleteBtn').addEventListener('click', async () => {
   await idbDelete('books', optionsTargetId);
   await idbDelete('files', optionsTargetId);
   await idbDelete('files', LOCATIONS_KEY(optionsTargetId));
+  await idbDelete('covers', optionsTargetId);
+  releaseCoverUrl(optionsTargetId);
   const bms = await idbGetByIndex('bookmarks', 'bookId', optionsTargetId);
   for (const bm of bms) await idbDelete('bookmarks', bm.id);
   const hls = await idbGetByIndex('highlights', 'bookId', optionsTargetId);
@@ -448,12 +502,21 @@ async function importEpub(file, opts = {}) {
     try {
       metadata = await tempBook.loaded.metadata;
     } catch (err) { /* malformed metadata block, fall back to filename below */ }
-    let coverUrl = null;
+    // The cover is stored as a Blob in its own record, NOT on the book
+    // record. The book record is rewritten on every page turn to save the
+    // reading position, and a base64 data URL cover riding along on it meant
+    // re-serialising a few hundred KB of image on every single turn. A Blob
+    // is also ~33% smaller than the same image base64-encoded, with no
+    // encode/decode cost on either end.
+    let hasCover = false;
     try {
       const coverPath = await tempBook.loaded.cover;
       if (coverPath) {
-        const coverBlobUrl = await tempBook.archive.createUrl(coverPath, { base64: true });
-        coverUrl = coverBlobUrl;
+        const blob = await tempBook.archive.getBlob(coverPath);
+        if (blob) {
+          await idbPut('covers', { id, blob });
+          hasCover = true;
+        }
       }
     } catch (err) { /* no cover, non-fatal */ }
 
@@ -466,7 +529,8 @@ async function importEpub(file, opts = {}) {
       id,
       title: metadata.title || file.name.replace(/\.epub$/i, ''),
       author: metadata.creator || 'Unknown author',
-      cover: coverUrl,
+      // Just a flag now — the image itself lives in the 'covers' store.
+      hasCover,
       addedAt: Date.now(),
       lastOpenedAt: null,
       progress: 0,
@@ -501,6 +565,121 @@ async function importEpub(file, opts = {}) {
     return false;
   }
 }
+
+/* ============================================================
+   STORAGE PERSISTENCE
+
+   Everything — books, reading positions, bookmarks, highlights — lives in
+   IndexedDB and nowhere else. By default that storage is "best effort":
+   under disk pressure a browser may evict an entire origin without warning,
+   which here means the whole library disappears. Asking for persistent
+   storage tells the browser to treat this data as worth keeping.
+
+   Chromium generally grants it silently once the app is installed or has
+   enough engagement; Firefox may prompt. A refusal isn't an error, so this
+   stays quiet unless the person goes looking in the storage sheet.
+   ============================================================ */
+async function requestPersistentStorage() {
+  if (!navigator.storage || !navigator.storage.persist) return false;
+  try {
+    if (await navigator.storage.persisted()) return true;
+    return await navigator.storage.persist();
+  } catch (e) { return false; }
+}
+
+async function getStorageInfo() {
+  const info = { persisted: false, usage: null, quota: null };
+  try {
+    if (navigator.storage && navigator.storage.persisted) {
+      info.persisted = await navigator.storage.persisted();
+    }
+    if (navigator.storage && navigator.storage.estimate) {
+      const est = await navigator.storage.estimate();
+      info.usage = est.usage;
+      info.quota = est.quota;
+    }
+  } catch (e) {}
+  return info;
+}
+
+function formatBytes(n) {
+  if (n == null) return '—';
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+  if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(n / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+/* ============================================================
+   EXPORT
+
+   Bookmarks and highlights are otherwise trapped in this app with no way
+   out. Exports a single JSON file containing every book's annotations plus
+   reading position — small, human-readable, and enough to rebuild the
+   annotation set elsewhere. Book files themselves are deliberately not
+   included: they're the large part, and you already have them.
+   ============================================================ */
+async function exportAnnotations() {
+  try {
+    const books = await idbGetAll('books');
+    const bookmarks = await idbGetAll('bookmarks');
+    const highlights = await idbGetAll('highlights');
+
+    const byBook = books.map(b => ({
+      id: b.id,
+      title: b.title,
+      author: b.author,
+      fileName: b.fileName,
+      progress: b.progress || 0,
+      cfi: b.cfi || null,
+      finished: !!b.finished,
+      bookmarks: bookmarks
+        .filter(x => x.bookId === b.id)
+        .map(({ id, cfi, chapter, createdAt, excerpt }) => ({ id, cfi, chapter, createdAt, excerpt })),
+      highlights: highlights
+        .filter(x => x.bookId === b.id)
+        .map(({ id, cfi, text, color, chapter, createdAt }) => ({ id, cfi, text, color, chapter, createdAt })),
+    }));
+
+    const payload = {
+      app: 'shelf',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      books: byBook,
+    };
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const stamp = new Date().toISOString().slice(0, 10);
+    const filename = `shelf-annotations-${stamp}.json`;
+
+    // Prefer the share sheet on mobile, where a download often lands
+    // somewhere the person can't easily find.
+    const file = new File([blob], filename, { type: 'application/json' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: 'shelf annotations' });
+        return;
+      } catch (e) {
+        if (e && e.name === 'AbortError') return;
+        // Sharing unavailable or refused — fall through to download.
+      }
+    }
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+
+    const counts = byBook.reduce((n, b) => n + b.bookmarks.length + b.highlights.length, 0);
+    showToast(`Exported ${counts} annotation${counts === 1 ? '' : 's'}`, 'accent');
+  } catch (err) {
+    console.error('Export failed:', err);
+    showToast('Could not export annotations', 'danger');
+  }
+}
+
 
 /* ============================================================
    FOLDER SYNC (File System Access API)
@@ -660,19 +839,21 @@ async function forgetSyncFolder() {
 
 /* ---------- Folder sync UI ---------- */
 
-// The whole feature is hidden where showDirectoryPicker() doesn't exist
-// (Firefox, Safari, and some Android builds), so the normal file picker
-// stays the obvious path rather than sitting next to a button that errors.
-if (folderSyncSupported()) {
-  el('folderBtn').hidden = false;
-}
+// This sheet holds storage status and export as well as folder sync, so it
+// is always available. The folder-sync rows inside it hide themselves where
+// showDirectoryPicker() doesn't exist (Firefox, Safari, some Android
+// builds) rather than sitting there and erroring — see refreshFolderSheet().
+el('folderBtn').hidden = false;
 
 async function refreshFolderSheet() {
   const handle = await getSavedFolderHandle();
   const status = el('folderStatus');
   const hasFolder = !!handle;
+  const supported = folderSyncSupported();
 
-  if (hasFolder) {
+  if (!supported) {
+    status.textContent = 'Folder sync needs a Chromium-based browser. You can still import books with the upload button.';
+  } else if (hasFolder) {
     const granted = await ensureFolderPermission(handle, 'query');
     status.innerHTML = granted
       ? `Watching <strong>${escapeHtml(handle.name)}</strong>. New EPUBs are picked up when you open the app.`
@@ -681,10 +862,30 @@ async function refreshFolderSheet() {
     status.textContent = 'Pick a folder and new EPUBs in it get added automatically each time you open the app. Nothing is scanned while the app is closed.';
   }
 
+  el('folderPickBtn').hidden = !supported;
   el('folderPickBtn').textContent = hasFolder ? 'CHANGE FOLDER' : 'CHOOSE FOLDER';
-  el('folderRescanBtn').hidden = !hasFolder;
-  el('folderForgetBtn').hidden = !hasFolder;
+  el('folderRescanBtn').hidden = !supported || !hasFolder;
+  el('folderForgetBtn').hidden = !supported || !hasFolder;
+
+  await refreshStorageStatus();
 }
+
+async function refreshStorageStatus() {
+  const info = await getStorageInfo();
+  const parts = [];
+  parts.push(info.persisted
+    ? 'Storage is <strong>protected</strong> — the browser won\'t evict your library to reclaim space.'
+    : 'Storage is <strong>best effort</strong> — the browser may clear your library if the device runs low on space.');
+  if (info.usage != null) {
+    parts.push(`Using ${formatBytes(info.usage)}${info.quota ? ` of ${formatBytes(info.quota)} available` : ''}.`);
+  }
+  el('storageStatus').innerHTML = parts.join(' ');
+}
+
+el('exportBtn').addEventListener('click', async () => {
+  closeSheet('folderOverlay');
+  await exportAnnotations();
+});
 
 el('folderBtn').addEventListener('click', async () => {
   await refreshFolderSheet();
@@ -1371,11 +1572,6 @@ el('bookmarkBtn').addEventListener('click', async () => {
     return;
   }
 
-  let excerpt = '';
-  try {
-    const range = await state.rendition.getContents()[0]?.document;
-  } catch (e) {}
-
   const bm = {
     id: uid(),
     bookId: state.currentBook.id,
@@ -1391,13 +1587,56 @@ el('bookmarkBtn').addEventListener('click', async () => {
   renderBookmarks();
 });
 
+// Text from the page you're actually looking at, not the start of the
+// chapter. The previous version took the first 160 characters of the whole
+// section's innerText, so every bookmark within a chapter came out with
+// identical text and the list was useless for telling them apart.
+//
+// In paginated mode the visible page is a horizontal slice of a CSS column
+// layout, so "visible" means elements whose bounding box falls inside the
+// current column window — walking text nodes and testing their rects is the
+// only reliable way to get it.
 function getVisibleTextExcerpt() {
   try {
     const contents = state.rendition.getContents();
-    if (contents && contents[0] && contents[0].document) {
-      const text = contents[0].document.body.innerText || '';
-      return text.trim().slice(0, 160);
+    const c = contents && contents[0];
+    if (!c || !c.document) return '';
+    const doc = c.document;
+
+    const scrollLeft = getEpubScrollLeft();
+    const pageWidth = el('readerSurface').clientWidth;
+    const scrolled = state.settings.flow === 'scrolled';
+    const pageHeight = el('readerSurface').clientHeight;
+
+    const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
+    let out = '';
+    let node;
+    while ((node = walker.nextNode())) {
+      const raw = node.textContent;
+      if (!raw || !raw.trim()) continue;
+      let rect;
+      try {
+        const range = doc.createRange();
+        range.selectNodeContents(node);
+        rect = range.getBoundingClientRect();
+      } catch (e) { continue; }
+      if (!rect || (!rect.width && !rect.height)) continue;
+
+      const onPage = scrolled
+        ? rect.bottom > 0 && rect.top < pageHeight
+        : rect.right > scrollLeft && rect.left < scrollLeft + pageWidth;
+
+      if (onPage) {
+        out += raw.replace(/\s+/g, ' ');
+        if (out.length >= 200) break;
+      }
     }
+
+    out = out.trim();
+    if (out) return out.slice(0, 160);
+
+    // Fall back to the section text if the geometry walk found nothing.
+    return (doc.body.innerText || '').trim().slice(0, 160);
   } catch (e) {}
   return '';
 }
@@ -1916,6 +2155,7 @@ el('searchLibraryBtn').addEventListener('click', () => {
   const grid = el('libraryGrid');
   el('emptyState').hidden = filtered.length > 0;
   grid.innerHTML = filtered.map(bookCardHTML).join('');
+  hydrateCovers(grid, filtered);
   grid.querySelectorAll('.book-card').forEach(card => {
     card.addEventListener('click', () => openBook(card.dataset.id));
     card.querySelector('.book-card-menu-btn')?.addEventListener('click', (e) => {
@@ -1963,6 +2203,10 @@ async function init() {
   loadSettings();
   await openDB();
   await loadLibrary();
+  // Ask the browser to treat the library as worth keeping. Chromium usually
+  // grants this silently for installed apps; a refusal is not an error, and
+  // the current state is always visible in the storage sheet.
+  requestPersistentStorage();
   // Best-effort rescan of the synced folder on launch. Silent: if the
   // permission grant lapsed we can't prompt without a user gesture here, so
   // it quietly does nothing and waits for the person to tap Rescan.
