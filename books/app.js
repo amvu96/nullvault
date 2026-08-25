@@ -897,7 +897,14 @@ async function openBook(id) {
 //    settles, so reading it too early can show a transient in-between page.
 let relocateDebounce = null;
 function onRelocated(location) {
-  persistLocation(location);
+  // persistLocation must never be allowed to throw into epub.js's event
+  // emit — an exception here propagates back into the rendition's own
+  // relocation handling and can leave it in a broken state.
+  try {
+    persistLocation(location);
+  } catch (err) {
+    console.error('Failed to persist reading position:', err);
+  }
   clearTimeout(relocateDebounce);
   relocateDebounce = setTimeout(() => applyRelocated(location), PAGE_TURN_ANIM_MS + 40);
 }
@@ -908,14 +915,27 @@ function persistLocation(location) {
   if (!cfi) return;
   state.currentBook.cfi = cfi;
 
-  let pct = 0;
-  if (state.book.locations && state.book.locations.length()) {
-    pct = state.book.locations.percentageFromCfi(cfi);
-  } else if (location.start.percentage != null) {
+  // The percentage is a nice-to-have; the CFI is the thing that actually
+  // restores your place. percentageFromCfi() can throw on a CFI it can't
+  // resolve, and when that happened here it aborted the whole function
+  // before the write — so the position was silently never saved. Work out
+  // the percentage defensively and save regardless of whether it succeeded.
+  let pct = null;
+  try {
+    if (state.book.locations && state.book.locations.length()) {
+      const p = state.book.locations.percentageFromCfi(cfi);
+      if (typeof p === 'number' && !isNaN(p)) pct = p;
+    }
+  } catch (e) { /* fall through to the location's own percentage */ }
+
+  if (pct === null && typeof location.start.percentage === 'number') {
     pct = location.start.percentage;
   }
-  state.currentBook.progress = pct;
-  if (pct >= 0.995) state.currentBook.finished = true;
+
+  if (pct !== null) {
+    state.currentBook.progress = pct;
+    if (pct >= 0.995) state.currentBook.finished = true;
+  }
 
   idbPut('books', state.currentBook).catch(err => {
     console.error('Failed to save reading position:', err);
@@ -1054,7 +1074,7 @@ function renderChapters(toc) {
   panel.querySelectorAll('.toc-item').forEach(row => {
     row.addEventListener('click', () => {
       const href = row.dataset.href;
-      state.rendition.display(href);
+      goToCfi(href);
       closeSheet('tocOverlay');
     });
   });
@@ -1335,6 +1355,26 @@ function updateBookmarkIcon(active) {
   btn.style.color = active ? 'var(--accent)' : '';
 }
 
+// Single place for "jump to this CFI", used by the contents list, bookmarks
+// and highlights. These all used to call rendition.display() bare: not
+// awaited and not guarded, so a CFI epub.js couldn't resolve produced an
+// unhandled rejection and left the reader wherever it happened to land,
+// with nothing written down. Here the jump is awaited, failures surface as
+// a toast instead of vanishing, and the new position is persisted straight
+// away rather than waiting for the relocation event to come back around.
+async function goToCfi(cfi) {
+  if (!state.rendition || !cfi) return false;
+  try {
+    await state.rendition.display(cfi);
+    flushReadingPosition();
+    return true;
+  } catch (err) {
+    console.error('Could not navigate to position:', cfi, err);
+    showToast('Could not open that position', 'danger');
+    return false;
+  }
+}
+
 function renderBookmarks() {
   const panel = el('bookmarksPanel');
   if (!state.currentBookmarks.length) {
@@ -1354,7 +1394,7 @@ function renderBookmarks() {
   `).join('');
   panel.querySelectorAll('.bookmark-item').forEach(row => {
     row.addEventListener('click', () => {
-      state.rendition.display(row.dataset.cfi);
+      goToCfi(row.dataset.cfi);
       closeSheet('tocOverlay');
     });
   });
@@ -1482,7 +1522,7 @@ function renderHighlights() {
   `).join('');
   panel.querySelectorAll('.highlight-item').forEach(row => {
     row.addEventListener('click', () => {
-      state.rendition.display(row.dataset.cfi);
+      goToCfi(row.dataset.cfi);
       closeSheet('tocOverlay');
     });
   });
