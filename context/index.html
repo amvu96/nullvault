@@ -144,6 +144,11 @@ a.chip{text-decoration:none;color:var(--fg)}
  .empty{display:grid;place-items:center;text-align:center;height:60vh;border:1px dashed var(--line);border-radius:28px}
 }
 @media(min-width:1000px) and (max-width:1199px){.pane .mg{grid-template-columns:1fr}.pane .mh,.pane .md,.pane .acts{grid-column:1;grid-row:auto}}
+.ctx{position:fixed;z-index:80;min-width:220px;max-height:80vh;overflow:auto;background:#0d1219f4;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:14px;padding:6px;box-shadow:0 20px 50px #000a}
+.ctx button{display:flex;align-items:center;width:100%;background:none;border:0;color:var(--fg);font:inherit;font-size:13px;padding:8px 10px;border-radius:8px;text-align:left;cursor:pointer}
+.ctx button:hover{background:#ff3b4e1f;color:var(--red)}.ctx kbd{margin-left:auto;padding-left:18px;color:var(--dim);font:inherit;font-size:11px}
+.ctx .ch{padding:8px 10px 4px;color:var(--lab);font-size:10px;letter-spacing:.14em;text-transform:uppercase}.ctx hr{border:0;border-top:1px solid var(--line);margin:6px 0}
+.mapwrap svg [data-n]{cursor:grab}.mapwrap svg [data-e]{cursor:pointer}
 </style></head><body><div class="wrap" id="app"></div>
 <script>
 const TIERS=['Hated','Disliked','Wary','Neutral','Acquaintance','Friend','Trusted','Best friend'];
@@ -209,7 +214,7 @@ const SOC=[['ig','Instagram','https://instagram.com/'],['x','X','https://x.com/'
 const sochref=(k,v,b)=>{v=v.trim();if(!v)return'';if(/^https?:\/\//i.test(v))return v;if(k==='web')return'https://'+v;if(k==='wa')v=v.replace(/\D/g,'');return b+v.replace(/^@/,'')};
 const socRow=p=>{const a=SOC.map(([k,n,b])=>{const h=sochref(k,(p.soc||{})[k]||'',b);return h?`<a class="chip" href="${esc(h)}" target="_blank" rel="noopener noreferrer">${n}</a>`:''}).join('');return a?`<div class="kv"><span>Social</span><span class="chips" style="justify-content:flex-end">${a}</span></div>`:''};
 /* ---------- views ---------- */
-function render(){closeCard();app.dataset.v=view.n;const f={list:vList,person:vPerson,settings:vSettings,mend:vMend,map:vMap,cal:vCal}[view.n];f();scrollTo(0,0)}
+function render(){closeCard();closeMenu();if(MAPKD){document.removeEventListener('keydown',MAPKD);MAPKD=null}app.dataset.v=view.n;const f={list:vList,person:vPerson,settings:vSettings,mend:vMend,map:vMap,cal:vCal}[view.n];f();scrollTo(0,0)}
 function vList(){
  let L=DB.people.filter(p=>(p.name+p.nick+(p.tags||[]).join(' ')).toLowerCase().includes(q.toLowerCase())&&(!FC||(p.circles||[]).includes(FC)));
  const att=DB.people.filter(p=>Date.now()-p.touched>2592e6).length,bd=DB.people.filter(p=>{const d=bdayDays(p.bday);return d!==null&&d<=30}).length;
@@ -342,7 +347,7 @@ function vSettings(){
 /* ---------- relationship map ---------- */
 const LT=[['friend','Friends','#e8edf2','',0],['family','Family','#9db4ff','',0],['partner','Partner','#ff8dc7','',0],['work','Colleagues','#8a96a5','6 5',0],['rival','Rivals','#ffb347','2 5',0],['hate','Hates','#ff3b4e','',1]];
 const LTm=Object.fromEntries(LT.map(t=>[t[0],t])),tc=t=>t<=1?'#ff3b4e':t<=3?'#6b7785':'#e8edf2';
-let V={x:0,y:0,k:1},M={sel:null,edge:null,link:false,pair:null,me:true};
+let V={x:0,y:0,k:1},M={sel:null,edge:null,link:false,pair:null,me:true,ms:new Set(),zones:true,box:null},CTX=null,MAPKD=null;
 function place(){const P=DB.people;P.forEach((p,i)=>{if(p.gx==null){const a=i/P.length*6.283;p.gx=Math.cos(a)*190;p.gy=Math.sin(a)*190}})}
 function sim(){const P=DB.people,I=Object.fromEntries(P.map((p,i)=>[p.id,i]));
  for(let it=0;it<250;it++){const F=P.map(()=>[0,0]);
@@ -351,56 +356,106 @@ function sim(){const P=DB.people,I=Object.fromEntries(P.map((p,i)=>[p.id,i]));
   (DB.links||[]).forEach(l=>{const a=I[l.a],b=I[l.b];if(a==null||b==null)return;const dx=P[b].gx-P[a].gx,dy=P[b].gy-P[a].gy,d=Math.hypot(dx,dy)||1,f=(d-140)*.03;
    F[a][0]+=dx/d*f;F[a][1]+=dy/d*f;F[b][0]-=dx/d*f;F[b][1]-=dy/d*f});
   P.forEach((p,i)=>{p.gx+=Math.max(-12,Math.min(12,F[i][0]));p.gy+=Math.max(-12,Math.min(12,F[i][1]))})}}
+function groupLayout(){const P=DB.people,cs=circ(),B=[];
+ cs.forEach(c=>{const m=P.filter(p=>cs.find(x=>(p.circles||[]).includes(x.id))===c);if(m.length)B.push(m)});
+ const o=P.filter(p=>!cs.some(x=>(p.circles||[]).includes(x.id)));if(o.length)B.push(o);
+ const rad=B.map(m=>40*Math.sqrt(m.length)+50),R=Math.max(B.length>1?230:0,rad.reduce((a,r)=>a+2*r,0)/6.283+100);
+ B.forEach((m,i)=>{const a=i/B.length*6.283-1.571,cx=B.length>1?Math.cos(a)*R:0,cy=B.length>1?Math.sin(a)*R:R*.9;
+  m.forEach((p,k)=>{const aa=k*2.4,rr=k?40*Math.sqrt(k)+10:0;p.gx=cx+Math.cos(aa)*rr;p.gy=cy+Math.sin(aa)*rr})})}
+function closeMenu(){if(CTX){CTX.remove();CTX=null}}
+document.addEventListener('pointerdown',e=>{if(CTX&&!CTX.contains(e.target))closeMenu()},true);
+function showMenu(e,items){closeMenu();const d=document.createElement('div');d.className='ctx';
+ d.innerHTML=items.map((it,i)=>it.h?`<div class="ch">${esc(it.h)}</div>`:it.s?'<hr>':`<button data-i="${i}">${it.c?`<i class="cdot" style="background:${it.c};margin:0 10px 0 0"></i>`:''}${esc(it.t)}${it.k?`<kbd>${it.k}</kbd>`:''}</button>`).join('');
+ document.body.appendChild(d);d.style.left=Math.max(8,Math.min(e.clientX,innerWidth-d.offsetWidth-8))+'px';d.style.top=Math.max(8,Math.min(e.clientY,innerHeight-d.offsetHeight-8))+'px';
+ d.oncontextmenu=ev=>ev.preventDefault();d.onclick=ev=>{const b=ev.target.closest('button');if(!b)return;const f=items[b.dataset.i].f;closeMenu();f()};CTX=d}
 function vMap(){
- DB.links=DB.links||[];const people=DB.people;M.sel=M.edge=M.pair=null;M.link=false;
- app.innerHTML=`<div class="mapwrap"><svg id="svg"></svg><div class="mtop"><button class="ib" id="back" aria-label="Back">&larr;</button><div class="t"><em>&gt;_</em> map</div><button class="ib" id="arr" aria-label="Auto arrange">&#10042;</button><button class="ib" id="meb" aria-label="Show my ties">&#9678;</button></div><div class="mfil chips scroll"></div><div class="sheet" id="sh"></div></div>`;
+ DB.links=DB.links||[];const people=DB.people;M.sel=M.edge=M.pair=null;M.link=false;M.ms=new Set();M.box=null;
+ app.innerHTML=`<div class="mapwrap"><svg id="svg"></svg><div class="mtop"><button class="ib" id="back" aria-label="Back">&larr;</button><div class="t"><em>&gt;_</em> map</div><button class="ib" id="arr" aria-label="Auto arrange">&#10042;</button><button class="ib" id="grp" aria-label="Group by circle">&#11043;</button><button class="ib" id="fit" aria-label="Fit to screen">&#10530;</button><button class="ib" id="meb" aria-label="Show my ties">&#9678;</button></div><div class="mfil chips scroll"></div><div class="sheet" id="sh"></div></div>`;
  const svg=$('#svg'),sh=$('#sh'),nm=id=>people.find(p=>p.id===id),r0=svg.getBoundingClientRect();
  const fresh=people.every(p=>p.gx==null);place();if(fresh)sim();
  V={x:r0.width/2,y:(r0.height-150)/2+30,k:people.length>12?.7:1};
  if(focusId){const f=people.find(p=>p.id===focusId);focusId=null;if(f){M.sel=f.id;V.k=1;V.x=r0.width/2-f.gx;V.y=(r0.height-150)/2+30-f.gy}}
  const P=e=>{const r=svg.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}};
+ const zones=()=>M.zones?circ().map(c=>{const m=people.filter(p=>(p.circles||[]).includes(c.id));if(!m.length)return'';const cx=m.reduce((a,p)=>a+p.gx,0)/m.length,cy=m.reduce((a,p)=>a+p.gy,0)/m.length,r=Math.max(...m.map(p=>Math.hypot(p.gx-cx,p.gy-cy)))+48;
+  return`<g opacity="${MF&&MF!==c.id?.15:1}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="${c.color}" fill-opacity=".06" stroke="${c.color}" stroke-opacity=".4" stroke-dasharray="4 6"/><text x="${cx}" y="${cy-r-8}" text-anchor="middle" font-size="12" style="fill:${c.color}">${esc(c.name)}</text></g>`}).join(''):'';
  const draw=()=>{let h='<defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ff3b4e"/></marker></defs>'+`<g transform="translate(${V.x} ${V.y}) scale(${V.k})">`;
-  if(M.me)people.forEach(p=>{h+=`<line x1="0" y1="0" x2="${p.gx}" y2="${p.gy}" stroke="${tc(p.tier)}" stroke-dasharray="1 6" opacity=".45"/>`});
+  h+=zones();if(M.me)people.forEach(p=>{h+=`<line x1="0" y1="0" x2="${p.gx}" y2="${p.gy}" stroke="${tc(p.tier)}" stroke-dasharray="1 6" opacity=".45"/>`});
   DB.links.forEach(l=>{const A=nm(l.a),B=nm(l.b);if(!A||!B)return;const t=LTm[l.type],dx=B.gx-A.gx,dy=B.gy-A.gy,d=Math.hypot(dx,dy)||1,ux=dx/d,uy=dy/d,x1=A.gx+ux*30,y1=A.gy+uy*30,x2=B.gx-ux*32,y2=B.gy-uy*32;
    h+=`<g data-e="${l.id}" opacity="${!MF||((A.circles||[]).includes(MF)&&(B.circles||[]).includes(MF))?1:.12}"><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="transparent" stroke-width="24"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${t[2]}" stroke-width="${M.edge===l.id?4:t[4]?2.6:1.8}" stroke-dasharray="${t[3]}" ${t[4]?'marker-end="url(#ar)"':''}/><text x="${(x1+x2)/2}" y="${(y1+y2)/2-7}" font-size="9" text-anchor="middle" opacity=".75">${t[1].toLowerCase()}</text></g>`});
   h+='<g><circle r="22" fill="#ff3b4e"/><text y="4" text-anchor="middle" font-size="11" font-weight="700" style="fill:#1b0307">ME</text></g>';
-  people.forEach(p=>{const s=M.sel===p.id||(M.pair&&M.pair.includes(p.id));
-   h+=`<g data-n="${p.id}" opacity="${!MF||(p.circles||[]).includes(MF)?1:.15}" transform="translate(${p.gx} ${p.gy})">${s?'<circle r="37" fill="none" stroke="#ff3b4e" stroke-dasharray="3 4"/>':''}<circle r="28" fill="#10151c" stroke="${tc(p.tier)}" stroke-width="2.5"/>${p.photo?`<image href="${p.photo}" x="-24" y="-24" width="48" height="48" preserveAspectRatio="xMidYMid slice" style="clip-path:circle(50%)"/>`:`<text y="6" text-anchor="middle" font-size="18" font-weight="600" style="fill:#ff3b4e">${esc((p.name||'?')[0].toUpperCase())}</text>`}<text y="46" text-anchor="middle" font-size="11">${esc((p.nick||p.name||'?').slice(0,14))}</text>${pc(p).slice(0,3).map((c,i)=>`<circle cx="${[21,30,31][i]}" cy="${[-21,-9,6][i]}" r="5.5" fill="${c.color}" stroke="#0a0d12" stroke-width="1.5"/>`).join('')}</g>`});
-  svg.innerHTML=h+'</g>'};
+  people.forEach(p=>{const s=M.sel===p.id||M.ms.has(p.id)||(M.pair&&M.pair.includes(p.id));
+   h+=`<g data-n="${p.id}" opacity="${!MF||(p.circles||[]).includes(MF)?1:.15}" transform="translate(${p.gx} ${p.gy})"><title>${esc(p.name)} · ${TIERS[p.tier]}</title>${s?'<circle r="37" fill="none" stroke="#ff3b4e" stroke-dasharray="3 4"/>':''}<circle r="28" fill="#10151c" stroke="${tc(p.tier)}" stroke-width="2.5"/>${p.photo?`<image href="${p.photo}" x="-24" y="-24" width="48" height="48" preserveAspectRatio="xMidYMid slice" style="clip-path:circle(50%)"/>`:`<text y="6" text-anchor="middle" font-size="18" font-weight="600" style="fill:#ff3b4e">${esc((p.name||'?')[0].toUpperCase())}</text>`}<text y="46" text-anchor="middle" font-size="11">${esc((p.nick||p.name||'?').slice(0,14))}</text>${pc(p).slice(0,3).map((c,i)=>`<circle cx="${[21,30,31][i]}" cy="${[-21,-9,6][i]}" r="5.5" fill="${c.color}" stroke="#0a0d12" stroke-width="1.5"/>`).join('')}</g>`});
+  svg.innerHTML=h+'</g>'+(M.box?`<rect x="${Math.min(M.box.x0,M.box.x1)}" y="${Math.min(M.box.y0,M.box.y1)}" width="${Math.abs(M.box.x1-M.box.x0)}" height="${Math.abs(M.box.y1-M.box.y0)}" fill="#ff3b4e18" stroke="#ff3b4e" stroke-dasharray="4 4"/>`:'')};
  const fil=()=>{const f=$('.mfil');f.innerHTML=`<span class="chip ${!MF?'on':''}" data-m="">All</span>`+circ().map(c=>`<span class="chip cc ${MF===c.id?'on':''}" style="--c:${c.color}" data-m="${c.id}">${esc(c.name)}</span>`).join('');f.onclick=e=>{const t=e.target.closest('[data-m]');if(!t)return;MF=t.dataset.m||null;fil();draw()}};
  const chips=c=>LT.map(t=>`<span class="chip ${c===t[0]?'on':''}" data-ty="${t[0]}" style="${c===t[0]?'':'border-color:'+t[2]+'66'}">${t[1]}</span>`).join('');
  const sheet=()=>{let c;
-  if(M.pair){const[a,b]=M.pair.map(nm);c=`<div class="lab">connect</div><b>${esc(a.name)} &rarr; ${esc(b.name)}</b><div class="chips" style="margin:10px 0">${chips('')}</div><button class="btn" data-act="cancel">Cancel</button>`}
+  if(M.ms.size){c=`<div class="lab">${M.ms.size} selected</div><div class="hint" style="margin-top:8px">Add / remove circle</div><div class="chips" style="margin:8px 0">${circ().map(k=>`<span class="chip cc" style="--c:${k.color}" data-mc="${k.id}">${esc(k.name)}</span>`).join('')}</div><div class="hint">Link all as</div><div class="chips" style="margin:8px 0">${chips('').replace(/data-ty=/g,'data-mt=')}</div><button class="btn" data-act="row">Row</button><button class="btn" data-act="col">Column</button><button class="btn" data-act="clr">Clear</button>`}
+  else if(M.pair){const[a,b]=M.pair.map(nm);c=`<div class="lab">connect</div><b>${esc(a.name)} &rarr; ${esc(b.name)}</b><div class="chips" style="margin:10px 0">${chips('')}</div><button class="btn" data-act="cancel">Cancel</button>`}
   else if(M.edge){const l=DB.links.find(x=>x.id===M.edge),a=nm(l.a),b=nm(l.b);c=`<div class="lab">relation</div><b>${esc(a.name)} ${LTm[l.type][4]?'&rarr;':'&harr;'} ${esc(b.name)}</b><div class="chips" style="margin:10px 0">${chips(l.type)}</div><input id="en" placeholder="note (optional)" value="${esc(l.note||'')}"><button class="btn" data-act="swap">Swap</button><button class="btn" data-act="del">Delete</button>`}
   else if(M.sel){const p=nm(M.sel),n=DB.links.filter(l=>l.a===p.id||l.b===p.id).length;c=`<b>${esc(p.name||'Unnamed')}</b> <span class="hint">${TIERS[p.tier].toLowerCase()} &middot; ${n} link${n==1?'':'s'}</span><div><button class="btn r" data-act="link">${M.link?'Tap another person&hellip;':'Link to&hellip;'}</button><button class="btn" data-act="open">Profile</button></div>`}
   else c=`<div class="lab">relationship map</div><p class="hint" style="margin:6px 0 10px">${people.length>1?'Drag people &middot; pinch to zoom &middot; tap a person to link them':'Add at least two people to start linking'}</p><div class="chips">${LT.map(t=>`<span class="chip" style="border-color:${t[2]}66;color:${t[2]}">${t[1]}</span>`).join('')}</div>`;
   sh.innerHTML=c};
- sh.onclick=async e=>{const t=e.target.closest('[data-ty],[data-act]');if(!t)return;const ty=t.dataset.ty,ac=t.dataset.act;
+ sh.onclick=async e=>{const t=e.target.closest('[data-ty],[data-act],[data-mc],[data-mt]');if(!t)return;const ty=t.dataset.ty,ac=t.dataset.act;
   if(ty){if(M.pair){const[a,b]=M.pair;let l=DB.links.find(x=>(x.a===a&&x.b===b)||(x.a===b&&x.b===a));if(l)l.type=ty;else{l={id:uid(),a,b,type:ty,note:''};DB.links.push(l)}M.edge=l.id;M.pair=null;M.sel=null;M.link=false}
    else if(M.edge)DB.links.find(x=>x.id===M.edge).type=ty;await save()}
   if(ac==='cancel'){M.pair=null;M.link=false}
+  if(t.dataset.mc)await addCircle([...M.ms],t.dataset.mc);if(t.dataset.mt)await linkAll([...M.ms],t.dataset.mt);
+  if(ac==='row')align([...M.ms],'h');if(ac==='col')align([...M.ms],'v');if(ac==='clr')M.ms=new Set();
   if(ac==='link')M.link=!M.link;
   if(ac==='open'){showCard(M.sel);return}
   if(ac==='swap'){const l=DB.links.find(x=>x.id===M.edge);[l.a,l.b]=[l.b,l.a];await save()}
   if(ac==='del'){DB.links=DB.links.filter(x=>x.id!==M.edge);M.edge=null;await save()}
   sheet();draw()};
  sh.oninput=e=>{if(e.target.id==='en'){DB.links.find(x=>x.id===M.edge).note=e.target.value;save()}};
- const tapNode=id=>{if(M.link&&M.sel&&M.sel!==id){M.pair=[M.sel,id];M.edge=null}else{M.sel=M.sel===id?null:id;M.edge=null;M.link=false;M.pair=null}sheet();draw()};
+ const refresh=()=>{sheet();draw()};
+ const addCircle=async(ids,cid)=>{const ps=ids.map(nm),all=ps.every(p=>(p.circles||[]).includes(cid));ps.forEach(p=>{p.circles=p.circles||[];if(all)p.circles=p.circles.filter(x=>x!==cid);else if(!p.circles.includes(cid))p.circles.push(cid)});await save()};
+ const linkAll=async(ids,ty)=>{const pr=[];for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++)pr.push([ids[i],ids[j]]);if(pr.length>28&&!confirm('Create '+pr.length+' links?'))return;
+  pr.forEach(([a,b])=>{const l=DB.links.find(x=>(x.a===a&&x.b===b)||(x.a===b&&x.b===a));if(l)l.type=ty;else DB.links.push({id:uid(),a,b,type:ty,note:''})});await save()};
+ const align=(ids,ax)=>{const ps=ids.map(nm).sort((a,b)=>ax==='h'?a.gx-b.gx:a.gy-b.gy),n=ps.length,cx=ps.reduce((a,p)=>a+p.gx,0)/n,cy=ps.reduce((a,p)=>a+p.gy,0)/n;ps.forEach((p,i)=>{if(ax==='h'){p.gy=cy;p.gx=cx+(i-(n-1)/2)*95}else{p.gx=cx;p.gy=cy+(i-(n-1)/2)*95}});save()};
+ const anim=fn=>{const o=people.map(p=>[p.gx,p.gy]);fn();const t=people.map(p=>[p.gx,p.gy]);let f=0;people.forEach((p,i)=>{p.gx=o[i][0];p.gy=o[i][1]});
+  const step=()=>{f++;const k=1-Math.pow(1-f/20,3);people.forEach((p,i)=>{p.gx=o[i][0]+(t[i][0]-o[i][0])*k;p.gy=o[i][1]+(t[i][1]-o[i][1])*k});draw();if(f<20)requestAnimationFrame(step);else save()};step()};
+ const fit=()=>{if(!people.length)return;const xs=people.map(p=>p.gx).concat(0),ys=people.map(p=>p.gy).concat(0),x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys),r=svg.getBoundingClientRect();
+  V.k=Math.max(.3,Math.min(1.6,(r.width-120)/(x1-x0+120),(r.height-270)/(y1-y0+140)));V.x=r.width/2-(x0+x1)/2*V.k;V.y=(r.height-120)/2+20-(y0+y1)/2*V.k;draw()};
+ const zoom=f=>{const r=svg.getBoundingClientRect(),cx=r.width/2,cy=r.height/2,k=Math.max(.3,Math.min(3,V.k*f)),wx=(cx-V.x)/V.k,wy=(cy-V.y)/V.k;V.k=k;V.x=cx-wx*k;V.y=cy-wy*k;draw()};
+ const exportPng=()=>{const c=svg.cloneNode(true),r=svg.getBoundingClientRect();c.setAttribute('xmlns','http://www.w3.org/2000/svg');c.setAttribute('width',r.width);c.setAttribute('height',r.height);
+  c.insertAdjacentHTML('afterbegin','<style>text{font-family:monospace;fill:#e8edf2}</style><rect width="100%" height="100%" fill="#0a0d12"/>');const img=new Image();
+  img.onload=()=>{const cv=document.createElement('canvas');cv.width=r.width*2;cv.height=r.height*2;const x=cv.getContext('2d');x.scale(2,2);x.drawImage(img,0,0);cv.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='context-map.png';a.click()})};
+  img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(new XMLSerializer().serializeToString(c))};
+ const tapNode=(id,ctrl)=>{if(ctrl){if(M.sel&&M.sel!==id)M.ms.add(M.sel);M.ms.has(id)?M.ms.delete(id):M.ms.add(id);M.sel=M.edge=M.pair=null;M.link=false}
+  else if(M.link&&M.sel&&M.sel!==id){M.pair=[M.sel,id];M.edge=null;M.ms=new Set()}
+  else{M.ms=new Set();M.sel=M.sel===id?null:id;M.edge=null;M.link=false;M.pair=null}sheet();draw()};
  const ptr=new Map();let mode=null,st={};
- svg.onpointerdown=e=>{svg.setPointerCapture(e.pointerId);const q=P(e);ptr.set(e.pointerId,q);
+ svg.onpointerdown=e=>{if(e.button===2)return;closeMenu();svg.setPointerCapture(e.pointerId);const q=P(e);ptr.set(e.pointerId,q);
   if(ptr.size===2){const[a,b]=[...ptr.values()];mode='pinch';st={d:Math.hypot(a.x-b.x,a.y-b.y)||1,k:V.k,mx:(a.x+b.x)/2,my:(a.y+b.y)/2,vx:V.x,vy:V.y,moved:1};return}
-  const n=e.target.closest('[data-n]'),l=e.target.closest('[data-e]');mode=n?'node':'pan';st={x:q.x,y:q.y,moved:0,n:n&&n.dataset.n,l:l&&l.dataset.e,vx:V.x,vy:V.y};
-  if(n){const p=nm(st.n);st.px=p.gx;st.py=p.gy}};
+  const n=e.target.closest('[data-n]'),l=e.target.closest('[data-e]');mode=n?'node':e.shiftKey?'box':'pan';st={x:q.x,y:q.y,moved:0,n:n&&n.dataset.n,l:l&&l.dataset.e,vx:V.x,vy:V.y,ctrl:e.ctrlKey||e.metaKey};
+  if(n){const p=nm(st.n);st.px=p.gx;st.py=p.gy;if(M.ms.has(st.n))st.g=[...M.ms].map(i=>{const o=nm(i);return[i,o.gx,o.gy]})}};
  svg.onpointermove=e=>{if(!ptr.has(e.pointerId))return;const q=P(e);ptr.set(e.pointerId,q);
   if(mode==='pinch'&&ptr.size>=2){const[a,b]=[...ptr.values()],k=Math.max(.3,Math.min(3,st.k*Math.hypot(a.x-b.x,a.y-b.y)/st.d)),wx=(st.mx-st.vx)/st.k,wy=(st.my-st.vy)/st.k;V.k=k;V.x=(a.x+b.x)/2-wx*k;V.y=(a.y+b.y)/2-wy*k;draw();return}
   const dx=q.x-st.x,dy=q.y-st.y;if(Math.hypot(dx,dy)>6)st.moved=1;if(!st.moved)return;
-  if(mode==='node'){const p=nm(st.n);p.gx=st.px+dx/V.k;p.gy=st.py+dy/V.k;draw()}else if(mode==='pan'){V.x=st.vx+dx;V.y=st.vy+dy;draw()}};
- svg.onpointerup=svg.onpointercancel=async e=>{ptr.delete(e.pointerId);if(ptr.size)return;
-  if(!st.moved){if(mode==='node')return tapNode(st.n);if(st.l){M.edge=st.l;M.sel=null;M.pair=null;M.link=false}else{M.sel=M.edge=M.pair=null;M.link=false}sheet();draw()}
+  if(mode==='node'){if(st.g)st.g.forEach(([i,x,y])=>{const o=nm(i);o.gx=x+dx/V.k;o.gy=y+dy/V.k});else{const p=nm(st.n);p.gx=st.px+dx/V.k;p.gy=st.py+dy/V.k}draw()}else if(mode==='box'){M.box={x0:st.x,y0:st.y,x1:q.x,y1:q.y};draw()}else if(mode==='pan'){V.x=st.vx+dx;V.y=st.vy+dy;draw()}};
+ svg.onpointerup=svg.onpointercancel=async e=>{if(!ptr.has(e.pointerId))return;ptr.delete(e.pointerId);if(ptr.size)return;
+  if(mode==='box'&&st.moved){const b=M.box,xa=Math.min(b.x0,b.x1),xb=Math.max(b.x0,b.x1),ya=Math.min(b.y0,b.y1),yb=Math.max(b.y0,b.y1);if(!st.ctrl)M.ms=new Set();
+   people.forEach(p=>{const sx=V.x+p.gx*V.k,sy=V.y+p.gy*V.k;if(sx>=xa&&sx<=xb&&sy>=ya&&sy<=yb)M.ms.add(p.id)});M.sel=M.edge=null;M.box=null;mode=null;sheet();draw();return}
+  if(!st.moved){if(mode==='node')return tapNode(st.n,st.ctrl);if(st.l){M.ms=new Set();M.edge=st.l;M.sel=null;M.pair=null;M.link=false}else if(!st.ctrl){M.ms=new Set();M.sel=M.edge=M.pair=null;M.link=false}sheet();draw()}
   else if(mode==='node')await save();mode=null};
  svg.addEventListener('wheel',e=>{e.preventDefault();const q=P(e),k=Math.max(.3,Math.min(3,V.k*(e.deltaY<0?1.1:.91))),wx=(q.x-V.x)/V.k,wy=(q.y-V.y)/V.k;V.k=k;V.x=q.x-wx*k;V.y=q.y-wy*k;draw()},{passive:false});
  $('#back').onclick=()=>{view={n:'list'};render()};
- $('#arr').onclick=async()=>{sim();await save();draw()};
+ $('#arr').onclick=()=>anim(sim);$('#grp').onclick=()=>anim(groupLayout);$('#fit').onclick=fit;
+ svg.oncontextmenu=e=>{e.preventDefault();const n=e.target.closest('[data-n]'),l=e.target.closest('[data-e]');let it;
+  const circs=ids=>circ().map(c=>({t:c.name,c:c.color,k:ids.every(i=>(nm(i).circles||[]).includes(c.id))?'\u2713':'',f:async()=>{await addCircle(ids,c.id);refresh()}}));
+  if(n){const id=n.dataset.n;if(!M.ms.has(id)){M.ms=new Set();M.sel=id;M.edge=M.pair=null;M.link=false}
+   if(M.ms.size>1){const ids=[...M.ms];it=[{h:ids.length+' selected'},{h:'Circles'},...circs(ids),{s:1},{h:'Link all as'},...LT.map(t=>({t:t[1],c:t[2],f:async()=>{await linkAll(ids,t[0]);refresh()}})),{s:1},{t:'Align in a row',f:()=>{align(ids,'h');refresh()}},{t:'Align in a column',f:()=>{align(ids,'v');refresh()}},{t:'Clear selection',k:'Esc',f:()=>{M.ms=new Set();refresh()}}]}
+   else it=[{h:nm(id).name||'Unnamed'},{t:'Open profile',f:()=>showCard(id)},{t:'Link to\u2026',k:'L',f:()=>{M.sel=id;M.link=true;refresh()}},{t:'Select connected',f:()=>{const s=new Set([id]);DB.links.forEach(x=>{if(x.a===id)s.add(x.b);if(x.b===id)s.add(x.a)});M.ms=s;M.sel=null;refresh()}},{s:1},{h:'Circles'},...circs([id])]}
+  else if(l){M.edge=l.dataset.e;M.sel=null;M.ms=new Set();const lk=DB.links.find(x=>x.id===M.edge);it=[{h:'Relation'},...LT.map(t=>({t:t[1],c:t[2],k:lk.type===t[0]?'\u2713':'',f:async()=>{lk.type=t[0];await save();refresh()}})),{s:1},{t:'Swap direction',f:async()=>{[lk.a,lk.b]=[lk.b,lk.a];await save();refresh()}},{t:'Delete link',k:'Del',f:async()=>{DB.links=DB.links.filter(x=>x.id!==lk.id);M.edge=null;await save();refresh()}}]}
+  else it=[{t:'Select all',k:'Ctrl+A',f:()=>{M.ms=new Set(people.map(p=>p.id));M.sel=M.edge=null;refresh()}},{t:'Arrange',k:'A',f:()=>anim(sim)},{t:'Group by circle',k:'G',f:()=>anim(groupLayout)},{t:'Fit to screen',k:'F',f:fit},{s:1},
+   {t:M.me?'Hide my ties':'Show my ties',f:()=>{M.me=!M.me;draw()}},{t:M.zones?'Hide circle zones':'Show circle zones',f:()=>{M.zones=!M.zones;draw()}},{s:1},{t:'Export as PNG',f:exportPng}];
+  refresh();showMenu(e,it)};
+ const kd=e=>{if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;const k=e.key.toLowerCase(),c=e.ctrlKey||e.metaKey;
+  if(k==='escape'){closeMenu();M.ms=new Set();M.sel=M.edge=M.pair=null;M.link=false;refresh()}
+  else if(c&&k==='a'){e.preventDefault();M.ms=new Set(people.map(p=>p.id));M.sel=M.edge=null;refresh()}
+  else if((k==='delete'||k==='backspace')&&M.edge){DB.links=DB.links.filter(x=>x.id!==M.edge);M.edge=null;save();refresh()}
+  else if(!c){if(k==='f')fit();else if(k==='g')anim(groupLayout);else if(k==='a')anim(sim);else if(k==='l'&&M.sel){M.link=true;refresh()}else if(k==='+'||k==='=')zoom(1.2);else if(k==='-')zoom(.83);else if(k==='0'){V.k=1;draw()}}};
+ document.addEventListener('keydown',kd);MAPKD=kd;
  const me=$('#meb');me.style.color=M.me?'var(--red)':'';me.onclick=()=>{M.me=!M.me;me.style.color=M.me?'var(--red)':'';draw()};
  fil();sheet();draw();
 }
