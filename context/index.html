@@ -159,9 +159,12 @@ a.chip{text-decoration:none;color:var(--fg)}
 .pg-f{animation:pgf .26s cubic-bezier(.2,.8,.2,1)}.pg-b{animation:pgb .26s cubic-bezier(.2,.8,.2,1)}.pg-u{animation:pgu .22s ease-out}
 @media(min-width:900px){.plist{max-height:470px;overflow-y:auto;padding-right:6px;scrollbar-width:thin;scrollbar-color:var(--red) transparent;overscroll-behavior:contain}
 .plist::-webkit-scrollbar{width:4px}.plist::-webkit-scrollbar-thumb{background:var(--red);border-radius:4px}}
+.je.sel{border-color:var(--red);background:#ff3b4e12}
+@media(min-width:900px){.jlist{max-height:480px;overflow-y:auto;padding-right:6px;scrollbar-width:thin;scrollbar-color:var(--red) transparent;overscroll-behavior:contain}.jlist::-webkit-scrollbar{width:4px}.jlist::-webkit-scrollbar-thumb{background:var(--red);border-radius:4px}}
+@media(min-width:1000px){[data-v=cal],[data-v=journal]{max-width:1320px}}
 </style></head><body><div class="wrap" id="app"></div>
 <script>
-const VERSION='1.16';
+const VERSION='1.17';
 const QS=new URLSearchParams(location.search);let GO=QS.get('go'),SHR=(QS.get('title')||QS.get('text')||QS.get('url'))?[QS.get('title'),QS.get('text'),QS.get('url')].filter(Boolean).join('\n'):null;
 async function startView(){if(SHR){DB.journal=DB.journal||[];const e={id:uid(),t:Date.now(),d:today(),title:'Shared',body:SHR,mood:0,people:[],pin:false,ai:[]};DB.journal.push(e);SHR=null;await save();view={n:'entry',id:e.id}}
  else view=({journal:{n:'journal'},map:{n:'map'},cal:{n:'cal'}}[GO])||{n:'list'};GO=null;if(location.search)history.replaceState(null,'',location.pathname);render()}
@@ -527,15 +530,25 @@ function vCal(){
  DB.people.forEach(p=>{if(!p.bday)return;const b=new Date(p.bday+'T00:00');if(b.getMonth()===m)(by[b.getDate()]=by[b.getDate()]||[]).push(p)});
  const days=CAL.sel?(by[CAL.sel]||[]):Object.keys(by).sort((a,b)=>a-b).flatMap(k=>by[k]);
  let cells='';for(let d=1;d<=nd;d++)cells+=`<button class="cd ${t.getFullYear()===y&&t.getMonth()===m&&t.getDate()===d?'td':''} ${CAL.sel===d?'on':''}" data-d="${d}">${d}${by[d]?'<u></u>':''}</button>`;
- app.innerHTML=`<div class="bar"><div class="logo">C</div><div class="t"><em>&gt;_</em> context <span>/ birthdays</span></div>${TOPR}</div>
+ app.innerHTML=`<div class="lay"><div class="lcol"><div class="bar"><div class="logo">C</div><div class="t"><em>&gt;_</em> context <span>/ birthdays</span></div>${TOPR}</div>
  <div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><button class="ib" id="pv"><i class="fa-solid fa-chevron-left"></i></button><div class="lab">${first.toLocaleDateString(undefined,{month:'long',year:'numeric'})}</div><button class="ib" id="nx"><i class="fa-solid fa-chevron-right"></i></button></div>
  <div class="cal">${'MTWTFSS'.split('').map(c=>`<small>${c}</small>`).join('')}${'<i></i>'.repeat(pad)}${cells}</div></div>
  <h2>${CAL.sel?new Date(y,m,CAL.sel).toLocaleDateString(undefined,{day:'numeric',month:'long'}):'this month'}</h2>
- ${days.length?days.map(p=>{const b=new Date(p.bday+'T00:00'),age=y-b.getFullYear();return`<div class="row" data-id="${p.id}">${avatar(p,64)}<div class="n"><b>${esc(p.name||'Unnamed')}</b><small>${age>0?'turns '+age+' · ':''}${b.toLocaleDateString(undefined,{day:'numeric',month:'short'})}</small></div></div>`}).join(''):'<p class="hint">No birthdays here.</p>'}`;
+ ${days.length?days.map(p=>{const b=new Date(p.bday+'T00:00'),age=y-b.getFullYear();return`<div class="row" data-id="${p.id}">${avatar(p,64)}<div class="n"><b>${esc(p.name||'Unnamed')}</b><small>${age>0?'turns '+age+' · ':''}${b.toLocaleDateString(undefined,{day:'numeric',month:'short'})}</small></div></div>`}).join(''):'<p class="hint">No birthdays here.</p>'}</div><aside class="pane" id="cpane"></aside></div>`;
  wireTop();
  const go=n=>{CAL.m+=n;if(CAL.m<0){CAL.m=11;CAL.y--}if(CAL.m>11){CAL.m=0;CAL.y++}CAL.sel=null;vCal()};$('#pv').onclick=()=>go(-1);$('#nx').onclick=()=>go(1);
  app.querySelectorAll('[data-d]').forEach(c=>c.onclick=()=>{CAL.sel=CAL.sel===+c.dataset.d?null:+c.dataset.d;vCal()});
  app.querySelectorAll('.row').forEach(r=>r.onclick=()=>showCard(r.dataset.id));
+ if(matchMedia('(min-width:1000px)').matches){const n=new Date(),tdy=new Date(n.getFullYear(),n.getMonth(),n.getDate());
+  const kvr=(k,v)=>v?`<div class="kv"><span>${k}</span><span>${esc(v)}</span></div>`:'';
+  const card=(p,age)=>{const d=bdayDays(p.bday);return`<div class="card" style="margin-bottom:14px;padding:18px"><div style="display:flex;gap:14px;align-items:center">${avatar(p,72)}<div><b style="font-size:17px;font-weight:500">${esc(p.name||'Unnamed')}</b><div class="hint">turns ${age} &middot; ${d===0?'today!':'in '+d+' day'+(d===1?'':'s')}</div><span class="lab">${TIERS[p.tier]}</span></div></div>
+   ${(p.love||[]).length?`<div class="chips" style="margin:14px 0 4px">${p.love.map(l=>`<span class="chip on">${l}</span>`).join('')}</div>`:''}${kvr('Gift ideas',p.gifts)}${kvr('Responds to',p.best)}${kvr('Hates',p.hates)}${kvr('Remember',p.remember)}${kvr('Contact',p.contact)}${socRow(p)}
+   <div class="acts"><button class="btn" data-op="${p.id}"><i class="fa-solid fa-user"></i> Profile</button><button class="btn r" data-nj="${p.id}"><i class="fa-solid fa-pen"></i> Journal</button></div></div>`};
+  let head,list;
+  if(CAL.sel&&by[CAL.sel]){head=new Date(y,m,CAL.sel).toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long'});list=by[CAL.sel].map(p=>card(p,y-new Date(p.bday+'T00:00').getFullYear()))}
+  else{head='Coming up';list=DB.people.filter(p=>p.bday).sort((a,b)=>bdayDays(a.bday)-bdayDays(b.bday)).slice(0,5).map(p=>{const b=new Date(p.bday+'T00:00');return card(p,tdy.getFullYear()+(new Date(tdy.getFullYear(),b.getMonth(),b.getDate())<tdy?1:0)-b.getFullYear())})}
+  const cp=$('#cpane');cp.innerHTML=`<div class="lab" style="margin-bottom:12px">${head}</div>${list.join('')||emptyPane('No birthdays saved yet')}`;
+  cp.querySelectorAll('[data-op]').forEach(b=>b.onclick=()=>showCard(b.dataset.op));cp.querySelectorAll('[data-nj]').forEach(b=>b.onclick=()=>{JP=b.dataset.nj;newEntry();JP=null})}
 }
 /* ---------- open prompt in Gemini ---------- */
 const geminiBtns=()=>`<button class="btn r" data-shr>${navigator.share?'Send to Gemini':'Open Gemini'}</button>${navigator.share?'<button class="btn" data-web>Gemini web</button>':''}<button class="btn" data-cpy>Copy</button>`;
@@ -543,7 +556,7 @@ function wireGem(root,pr){const cp=()=>{try{navigator.clipboard.writeText(pr).ca
  root.querySelector('[data-shr]').onclick=()=>{cp();navigator.share?navigator.share({text:pr}).catch(()=>{}):web()};
  const w=root.querySelector('[data-web]');if(w)w.onclick=web;root.querySelector('[data-cpy]').onclick=cp}
 /* ---------- journal ---------- */
-let JP=null,JQ='',JF='all',lastEntry=null;
+let JP=null,JQ='',JF='all',lastEntry=null,JSEL=null;const emptyPane=t=>`<div class="empty"><div><div class="dots" style="color:var(--red)">&#9679; &#9679; &#9679;</div><p class="hint">${t}</p></div></div>`;
 const MOODS=['','Awful','Low','Okay','Good','Great'],dfmt=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'),today=()=>dfmt(new Date());
 const PROMPTS=['What went well today, and why?','What drained me today?','Who did I think about, and what did I want to say?','What am I avoiding?','What would I tell a friend in my situation?','What am I grateful for right now?','Which relationship needs attention this week?','What do I want to remember about today?'];
 const jdate=d=>new Date(d+'T00:00').toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'}),words=t=>(t||'').trim().split(/\s+/).filter(Boolean).length;
@@ -563,27 +576,41 @@ function vJournal(){DB.journal=DB.journal||[];
  const w7=new Date();w7.setDate(w7.getDate()-7);const cut=dfmt(w7),wk=all.filter(e=>e.d>cut).reduce((a,e)=>a+words(e.body),0);
  const L=all.filter(e=>(!JP||e.people.includes(JP))&&(JF!=='pin'||e.pin)&&(e.title+' '+e.body).toLowerCase().includes(JQ.toLowerCase())),grp={},jp=JP&&DB.people.find(p=>p.id===JP);
  L.forEach(e=>{const k=new Date(e.d+'T00:00').toLocaleDateString(undefined,{month:'long',year:'numeric'});(grp[k]=grp[k]||[]).push(e)});
- app.innerHTML=`<div class="bar"><div class="logo">C</div><div class="t"><em>&gt;_</em> context <span>/ journal</span></div>${TOPR}</div>
+ app.innerHTML=`<div class="lay"><div class="lcol"><div class="bar"><div class="logo">C</div><div class="t"><em>&gt;_</em> context <span>/ journal</span></div>${TOPR}</div>
  <div class="card"><div class="lab">${new Date().toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long'})}</div><div class="hi">${days.has(today())?'Written today. Nice.':'Anything on your mind?'}</div>
  <div class="stats"><div class="stt"><b>${all.length}</b><small>entries</small></div><div class="stt"><b>${st}</b><small>day streak</small></div><div class="stt"><b>${wk}</b><small>words / 7d</small></div></div>
  <div style="margin-top:16px"><button class="btn r" id="jn2">Write</button>${aiOn()&&all.length?'<button class="btn" id="jsum">Summarize 7 days</button>':''}${all.length?'<button class="btn" id="jex">Export</button>':''}</div></div><div id="jout"></div>
  <input id="jq" placeholder="search journal" value="${esc(JQ)}" style="margin-top:18px"><div class="chips scroll"><span class="chip ${JF==='all'?'on':''}" data-jf="all">All</span><span class="chip ${JF==='pin'?'on':''}" data-jf="pin">Pinned</span>${jp?`<span class="chip on" id="jpc">${esc(jp.name||'?')} <i class="fa-solid fa-xmark"></i></span>`:''}</div>
- ${Object.entries(grp).map(([k,es])=>`<h2>${k}</h2>${es.map(e=>`<div class="je" data-id="${e.id}"><div style="display:flex;justify-content:space-between;gap:10px"><b style="font-weight:500">${e.pin?'<span style="color:var(--red)"><i class="fa-solid fa-star"></i></span> ':''}${esc(e.title||'Untitled')}</b>${moodDots(e.mood)}</div><small>${jdate(e.d)}${e.people.length?' &middot; '+esc(e.people.slice(0,3).map(i=>(DB.people.find(p=>p.id===i)||{}).name||'').filter(Boolean).join(', ')):''} &middot; ${words(e.body)} words</small><p>${esc(e.body)}</p></div>`).join('')}`).join('')||'<p class="hint" style="margin-top:30px">No entries yet. Tap Write.</p>'}`;
+ <div class="jlist">${Object.entries(grp).map(([k,es])=>`<h2>${k}</h2>${es.map(e=>`<div class="je" data-id="${e.id}"><div style="display:flex;justify-content:space-between;gap:10px"><b style="font-weight:500">${e.pin?'<span style="color:var(--red)"><i class="fa-solid fa-star"></i></span> ':''}${esc(e.title||'Untitled')}</b>${moodDots(e.mood)}</div><small>${jdate(e.d)}${e.people.length?' &middot; '+esc(e.people.slice(0,3).map(i=>(DB.people.find(p=>p.id===i)||{}).name||'').filter(Boolean).join(', ')):''} &middot; ${words(e.body)} words</small><p>${esc(e.body)}</p></div>`).join('')}`).join('')||'<p class="hint" style="margin-top:30px">No entries yet. Tap Write.</p>'}</div></div><aside class="pane" id="jpane"></aside></div>`;
  wireTop();
  const nw=async()=>{const e={id:uid(),t:Date.now(),d:today(),title:'',body:'',mood:0,people:JP?[JP]:[],pin:false,ai:[]};DB.journal.push(e);await save();view={n:'entry',id:e.id};render()};$('#jn2').onclick=nw;
  $('#jq').oninput=e=>{JQ=e.target.value;const p=e.target.selectionStart;vJournal();const q=$('#jq');q.focus();q.setSelectionRange(p,p)};
  app.querySelectorAll('[data-jf]').forEach(c=>c.onclick=()=>{JF=c.dataset.jf;vJournal()});const jc=$('#jpc');if(jc)jc.onclick=()=>{JP=null;vJournal()};
- app.querySelectorAll('.je').forEach(c=>c.onclick=()=>{view={n:'entry',id:c.dataset.id};render()});
+ app.querySelectorAll('.je').forEach(c=>c.onclick=()=>{vib();showEntry(c.dataset.id)});
  const sm=$('#jsum');if(sm)sm.onclick=()=>{const es=all.filter(e=>e.d>cut).reverse();if(!es.length){$('#jout').innerHTML='<p class="hint">No entries in the last 7 days.</p>';return}
   runAI(sumPrompt(es,'last 7 days'),$('#jout'),'Save as entry',async t=>{DB.journal.push({id:uid(),t:Date.now(),d:today(),title:'Weekly summary',body:t,mood:0,people:[],pin:false,ai:[]});await save();vJournal()})};
  const ex=$('#jex');if(ex)ex.onclick=()=>{if(!confirm('This file is NOT encrypted. Continue?'))return;const md=[...DB.journal].sort((a,b)=>a.d.localeCompare(b.d)).map(e=>`## ${e.d}${e.title?' \u2014 '+e.title:''}\nMood: ${e.mood||'-'}/5\n\n${e.body}`).join('\n\n---\n\n');
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([md],{type:'text/markdown'}));a.download='context-journal.md';a.click()}}
-function vEntry(){const e=(DB.journal||[]).find(x=>x.id===view.id);if(!e){view={n:'journal'};return render()}e.ai=e.ai||[];lastEntry=e.id;
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([md],{type:'text/markdown'}));a.download='context-journal.md';a.click()};
+ if(matchMedia('(min-width:1000px)').matches){const sx=JSEL&&(DB.journal||[]).find(x=>x.id===JSEL);if(sx)showEntry(JSEL);else $('#jpane').innerHTML=emptyPane('Select an entry')}
+}
+function showEntry(id){const e=(DB.journal||[]).find(x=>x.id===id);if(!e)return;closeCard();
+ const pane=document.getElementById('jpane'),split=!!pane&&matchMedia('(min-width:1000px)').matches&&view.n==='journal',m=document.createElement('div');m.className='modal';m.id='card';const root=split?pane:m;
+ const ppl=e.people.map(i=>DB.people.find(p=>p.id===i)).filter(Boolean);
+ root.innerHTML=`<div class="mc"><button class="ib x" id="cx" aria-label="Close"><i class="fa-solid fa-xmark"></i></button><div class="lab">${jdate(e.d)}</div><h1 class="dot" style="font-size:24px;margin:8px 0;padding-right:40px">${esc(e.title||'Untitled')}</h1>
+ <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">${e.mood?moodDots(e.mood)+'<span class="hint">'+MOODS[e.mood]+'</span>':''}${e.pin?'<i class="fa-solid fa-star" style="color:var(--red)"></i>':''}<span class="hint">${words(e.body)} words</span></div>
+ ${ppl.length?`<div class="chips" style="margin-top:14px">${ppl.map(p=>`<span class="chip" data-pp="${p.id}" style="cursor:pointer">${esc(p.name||'?')}</span>`).join('')}</div>`:''}
+ <div style="white-space:pre-wrap;margin:18px 0;line-height:1.7;overflow-wrap:anywhere">${esc(e.body)||'<span class="hint">Empty entry</span>'}</div>
+ ${(e.ai||[]).map(a=>`<h2>${a.k}</h2><pre>${esc(a.x)}</pre>`).join('')}
+ <div class="acts"><button class="btn r" id="jed"><i class="fa-solid fa-pen"></i> Edit</button></div></div>`;
+ if(!split){document.body.appendChild(m);m.onclick=x=>{if(x.target===m)closeCard()}}else{JSEL=id;document.querySelectorAll('.je').forEach(r=>r.classList.toggle('sel',r.dataset.id===id))}
+ root.querySelector('#cx').onclick=closeCard;root.querySelector('#jed').onclick=()=>{JSEL=id;view={n:'entry',id};render()};
+ root.querySelectorAll('[data-pp]').forEach(c=>c.onclick=()=>showCard(c.dataset.pp))}
+function vEntry(){const e=(DB.journal||[]).find(x=>x.id===view.id);if(!e){view={n:'journal'};return render()}e.ai=e.ai||[];lastEntry=e.id;JSEL=e.id;
  app.innerHTML=`<div class="bar"><button class="ib" id="back" aria-label="Back"><i class="fa-solid fa-arrow-left"></i></button><div class="t"><em>&gt;_</em> entry</div><button class="ib" id="pin" aria-label="Pin" style="${e.pin?'color:var(--red);border-color:var(--red)':''}"><i class="fa-solid fa-star"></i></button><button class="ib" id="del" aria-label="Delete"><i class="fa-solid fa-trash"></i></button></div>
  <input type="date" id="jd" value="${e.d}"><label>Mood</label><div class="chips">${[1,2,3,4,5].map(i=>`<span class="chip ${e.mood===i?'on':''}" data-m="${i}">${MOODS[i]}</span>`).join('')}</div>
  <label>Title</label><input id="jt" value="${esc(e.title)}" placeholder="Optional"><div style="margin:16px 0 6px"><button class="btn" id="pr" style="margin:0">Prompt me</button> <span class="hint" id="pt"></span></div>
  <textarea id="jbody" style="min-height:42vh" placeholder="Write anything&hellip;">${esc(e.body)}</textarea><div class="hint" id="wc">${words(e.body)} words</div>
- <label>Who is this about?</label><div class="chips scroll">${DB.people.map(p=>`<span class="chip ${e.people.includes(p.id)?'on':''}" data-p="${p.id}">${esc(p.nick||p.name||'?')}</span>`).join('')||'<span class="hint">No people yet</span>'}</div>
+ <label>Who is this about?</label><input id="ps" placeholder="search people" style="margin-bottom:10px"><div class="chips" style="max-height:132px;overflow-y:auto">${DB.people.map(p=>`<span class="chip ${e.people.includes(p.id)?'on':''}" data-p="${p.id}" data-n="${esc((p.name+' '+(p.nick||'')).toLowerCase())}">${esc(p.nick||p.name||'?')}</span>`).join('')||'<span class="hint">No people yet</span>'}</div>
  ${aiOn()?`<h2>ai</h2><button class="btn r" id="adv">Get advice</button><button class="btn" id="sum">Summarize</button><p class="hint">Entry text is sent as written. People are aliased if that is on in settings.</p>`:''}<div id="aiout"></div>
  ${e.ai.map((a,i)=>`<h2>${a.k}</h2><pre>${esc(a.x)}</pre><button class="btn" data-ad="${i}">Remove</button>`).join('')}`;
  let tm;const ts=()=>{clearTimeout(tm);tm=setTimeout(save,400)};
@@ -592,6 +619,7 @@ function vEntry(){const e=(DB.journal||[]).find(x=>x.id===view.id);if(!e){view={
  app.querySelectorAll('[data-m]').forEach(c=>c.onclick=()=>{const m=+c.dataset.m;e.mood=e.mood===m?0:m;app.querySelectorAll('[data-m]').forEach(z=>z.classList.toggle('on',+z.dataset.m===e.mood));ts()});
  app.querySelectorAll('[data-p]').forEach(c=>c.onclick=()=>{const i=c.dataset.p;e.people=e.people.includes(i)?e.people.filter(x=>x!==i):[...e.people,i];c.classList.toggle('on');ts()});
  app.querySelectorAll('[data-ad]').forEach(b=>b.onclick=async()=>{e.ai.splice(+b.dataset.ad,1);await save();vEntry()});
+ $('#ps').oninput=x=>{const q=x.target.value.trim().toLowerCase();app.querySelectorAll('[data-p]').forEach(c=>{c.style.display=!q||c.classList.contains('on')||c.dataset.n.includes(q)?'':'none'})};
  let pi=Math.floor(Math.random()*PROMPTS.length);$('#pr').onclick=()=>{$('#pt').textContent=PROMPTS[pi++%PROMPTS.length]};
  $('#pin').onclick=async()=>{e.pin=!e.pin;await save();vEntry()};
  $('#del').onclick=async()=>{if(confirm('Delete this entry?')){DB.journal=DB.journal.filter(x=>x.id!==e.id);await save();view={n:'journal'};render()}};
