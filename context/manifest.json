@@ -1,1 +1,9 @@
-{"name":"Context","short_name":"Context","description":"Private relationship context","start_url":"./index.html","scope":"./","display":"standalone","background_color":"#0a0d12","theme_color":"#0a0d12","icons":[{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]}
+{
+ "id":"./index.html","name":"Context","short_name":"Context","description":"Private, encrypted relationship tracker with a journal and relationship map.",
+ "start_url":"./index.html","scope":"./","display":"standalone","display_override":["standalone","minimal-ui"],"orientation":"any",
+ "background_color":"#0a0d12","theme_color":"#0a0d12","lang":"en","dir":"ltr","categories":["lifestyle","productivity","social"],
+ "icons":[{"src":"icon-192.png","sizes":"192x192","type":"image/png","purpose":"any"},{"src":"icon-512.png","sizes":"512x512","type":"image/png","purpose":"any"},{"src":"icon-maskable-512.png","sizes":"512x512","type":"image/png","purpose":"maskable"},{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any"}],
+ "shortcuts":[{"name":"Journal","url":"./index.html?go=journal"},{"name":"Relationship map","url":"./index.html?go=map"},{"name":"Birthdays","url":"./index.html?go=cal"}],
+ "share_target":{"action":"./index.html","method":"GET","params":{"title":"title","text":"text","url":"url"}},
+ "launch_handler":{"client_mode":["navigate-existing","auto"]},"prefer_related_applications":false
+}
