@@ -149,6 +149,10 @@ a.chip{text-decoration:none;color:var(--fg)}
 .ctx button:hover{background:#ff3b4e1f;color:var(--red)}.ctx kbd{margin-left:auto;padding-left:18px;color:var(--dim);font:inherit;font-size:11px}
 .ctx .ch{padding:8px 10px 4px;color:var(--lab);font-size:10px;letter-spacing:.14em;text-transform:uppercase}.ctx hr{border:0;border-top:1px solid var(--line);margin:6px 0}
 .mapwrap svg [data-n]{cursor:grab}.mapwrap svg [data-e]{cursor:pointer}
+.md{display:inline-flex;gap:4px;align-items:center}.md i{width:7px;height:7px;border-radius:50%;background:#2a323c}.md i.on{background:var(--red);box-shadow:0 0 6px var(--red)}
+.je{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:14px 16px;margin-bottom:10px;cursor:pointer}.je:active{border-color:var(--red)}
+.je small{color:var(--dim)}.je p{margin:6px 0 0;color:#b6c0cb;font-size:13px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap}
+@media(min-width:900px){[data-v=journal],[data-v=entry]{max-width:780px}}
 </style></head><body><div class="wrap" id="app"></div>
 <script>
 const TIERS=['Hated','Disliked','Wary','Neutral','Acquaintance','Friend','Trusted','Best friend'];
@@ -214,14 +218,14 @@ const SOC=[['ig','Instagram','https://instagram.com/'],['x','X','https://x.com/'
 const sochref=(k,v,b)=>{v=v.trim();if(!v)return'';if(/^https?:\/\//i.test(v))return v;if(k==='web')return'https://'+v;if(k==='wa')v=v.replace(/\D/g,'');return b+v.replace(/^@/,'')};
 const socRow=p=>{const a=SOC.map(([k,n,b])=>{const h=sochref(k,(p.soc||{})[k]||'',b);return h?`<a class="chip" href="${esc(h)}" target="_blank" rel="noopener noreferrer">${n}</a>`:''}).join('');return a?`<div class="kv"><span>Social</span><span class="chips" style="justify-content:flex-end">${a}</span></div>`:''};
 /* ---------- views ---------- */
-function render(){closeCard();closeMenu();if(MAPKD){document.removeEventListener('keydown',MAPKD);MAPKD=null}app.dataset.v=view.n;const f={list:vList,person:vPerson,settings:vSettings,mend:vMend,map:vMap,cal:vCal}[view.n];f();scrollTo(0,0)}
+function render(){closeCard();closeMenu();if(MAPKD){document.removeEventListener('keydown',MAPKD);MAPKD=null}app.dataset.v=view.n;const f={list:vList,person:vPerson,settings:vSettings,mend:vMend,map:vMap,cal:vCal,journal:vJournal,entry:vEntry}[view.n];f();scrollTo(0,0)}
 function vList(){
  let L=DB.people.filter(p=>(p.name+p.nick+(p.tags||[]).join(' ')).toLowerCase().includes(q.toLowerCase())&&(!FC||(p.circles||[]).includes(FC)));
  const att=DB.people.filter(p=>Date.now()-p.touched>2592e6).length,bd=DB.people.filter(p=>{const d=bdayDays(p.bday);return d!==null&&d<=30}).length;
  if(sort==='recent')L.sort((a,b)=>b.touched-a.touched);
  if(sort==='trust')L.sort((a,b)=>a.tier-b.tier);
  if(sort==='bday')L.sort((a,b)=>(bdayDays(a.bday)??999)-(bdayDays(b.bday)??999));
- app.innerHTML=`<div class="lay"><div class="lcol"><div class="bar"><div class="logo">C</div><div class="t"><em>&gt;_</em> context <span>/ people</span></div><button class="ib" id="lk" aria-label="Lock">&#9211;</button></div>
+ app.innerHTML=`<div class="lay"><div class="lcol"><div class="bar"><div class="logo">C</div><div class="t"><em>&gt;_</em> context <span>/ people</span></div><button class="ib" id="st" aria-label="Settings">&#9881;</button><button class="ib" id="lk" aria-label="Lock">&#9211;</button></div>
  <div class="card"><div class="lab">${new Date().toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long'})}</div>
  <div class="hi">${att?att+' to check in on.':DB.people.length?'All quiet. Nice.':'Add your first person.'}</div>
  <div class="stats"><div class="stt"><b>${DB.people.length}</b><small>people</small></div><div class="stt"><b>${att}</b><small>stale</small></div><div class="stt"><b>${bd}</b><small>bdays / 30d</small></div></div></div>
@@ -232,11 +236,11 @@ function vList(){
  </div></div><aside class="pane" id="pane"></aside></div>
  <nav class="nav"><button class="ni ${sort==='recent'?'on':''}" data-s="recent"><span class="g">&#9678;</span>People</button>
  <button class="ni" id="calb"><span class="g">&#10022;</span>Birthdays</button><button class="cfab" id="add" aria-label="Add person">+</button>
- <button class="ni" id="mapb"><span class="g">&#9672;</span>Map</button><button class="ni" id="st"><span class="g">&#9881;</span>Settings</button></nav>`;
+ <button class="ni" id="mapb"><span class="g">&#9672;</span>Map</button><button class="ni" id="jb"><span class="g">&#9998;</span>Journal</button></nav>`;
  $('#q').oninput=e=>{q=e.target.value;const p=e.target.selectionStart;vList();$('#q').focus();$('#q').setSelectionRange(p,p)};
  app.querySelectorAll('[data-s]').forEach(c=>c.onclick=()=>{sort=c.dataset.s;vList()});
  app.querySelectorAll('.row').forEach(r=>r.onclick=()=>{vib();showCard(r.dataset.id)});
- app.querySelectorAll('[data-f]').forEach(c=>c.onclick=()=>{FC=c.dataset.f||null;vList()});$('#lk').onclick=()=>lockScreen();$('#calb').onclick=()=>{const n=new Date();CAL={y:n.getFullYear(),m:n.getMonth(),sel:n.getDate()};view={n:'cal'};render()};$('#mapb').onclick=()=>{view={n:'map'};render()};$('#sorth').onclick=()=>{sort={recent:'trust',trust:'bday',bday:'recent'}[sort];vList()};$('#st').onclick=()=>{view={n:'settings'};render()};
+ app.querySelectorAll('[data-f]').forEach(c=>c.onclick=()=>{FC=c.dataset.f||null;vList()});$('#lk').onclick=()=>lockScreen();$('#jb').onclick=()=>{JP=null;view={n:'journal'};render()};$('#calb').onclick=()=>{const n=new Date();CAL={y:n.getFullYear(),m:n.getMonth(),sel:n.getDate()};view={n:'cal'};render()};$('#mapb').onclick=()=>{view={n:'map'};render()};$('#sorth').onclick=()=>{sort={recent:'trust',trust:'bday',bday:'recent'}[sort];vList()};$('#st').onclick=()=>{view={n:'settings'};render()};
  $('#add').onclick=async()=>{const p=blank();DB.people.push(p);await save();view={n:'person',id:p.id};render()};
  if(matchMedia('(min-width:1000px)').matches){if(SEL&&DB.people.some(p=>p.id===SEL))showCard(SEL);else $('#pane').innerHTML='<div class="empty"><div><div class="dots" style="color:var(--red)">&#9679; &#9679; &#9679;</div><p class="hint">Select a person</p></div></div>'}
 }
@@ -279,7 +283,7 @@ function vPerson(){
  $('#tg').oninput=e=>{p.tags=e.target.value.split(',').map(x=>x.trim()).filter(Boolean);touch()};
  $('#pf').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{p.photo=await shrink(f);await touch();vPerson()}catch{alert('Could not read that image. Try a JPG or PNG.')}};
  const rm=$('#rmph');if(rm)rm.onclick=async()=>{delete p.photo;await touch();vPerson()};
- $('#del').onclick=async()=>{if(confirm('Delete this person permanently?')){DB.people=DB.people.filter(x=>x.id!==p.id);DB.links=(DB.links||[]).filter(l=>l.a!==p.id&&l.b!==p.id);await save();view={n:'list'};render()}};
+ $('#del').onclick=async()=>{if(confirm('Delete this person permanently?')){DB.people=DB.people.filter(x=>x.id!==p.id);DB.links=(DB.links||[]).filter(l=>l.a!==p.id&&l.b!==p.id);(DB.journal||[]).forEach(j=>j.people=j.people.filter(x=>x!==p.id));await save();view={n:'list'};render()}};
  $('#mend').onclick=()=>{view={n:'mend',id:p.id};render()};
 }
 function buildPrompt(p,problem){const s=DB.settings,name=s.alias?'Person X':(p.name||'them');
@@ -299,8 +303,7 @@ function vMend(){
  <button class="btn r" id="run">${s.mode==='direct'?'Ask Gemini':'Build prompt'}</button><div id="out"></div>`;
  $('#back').onclick=()=>{view={n:'person',id:p.id};render()};
  $('#run').onclick=async()=>{const pr=buildPrompt(p,$('#prob').value||'(not described)'),out=$('#out');
-  if(s.mode!=='direct'){out.innerHTML=`<h2>paste into any llm</h2><pre>${esc(pr)}</pre><button class="btn" id="cp">Copy</button>`;
-   $('#cp').onclick=()=>navigator.clipboard.writeText(pr);return}
+  if(s.mode!=='direct'){out.innerHTML=`<h2>send to an llm</h2><pre>${esc(pr)}</pre>${geminiBtns()}<p class="hint">On Android this opens the Gemini app with the text. If it opens empty, the prompt is already copied: just paste.</p>`;wireGem(out,pr);return}
   if(!s.apiKey){out.innerHTML='<p class="err">Add your Google AI Studio key in settings.</p>';return}
   out.innerHTML='<p class="hint">thinking…</p>';
   try{const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${s.model}:generateContent`,{method:'POST',
@@ -489,12 +492,12 @@ function showCard(id){const p=DB.people.find(x=>x.id===id);if(!p)return;closeCar
  ${kv('Met',[p.met,p.metWhen&&new Date(p.metWhen+'T00:00').toLocaleDateString(undefined,{month:'short',year:'numeric'})].filter(Boolean).join(' · '))}
  ${kv('Location',p.loc)}${kv('Contact',p.contact)}${socRow(p)}${kv('Responds to',p.best)}${kv('Hates',p.hates)}
  ${mb('Empathy',p.empathy)}${mb('Reliability',p.reliab)}${mb('Trust',p.trust)}
- ${kv('Last change',h?TIERS[h.from].toLowerCase()+' → '+TIERS[h.to].toLowerCase()+(h.why?' · '+h.why:''):'')}${LK.length?`<h2 style="margin-top:22px">links</h2>${LK.map(k=>`<div class="kv" data-o="${k.o.id}" style="cursor:pointer"><span style="color:${k.t[2]}">${k.ph}</span><span>${esc(k.o.name||'Unnamed')} &rsaquo;${k.l.note?`<br><small style="color:var(--dim)">${esc(k.l.note)}</small>`:''}</span></div>`).join('')}<button class="btn" id="cmap" style="margin-top:12px">Show on map</button>`:''}
+ ${(DB.journal||[]).filter(j=>j.people.includes(id)).length?`<div class="kv" data-j="1" style="cursor:pointer"><span>Journal</span><span>${(DB.journal||[]).filter(j=>j.people.includes(id)).length} entries &rsaquo;</span></div>`:''}${kv('Last change',h?TIERS[h.from].toLowerCase()+' → '+TIERS[h.to].toLowerCase()+(h.why?' · '+h.why:''):'')}${LK.length?`<h2 style="margin-top:22px">links</h2>${LK.map(k=>`<div class="kv" data-o="${k.o.id}" style="cursor:pointer"><span style="color:${k.t[2]}">${k.ph}</span><span>${esc(k.o.name||'Unnamed')} &rsaquo;${k.l.note?`<br><small style="color:var(--dim)">${esc(k.l.note)}</small>`:''}</span></div>`).join('')}<button class="btn" id="cmap" style="margin-top:12px">Show on map</button>`:''}
  ${p.notes?`<div class="kv" style="display:block"><span style="color:var(--dim)">Notes</span><div style="margin-top:6px;white-space:pre-wrap">${esc(p.notes.length>240?p.notes.slice(0,240)+'…':p.notes)}</div></div>`:''}
  </div><div class="acts"><button class="btn" id="ced">Edit</button><button class="btn r" id="cai">Ask AI</button></div></div></div>`;
  if(!split){document.body.appendChild(m);m.onclick=e=>{if(e.target===m)closeCard()}}else{SEL=id;document.querySelectorAll('.row').forEach(r=>r.classList.toggle('sel',r.dataset.id===id))}
  root.querySelector('#cx').onclick=closeCard;
- root.querySelectorAll('[data-o]').forEach(r=>r.onclick=()=>showCard(r.dataset.o));const cm=root.querySelector('#cmap');if(cm)cm.onclick=()=>{focusId=id;view={n:'map'};render()};
+ root.querySelectorAll('[data-o]').forEach(r=>r.onclick=()=>showCard(r.dataset.o));const jj=root.querySelector('[data-j]');if(jj)jj.onclick=()=>{JP=id;view={n:'journal'};render()};const cm=root.querySelector('#cmap');if(cm)cm.onclick=()=>{focusId=id;view={n:'map'};render()};
  root.querySelector('#ced').onclick=()=>{view={n:'person',id};render()};
  root.querySelector('#cai').onclick=()=>{view={n:'mend',id};render()}}
 /* ---------- birthday calendar ---------- */
@@ -514,6 +517,70 @@ function vCal(){
  app.querySelectorAll('[data-d]').forEach(c=>c.onclick=()=>{CAL.sel=CAL.sel===+c.dataset.d?null:+c.dataset.d;vCal()});
  app.querySelectorAll('.row').forEach(r=>r.onclick=()=>showCard(r.dataset.id));
 }
+/* ---------- open prompt in Gemini ---------- */
+const geminiBtns=()=>`<button class="btn r" data-gem>Open in Gemini</button>${navigator.share?'<button class="btn" data-shr>Share&hellip;</button>':''}<button class="btn" data-cpy>Copy</button>`;
+function wireGem(root,pr){const cp=()=>{try{navigator.clipboard.writeText(pr).catch(()=>{})}catch{}};
+ root.querySelector('[data-gem]').onclick=()=>{cp();
+  if(/Android/i.test(navigator.userAgent))location.href='intent:#Intent;action=android.intent.action.SEND;type=text/plain;package=com.google.android.apps.bard;S.android.intent.extra.TEXT='+encodeURIComponent(pr)+';S.browser_fallback_url='+encodeURIComponent('https://gemini.google.com/app')+';end';
+  else window.open('https://gemini.google.com/app','_blank','noopener')};
+ const sh=root.querySelector('[data-shr]');if(sh)sh.onclick=()=>navigator.share({text:pr}).catch(()=>{});
+ root.querySelector('[data-cpy]').onclick=cp}
+/* ---------- journal ---------- */
+let JP=null,JQ='',JF='all';
+const MOODS=['','Awful','Low','Okay','Good','Great'],dfmt=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'),today=()=>dfmt(new Date());
+const PROMPTS=['What went well today, and why?','What drained me today?','Who did I think about, and what did I want to say?','What am I avoiding?','What would I tell a friend in my situation?','What am I grateful for right now?','Which relationship needs attention this week?','What do I want to remember about today?'];
+const jdate=d=>new Date(d+'T00:00').toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'}),words=t=>(t||'').trim().split(/\s+/).filter(Boolean).length;
+const aiOn=()=>!!(DB.settings.apiKey||DB.settings.mode==='prompt'),moodDots=m=>`<span class="md">${[1,2,3,4,5].map(i=>`<i class="${i<=m?'on':''}"></i>`).join('')}</span>`;
+const jppl=e=>e.people.map((id,i)=>{const p=DB.people.find(x=>x.id===id);return p?`${DB.settings.alias?'Person '+String.fromCharCode(65+i):p.name} (standing: ${TIERS[p.tier]}${p.best?'; responds best to '+p.best:''}${p.hates?'; dislikes '+p.hates:''})`:''}).filter(Boolean).join('; ')||'none tagged';
+const advPrompt=e=>`You are a warm, practical, honest coach. Read my private journal entry and respond with: 1) what I seem to be feeling, 2) honest, kind advice, 3) one small next step. Keep it concise.\nDate: ${e.d}. Mood: ${e.mood?MOODS[e.mood]+' ('+e.mood+'/5)':'not set'}.\nPeople involved: ${jppl(e)}.\nTitle: ${e.title||'(none)'}\nEntry:\n${e.body}`;
+const sumPrompt=(es,l)=>`Summarize these journal entries (${l}). Give: key events, recurring themes, mood trend, people mentioned, and open loops worth acting on. Be concise.\n\n${es.map(e=>`[${e.d}] mood ${e.mood||'?'}/5, with ${jppl(e)}\n${e.title?e.title+'\n':''}${e.body}`).join('\n\n')}`;
+async function runAI(pr,out,lab,onSave){const s=DB.settings;
+ if(s.mode!=='direct'){out.innerHTML=`<h2>send to an llm</h2><pre>${esc(pr)}</pre>${geminiBtns()}<p class="hint">On Android this opens the Gemini app with the text. If it opens empty, the prompt is already copied: just paste.</p>`;wireGem(out,pr);return}
+ if(!s.apiKey){out.innerHTML='<p class="err">Add your Google AI Studio key in settings.</p>';return}
+ out.innerHTML='<p class="hint">thinking&hellip;</p>';
+ try{const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${s.model}:generateContent`,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':s.apiKey},body:JSON.stringify({contents:[{parts:[{text:pr}]}]})});
+  const j=await r.json();if(!r.ok)throw new Error(j.error?.message||r.status);const t=j.candidates[0].content.parts.map(x=>x.text).join('');
+  out.innerHTML=`<pre>${esc(t)}</pre><button class="btn r" id="sv">${lab}</button>`;out.querySelector('#sv').onclick=()=>onSave(t)}catch(e){out.innerHTML=`<p class="err">${esc(e.message)}</p>`}}
+function vJournal(){DB.journal=DB.journal||[];
+ const all=[...DB.journal].sort((a,b)=>b.d.localeCompare(a.d)||b.t-a.t),days=new Set(all.map(e=>e.d)),c=new Date();let st=0;if(!days.has(today()))c.setDate(c.getDate()-1);while(days.has(dfmt(c))){st++;c.setDate(c.getDate()-1)}
+ const w7=new Date();w7.setDate(w7.getDate()-7);const cut=dfmt(w7),wk=all.filter(e=>e.d>cut).reduce((a,e)=>a+words(e.body),0);
+ const L=all.filter(e=>(!JP||e.people.includes(JP))&&(JF!=='pin'||e.pin)&&(e.title+' '+e.body).toLowerCase().includes(JQ.toLowerCase())),grp={},jp=JP&&DB.people.find(p=>p.id===JP);
+ L.forEach(e=>{const k=new Date(e.d+'T00:00').toLocaleDateString(undefined,{month:'long',year:'numeric'});(grp[k]=grp[k]||[]).push(e)});
+ app.innerHTML=`<div class="bar"><button class="ib" id="back" aria-label="Back">&larr;</button><div class="t"><em>&gt;_</em> journal</div><button class="ib" id="jn" aria-label="New entry">+</button></div>
+ <div class="card"><div class="lab">${new Date().toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long'})}</div><div class="hi">${days.has(today())?'Written today. Nice.':'Anything on your mind?'}</div>
+ <div class="stats"><div class="stt"><b>${all.length}</b><small>entries</small></div><div class="stt"><b>${st}</b><small>day streak</small></div><div class="stt"><b>${wk}</b><small>words / 7d</small></div></div>
+ <div style="margin-top:16px"><button class="btn r" id="jn2">Write</button>${aiOn()&&all.length?'<button class="btn" id="jsum">Summarize 7 days</button>':''}${all.length?'<button class="btn" id="jex">Export</button>':''}</div></div><div id="jout"></div>
+ <input id="jq" placeholder="search journal" value="${esc(JQ)}" style="margin-top:18px"><div class="chips scroll"><span class="chip ${JF==='all'?'on':''}" data-jf="all">All</span><span class="chip ${JF==='pin'?'on':''}" data-jf="pin">Pinned</span>${jp?`<span class="chip on" id="jpc">${esc(jp.name||'?')} &times;</span>`:''}</div>
+ ${Object.entries(grp).map(([k,es])=>`<h2>${k}</h2>${es.map(e=>`<div class="je" data-id="${e.id}"><div style="display:flex;justify-content:space-between;gap:10px"><b style="font-weight:500">${e.pin?'<span style="color:var(--red)">&#9733;</span> ':''}${esc(e.title||'Untitled')}</b>${moodDots(e.mood)}</div><small>${jdate(e.d)}${e.people.length?' &middot; '+esc(e.people.slice(0,3).map(i=>(DB.people.find(p=>p.id===i)||{}).name||'').filter(Boolean).join(', ')):''} &middot; ${words(e.body)} words</small><p>${esc(e.body)}</p></div>`).join('')}`).join('')||'<p class="hint" style="margin-top:30px">No entries yet. Tap Write.</p>'}`;
+ $('#back').onclick=()=>{JP=null;view={n:'list'};render()};
+ const nw=async()=>{const e={id:uid(),t:Date.now(),d:today(),title:'',body:'',mood:0,people:JP?[JP]:[],pin:false,ai:[]};DB.journal.push(e);await save();view={n:'entry',id:e.id};render()};$('#jn').onclick=$('#jn2').onclick=nw;
+ $('#jq').oninput=e=>{JQ=e.target.value;const p=e.target.selectionStart;vJournal();const q=$('#jq');q.focus();q.setSelectionRange(p,p)};
+ app.querySelectorAll('[data-jf]').forEach(c=>c.onclick=()=>{JF=c.dataset.jf;vJournal()});const jc=$('#jpc');if(jc)jc.onclick=()=>{JP=null;vJournal()};
+ app.querySelectorAll('.je').forEach(c=>c.onclick=()=>{view={n:'entry',id:c.dataset.id};render()});
+ const sm=$('#jsum');if(sm)sm.onclick=()=>{const es=all.filter(e=>e.d>cut).reverse();if(!es.length){$('#jout').innerHTML='<p class="hint">No entries in the last 7 days.</p>';return}
+  runAI(sumPrompt(es,'last 7 days'),$('#jout'),'Save as entry',async t=>{DB.journal.push({id:uid(),t:Date.now(),d:today(),title:'Weekly summary',body:t,mood:0,people:[],pin:false,ai:[]});await save();vJournal()})};
+ const ex=$('#jex');if(ex)ex.onclick=()=>{if(!confirm('This file is NOT encrypted. Continue?'))return;const md=[...DB.journal].sort((a,b)=>a.d.localeCompare(b.d)).map(e=>`## ${e.d}${e.title?' \u2014 '+e.title:''}\nMood: ${e.mood||'-'}/5\n\n${e.body}`).join('\n\n---\n\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([md],{type:'text/markdown'}));a.download='context-journal.md';a.click()}}
+function vEntry(){const e=(DB.journal||[]).find(x=>x.id===view.id);if(!e){view={n:'journal'};return render()}e.ai=e.ai||[];
+ app.innerHTML=`<div class="bar"><button class="ib" id="back" aria-label="Back">&larr;</button><div class="t"><em>&gt;_</em> entry</div><button class="ib" id="pin" aria-label="Pin" style="${e.pin?'color:var(--red);border-color:var(--red)':''}">&#9733;</button><button class="ib" id="del" aria-label="Delete">&times;</button></div>
+ <input type="date" id="jd" value="${e.d}"><label>Mood</label><div class="chips">${[1,2,3,4,5].map(i=>`<span class="chip ${e.mood===i?'on':''}" data-m="${i}">${MOODS[i]}</span>`).join('')}</div>
+ <label>Title</label><input id="jt" value="${esc(e.title)}" placeholder="Optional"><div style="margin:16px 0 6px"><button class="btn" id="pr" style="margin:0">Prompt me</button> <span class="hint" id="pt"></span></div>
+ <textarea id="jbody" style="min-height:42vh" placeholder="Write anything&hellip;">${esc(e.body)}</textarea><div class="hint" id="wc">${words(e.body)} words</div>
+ <label>Who is this about?</label><div class="chips scroll">${DB.people.map(p=>`<span class="chip ${e.people.includes(p.id)?'on':''}" data-p="${p.id}">${esc(p.nick||p.name||'?')}</span>`).join('')||'<span class="hint">No people yet</span>'}</div>
+ ${aiOn()?`<h2>ai</h2><button class="btn r" id="adv">Get advice</button><button class="btn" id="sum">Summarize</button><p class="hint">Entry text is sent as written. People are aliased if that is on in settings.</p>`:''}<div id="aiout"></div>
+ ${e.ai.map((a,i)=>`<h2>${a.k}</h2><pre>${esc(a.x)}</pre><button class="btn" data-ad="${i}">Remove</button>`).join('')}`;
+ let tm;const ts=()=>{clearTimeout(tm);tm=setTimeout(save,400)};
+ $('#jt').oninput=x=>{e.title=x.target.value;ts()};$('#jbody').oninput=x=>{e.body=x.target.value;$('#wc').textContent=words(e.body)+' words';ts()};
+ $('#jd').onchange=x=>{if(x.target.value){e.d=x.target.value;ts()}};
+ app.querySelectorAll('[data-m]').forEach(c=>c.onclick=()=>{const m=+c.dataset.m;e.mood=e.mood===m?0:m;app.querySelectorAll('[data-m]').forEach(z=>z.classList.toggle('on',+z.dataset.m===e.mood));ts()});
+ app.querySelectorAll('[data-p]').forEach(c=>c.onclick=()=>{const i=c.dataset.p;e.people=e.people.includes(i)?e.people.filter(x=>x!==i):[...e.people,i];c.classList.toggle('on');ts()});
+ app.querySelectorAll('[data-ad]').forEach(b=>b.onclick=async()=>{e.ai.splice(+b.dataset.ad,1);await save();vEntry()});
+ let pi=Math.floor(Math.random()*PROMPTS.length);$('#pr').onclick=()=>{$('#pt').textContent=PROMPTS[pi++%PROMPTS.length]};
+ $('#pin').onclick=async()=>{e.pin=!e.pin;await save();vEntry()};
+ $('#del').onclick=async()=>{if(confirm('Delete this entry?')){DB.journal=DB.journal.filter(x=>x.id!==e.id);await save();view={n:'journal'};render()}};
+ $('#back').onclick=async()=>{clearTimeout(tm);if(!e.title.trim()&&!e.body.trim()&&!e.ai.length)DB.journal=DB.journal.filter(x=>x.id!==e.id);await save();view={n:'journal'};render()};
+ const go=(k,pr)=>runAI(pr,$('#aiout'),'Save to entry',async t=>{e.ai.push({k,x:t});await save();vEntry()});
+ const a=$('#adv');if(a){a.onclick=()=>go('advice',advPrompt(e));$('#sum').onclick=()=>go('summary',sumPrompt([e],'one entry'))}}
 if('serviceWorker'in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 navigator.storage?.persist?.();
 lockScreen();
