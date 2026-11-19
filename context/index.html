@@ -303,7 +303,7 @@ function vMend(){
  <button class="btn r" id="run">${s.mode==='direct'?'Ask Gemini':'Build prompt'}</button><div id="out"></div>`;
  $('#back').onclick=()=>{view={n:'person',id:p.id};render()};
  $('#run').onclick=async()=>{const pr=buildPrompt(p,$('#prob').value||'(not described)'),out=$('#out');
-  if(s.mode!=='direct'){out.innerHTML=`<h2>send to an llm</h2><pre>${esc(pr)}</pre>${geminiBtns()}<p class="hint">On Android this opens the Gemini app with the text. If it opens empty, the prompt is already copied: just paste.</p>`;wireGem(out,pr);return}
+  if(s.mode!=='direct'){out.innerHTML=`<h2>send to an llm</h2><pre>${esc(pr)}</pre>${geminiBtns()}<p class="hint">Pick Gemini in the share sheet and the text is prefilled. The prompt is also copied.</p>`;wireGem(out,pr);return}
   if(!s.apiKey){out.innerHTML='<p class="err">Add your Google AI Studio key in settings.</p>';return}
   out.innerHTML='<p class="hint">thinking…</p>';
   try{const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${s.model}:generateContent`,{method:'POST',
@@ -518,13 +518,10 @@ function vCal(){
  app.querySelectorAll('.row').forEach(r=>r.onclick=()=>showCard(r.dataset.id));
 }
 /* ---------- open prompt in Gemini ---------- */
-const geminiBtns=()=>`<button class="btn r" data-gem>Open in Gemini</button>${navigator.share?'<button class="btn" data-shr>Share&hellip;</button>':''}<button class="btn" data-cpy>Copy</button>`;
-function wireGem(root,pr){const cp=()=>{try{navigator.clipboard.writeText(pr).catch(()=>{})}catch{}};
- root.querySelector('[data-gem]').onclick=()=>{cp();
-  if(/Android/i.test(navigator.userAgent))location.href='intent:#Intent;action=android.intent.action.SEND;type=text/plain;package=com.google.android.apps.bard;S.android.intent.extra.TEXT='+encodeURIComponent(pr)+';S.browser_fallback_url='+encodeURIComponent('https://gemini.google.com/app')+';end';
-  else window.open('https://gemini.google.com/app','_blank','noopener')};
- const sh=root.querySelector('[data-shr]');if(sh)sh.onclick=()=>navigator.share({text:pr}).catch(()=>{});
- root.querySelector('[data-cpy]').onclick=cp}
+const geminiBtns=()=>`<button class="btn r" data-shr>${navigator.share?'Send to Gemini':'Open Gemini'}</button>${navigator.share?'<button class="btn" data-web>Gemini web</button>':''}<button class="btn" data-cpy>Copy</button>`;
+function wireGem(root,pr){const cp=()=>{try{navigator.clipboard.writeText(pr).catch(()=>{})}catch{}},web=()=>{cp();window.open('https://gemini.google.com/app','_blank','noopener')};
+ root.querySelector('[data-shr]').onclick=()=>{cp();navigator.share?navigator.share({text:pr}).catch(()=>{}):web()};
+ const w=root.querySelector('[data-web]');if(w)w.onclick=web;root.querySelector('[data-cpy]').onclick=cp}
 /* ---------- journal ---------- */
 let JP=null,JQ='',JF='all';
 const MOODS=['','Awful','Low','Okay','Good','Great'],dfmt=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'),today=()=>dfmt(new Date());
@@ -535,7 +532,7 @@ const jppl=e=>e.people.map((id,i)=>{const p=DB.people.find(x=>x.id===id);return 
 const advPrompt=e=>`You are a warm, practical, honest coach. Read my private journal entry and respond with: 1) what I seem to be feeling, 2) honest, kind advice, 3) one small next step. Keep it concise.\nDate: ${e.d}. Mood: ${e.mood?MOODS[e.mood]+' ('+e.mood+'/5)':'not set'}.\nPeople involved: ${jppl(e)}.\nTitle: ${e.title||'(none)'}\nEntry:\n${e.body}`;
 const sumPrompt=(es,l)=>`Summarize these journal entries (${l}). Give: key events, recurring themes, mood trend, people mentioned, and open loops worth acting on. Be concise.\n\n${es.map(e=>`[${e.d}] mood ${e.mood||'?'}/5, with ${jppl(e)}\n${e.title?e.title+'\n':''}${e.body}`).join('\n\n')}`;
 async function runAI(pr,out,lab,onSave){const s=DB.settings;
- if(s.mode!=='direct'){out.innerHTML=`<h2>send to an llm</h2><pre>${esc(pr)}</pre>${geminiBtns()}<p class="hint">On Android this opens the Gemini app with the text. If it opens empty, the prompt is already copied: just paste.</p>`;wireGem(out,pr);return}
+ if(s.mode!=='direct'){out.innerHTML=`<h2>send to an llm</h2><pre>${esc(pr)}</pre>${geminiBtns()}<p class="hint">Pick Gemini in the share sheet and the text is prefilled. The prompt is also copied.</p>`;wireGem(out,pr);return}
  if(!s.apiKey){out.innerHTML='<p class="err">Add your Google AI Studio key in settings.</p>';return}
  out.innerHTML='<p class="hint">thinking&hellip;</p>';
  try{const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${s.model}:generateContent`,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':s.apiKey},body:JSON.stringify({contents:[{parts:[{text:pr}]}]})});
