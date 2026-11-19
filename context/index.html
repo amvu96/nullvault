@@ -108,7 +108,7 @@ input,select,textarea{background:var(--card);border-radius:14px}
 
 .av .im::after{display:none}.av img{filter:none}
 .modal{position:fixed;inset:0;z-index:50;background:#000b;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:flex;align-items:flex-end;justify-content:center;animation:in .2s}
-.mc{position:relative;width:min(560px,100%);max-height:90vh;overflow:auto;background:linear-gradient(135deg,#ff3b4e14,transparent 55%),var(--card);border:1px solid #2b2430;border-radius:28px 28px 0 0;padding:26px 18px calc(22px + env(safe-area-inset-bottom));animation:up .28s ease-out}
+.mc{position:relative;width:min(560px,100%);max-height:90vh;max-height:90dvh;overflow:auto;background:linear-gradient(135deg,#ff3b4e14,transparent 55%),var(--card);border:1px solid #2b2430;border-radius:28px 28px 0 0;padding:26px 18px calc(22px + env(safe-area-inset-bottom));animation:up .28s ease-out}
 @keyframes up{from{transform:translateY(40px);opacity:.4}to{transform:none;opacity:1}}
 .mc .x{position:absolute;top:14px;right:14px;width:36px;height:36px}
 .kv{display:flex;justify-content:space-between;gap:16px;padding:11px 0;border-bottom:1px solid var(--line);font-size:13px}
@@ -133,13 +133,13 @@ a.chip{text-decoration:none;color:var(--fg)}
  html,body{font-size:15px}.hi{font-size:30px}
  [data-v=list]{max-width:1320px}[data-v=person]{max-width:1100px}[data-v=settings],[data-v=mend],[data-v=cal]{max-width:780px}
  .wrap{padding:28px 40px 140px}.nav{width:560px;height:76px}
- .modal{align-items:center}.mc{width:min(900px,92vw);border-radius:28px;max-height:88vh}
+ .modal{align-items:center}.mc{width:min(900px,92vw);border-radius:28px;max-height:88vh;max-height:88dvh}
  .mg{display:grid;grid-template-columns:290px 1fr;gap:8px 36px}.mh{grid-column:1}.acts{grid-column:1;grid-row:2;align-self:start}.md{grid-column:2;grid-row:1/span 2}
  .sheet{left:24px;right:auto;width:440px;max-height:60vh}.mtop,.mfil{left:24px;right:24px}
 }
 @media(min-width:1000px){
  .lay{display:grid;grid-template-columns:minmax(340px,400px) 1fr;gap:32px;align-items:start}.lay .plist{grid-template-columns:1fr}
- .pane{display:block;position:sticky;top:24px;max-height:calc(100vh - 150px);overflow:auto;border-radius:28px}
+ .pane{display:block;position:sticky;top:24px;max-height:calc(100vh - 170px);max-height:calc(100dvh - 170px);overflow:auto;border-radius:28px}
  .pane .mc{width:100%;max-height:none;animation:none;border-radius:28px}.pane .x{display:none}
  .empty{display:grid;place-items:center;text-align:center;height:60vh;border:1px dashed var(--line);border-radius:28px}
 }
@@ -149,7 +149,7 @@ a.chip{text-decoration:none;color:var(--fg)}
 .ctx button:hover{background:#ff3b4e1f;color:var(--red)}.ctx kbd{margin-left:auto;padding-left:18px;color:var(--dim);font:inherit;font-size:11px}
 .ctx .ch{padding:8px 10px 4px;color:var(--lab);font-size:10px;letter-spacing:.14em;text-transform:uppercase}.ctx hr{border:0;border-top:1px solid var(--line);margin:6px 0}
 .mapwrap svg [data-n]{cursor:grab}.mapwrap svg [data-e]{cursor:pointer}
-.md{display:inline-flex;gap:4px;align-items:center}.md i{width:7px;height:7px;border-radius:50%;background:#2a323c}.md i.on{background:var(--red);box-shadow:0 0 6px var(--red)}
+.mood5{display:inline-flex;gap:4px;align-items:center}.mood5 i{width:7px;height:7px;border-radius:50%;background:#2a323c}.mood5 i.on{background:var(--red);box-shadow:0 0 6px var(--red)}
 .je{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:14px 16px;margin-bottom:10px;cursor:pointer}.je:active{border-color:var(--red)}
 .je small{color:var(--dim)}.je p{margin:6px 0 0;color:#b6c0cb;font-size:13px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap}
 @media(min-width:900px){[data-v=journal],[data-v=entry]{max-width:780px}}
@@ -157,9 +157,11 @@ a.chip{text-decoration:none;color:var(--fg)}
 .cfab i{font-size:24px}.ni{transition:color .2s}.ib i{font-size:15px}
 @keyframes pgf{from{opacity:0;transform:translateX(26px)}}@keyframes pgb{from{opacity:0;transform:translateX(-26px)}}@keyframes pgu{from{opacity:0}}
 .pg-f{animation:pgf .26s cubic-bezier(.2,.8,.2,1)}.pg-b{animation:pgb .26s cubic-bezier(.2,.8,.2,1)}.pg-u{animation:pgu .22s ease-out}
+@media(min-width:900px){.plist{max-height:470px;overflow-y:auto;padding-right:6px;scrollbar-width:thin;scrollbar-color:var(--red) transparent;overscroll-behavior:contain}
+.plist::-webkit-scrollbar{width:4px}.plist::-webkit-scrollbar-thumb{background:var(--red);border-radius:4px}}
 </style></head><body><div class="wrap" id="app"></div>
 <script>
-const VERSION='1.15';
+const VERSION='1.16';
 const QS=new URLSearchParams(location.search);let GO=QS.get('go'),SHR=(QS.get('title')||QS.get('text')||QS.get('url'))?[QS.get('title'),QS.get('text'),QS.get('url')].filter(Boolean).join('\n'):null;
 async function startView(){if(SHR){DB.journal=DB.journal||[];const e={id:uid(),t:Date.now(),d:today(),title:'Shared',body:SHR,mood:0,people:[],pin:false,ai:[]};DB.journal.push(e);SHR=null;await save();view={n:'entry',id:e.id}}
  else view=({journal:{n:'journal'},map:{n:'map'},cal:{n:'cal'}}[GO])||{n:'list'};GO=null;if(location.search)history.replaceState(null,'',location.pathname);render()}
@@ -545,7 +547,7 @@ let JP=null,JQ='',JF='all',lastEntry=null;
 const MOODS=['','Awful','Low','Okay','Good','Great'],dfmt=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'),today=()=>dfmt(new Date());
 const PROMPTS=['What went well today, and why?','What drained me today?','Who did I think about, and what did I want to say?','What am I avoiding?','What would I tell a friend in my situation?','What am I grateful for right now?','Which relationship needs attention this week?','What do I want to remember about today?'];
 const jdate=d=>new Date(d+'T00:00').toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'}),words=t=>(t||'').trim().split(/\s+/).filter(Boolean).length;
-const aiOn=()=>!!(DB.settings.apiKey||DB.settings.mode==='prompt'),moodDots=m=>`<span class="md">${[1,2,3,4,5].map(i=>`<i class="${i<=m?'on':''}"></i>`).join('')}</span>`;
+const aiOn=()=>!!(DB.settings.apiKey||DB.settings.mode==='prompt'),moodDots=m=>`<span class="mood5">${[1,2,3,4,5].map(i=>`<i class="${i<=m?'on':''}"></i>`).join('')}</span>`;
 const jppl=e=>e.people.map((id,i)=>{const p=DB.people.find(x=>x.id===id);return p?`${DB.settings.alias?'Person '+String.fromCharCode(65+i):p.name} (standing: ${TIERS[p.tier]}${p.best?'; responds best to '+p.best:''}${p.hates?'; dislikes '+p.hates:''})`:''}).filter(Boolean).join('; ')||'none tagged';
 const advPrompt=e=>`You are a warm, practical, honest coach. Read my private journal entry and respond with: 1) what I seem to be feeling, 2) honest, kind advice, 3) one small next step. Keep it concise.\nDate: ${e.d}. Mood: ${e.mood?MOODS[e.mood]+' ('+e.mood+'/5)':'not set'}.\nPeople involved: ${jppl(e)}.\nTitle: ${e.title||'(none)'}\nEntry:\n${e.body}`;
 const sumPrompt=(es,l)=>`Summarize these journal entries (${l}). Give: key events, recurring themes, mood trend, people mentioned, and open loops worth acting on. Be concise.\n\n${es.map(e=>`[${e.d}] mood ${e.mood||'?'}/5, with ${jppl(e)}\n${e.title?e.title+'\n':''}${e.body}`).join('\n\n')}`;
