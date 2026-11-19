@@ -2,7 +2,7 @@
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0a0d12"><link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon.svg"><title>Context</title>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"><link rel="icon" type="image/png" href="icon-192.png"><meta name="description" content="Private, encrypted relationship tracker."><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer"><title>Context</title>
 <style>
 :root{--bg:#000;--fg:#f2f2f2;--dim:#7a7a7a;--line:#2a2a2a;--red:#ff1e1e;--m:'Space Mono',ui-monospace,Menlo,Consolas,monospace}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -83,7 +83,7 @@ input,select,textarea{background:var(--card);border-radius:14px}
 .btn.r{background:var(--red);border-color:var(--red);color:#1b0307;box-shadow:0 0 26px #ff3b4e40}
 .chip{border-radius:12px;background:var(--card)}.chip.on{background:#ff3b4e1f;color:var(--red);border-color:var(--red)}
 .row{background:var(--card);border-color:var(--line);border-radius:22px;padding:10px 16px 10px 12px}
-.row::after{content:'\203A';color:var(--red);font-size:24px}
+.row::after{content:'\f054';font-family:'Font Awesome 6 Free';font-weight:900;color:var(--red);font-size:13px}
 .card,.hero{background:linear-gradient(135deg,#ff3b4e14,transparent 55%),var(--card);border:1px solid #2b2430;border-radius:28px;padding:22px 18px}
 .hero{padding:24px 16px}
 .bar{display:flex;align-items:center;gap:12px;margin:6px 0 20px;padding-bottom:16px;border-bottom:1px solid var(--line)}
@@ -154,9 +154,15 @@ a.chip{text-decoration:none;color:var(--fg)}
 .je small{color:var(--dim)}.je p{margin:6px 0 0;color:#b6c0cb;font-size:13px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap}
 @media(min-width:900px){[data-v=journal],[data-v=entry]{max-width:780px}}
 .nav{z-index:15}
+.cfab i{font-size:24px}.ni{transition:color .2s}.ib i{font-size:15px}
+@keyframes pgf{from{opacity:0;transform:translateX(26px)}}@keyframes pgb{from{opacity:0;transform:translateX(-26px)}}@keyframes pgu{from{opacity:0}}
+.pg-f{animation:pgf .26s cubic-bezier(.2,.8,.2,1)}.pg-b{animation:pgb .26s cubic-bezier(.2,.8,.2,1)}.pg-u{animation:pgu .22s ease-out}
 </style></head><body><div class="wrap" id="app"></div>
 <script>
-const VERSION='1.14';
+const VERSION='1.15';
+const QS=new URLSearchParams(location.search);let GO=QS.get('go'),SHR=(QS.get('title')||QS.get('text')||QS.get('url'))?[QS.get('title'),QS.get('text'),QS.get('url')].filter(Boolean).join('\n'):null;
+async function startView(){if(SHR){DB.journal=DB.journal||[];const e={id:uid(),t:Date.now(),d:today(),title:'Shared',body:SHR,mood:0,people:[],pin:false,ai:[]};DB.journal.push(e);SHR=null;await save();view={n:'entry',id:e.id}}
+ else view=({journal:{n:'journal'},map:{n:'map'},cal:{n:'cal'}}[GO])||{n:'list'};GO=null;if(location.search)history.replaceState(null,'',location.pathname);render()}
 const TIERS=['Hated','Disliked','Wary','Neutral','Acquaintance','Friend','Trusted','Best friend'];
 const LOVE=['Gifts','Praise','Quality time','Acts of service','Touch'];
 const $=s=>document.querySelector(s),app=$('#app');
@@ -184,14 +190,14 @@ async function lockScreen(msg=''){
  <p class="hint">${first?'Create a PIN. It encrypts everything on this device.<br>If you forget it and have no backup, your data is gone.':'Enter your PIN'}</p>
  <input id="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="12" placeholder="••••">
  ${first?'<input id="pin2" type="password" inputmode="numeric" maxlength="12" placeholder="repeat">':''}
- <div class="err" id="err">${msg}</div><button class="btn r" id="go">${first?'Create PIN':'Unlock'}</button>${bio?'<button class="btn" id="fp">&#9758; Fingerprint</button>':''}<div class="hint" style="margin-top:34px">v${VERSION}</div></div>`;
- if(bio){const fp=async quiet=>{try{const k=await bioUnlock(bio);DB=await dec(await kvGet('data'),k);KEY=k;view={n:'list'};render();bump()}catch{if(!quiet){vib();$('#err').textContent='Fingerprint failed. Use your PIN.'}}};
+ <div class="err" id="err">${msg}</div><button class="btn r" id="go">${first?'Create PIN':'Unlock'}</button>${bio?'<button class="btn" id="fp"><i class="fa-solid fa-fingerprint"></i> Fingerprint</button>':''}<div class="hint" style="margin-top:34px">v${VERSION}</div></div>`;
+ if(bio){const fp=async quiet=>{try{const k=await bioUnlock(bio);DB=await dec(await kvGet('data'),k);KEY=k;startView();bump()}catch{if(!quiet){vib();$('#err').textContent='Fingerprint failed. Use your PIN.'}}};
   $('#fp').onclick=()=>fp(false);setTimeout(()=>fp(true),400)}
  const go=async()=>{const p=$('#pin').value,err=$('#err');
   if(first){if(p.length<4)return err.textContent='Use at least 4 digits.';if(p!==$('#pin2').value)return err.textContent='PINs do not match.';
    const salt=crypto.getRandomValues(new Uint8Array(16));KEY=await derive(p,salt);await kvSet('meta',{salt:b64(salt)});await save();}
   else{try{const k=await derive(p,ub(meta.salt));DB=await dec(await kvGet('data'),k);KEY=k;}catch{vib();return err.textContent='Wrong PIN.'}}
-  view={n:'list'};render();bump()};
+  startView();bump()};
  $('#go').onclick=go;$('#pin').onkeydown=e=>{if(e.key==='Enter'&&!first)go()};
 }
 function bump(){clearTimeout(lockT);if(KEY&&DB.settings.lockMin>0)lockT=setTimeout(()=>lockScreen(),DB.settings.lockMin*6e4)}
@@ -216,18 +222,20 @@ const CC=['#ff3b4e','#9db4ff','#ffb347','#8fd3a8','#ff8dc7','#c9a0ff','#e8edf2']
 const circ=()=>{if(!DB.circles)DB.circles=['Family','Friends','Work','Gym'].map((n,i)=>({id:uid(),name:n,color:CC[i+1]}));return DB.circles};
 const pc=p=>(p.circles||[]).map(id=>circ().find(c=>c.id===id)).filter(Boolean);
 const shr=(a,b)=>(a.circles||[]).some(c=>(b.circles||[]).includes(c));
-const SOC=[['ig','Instagram','https://instagram.com/'],['x','X','https://x.com/'],['fb','Facebook','https://facebook.com/'],['li','LinkedIn','https://linkedin.com/in/'],['tt','TikTok','https://tiktok.com/@'],['sn','Snapchat','https://snapchat.com/add/'],['wa','WhatsApp','https://wa.me/'],['tg','Telegram','https://t.me/'],['web','Website','']];
+const SOC=[['ig','Instagram','https://instagram.com/','fa-brands fa-instagram'],['x','X','https://x.com/','fa-brands fa-x-twitter'],['fb','Facebook','https://facebook.com/','fa-brands fa-facebook'],['li','LinkedIn','https://linkedin.com/in/','fa-brands fa-linkedin'],['tt','TikTok','https://tiktok.com/@','fa-brands fa-tiktok'],['sn','Snapchat','https://snapchat.com/add/','fa-brands fa-snapchat'],['wa','WhatsApp','https://wa.me/','fa-brands fa-whatsapp'],['tg','Telegram','https://t.me/','fa-brands fa-telegram'],['web','Website','','fa-solid fa-globe']];
 const sochref=(k,v,b)=>{v=v.trim();if(!v)return'';if(/^https?:\/\//i.test(v))return v;if(k==='web')return'https://'+v;if(k==='wa')v=v.replace(/\D/g,'');return b+v.replace(/^@/,'')};
-const socRow=p=>{const a=SOC.map(([k,n,b])=>{const h=sochref(k,(p.soc||{})[k]||'',b);return h?`<a class="chip" href="${esc(h)}" target="_blank" rel="noopener noreferrer">${n}</a>`:''}).join('');return a?`<div class="kv"><span>Social</span><span class="chips" style="justify-content:flex-end">${a}</span></div>`:''};
+const socRow=p=>{const a=SOC.map(([k,n,b,ic])=>{const h=sochref(k,(p.soc||{})[k]||'',b);return h?`<a class="chip" href="${esc(h)}" target="_blank" rel="noopener noreferrer"><i class="${ic}"></i> ${n}</a>`:''}).join('');return a?`<div class="kv"><span>Social</span><span class="chips" style="justify-content:flex-end">${a}</span></div>`:''};
 /* ---------- views ---------- */
-function render(){if(lastEntry&&!(view.n==='entry'&&view.id===lastEntry)){const x=(DB.journal||[]).find(j=>j.id===lastEntry);if(x&&!x.title.trim()&&!x.body.trim()&&!(x.ai||[]).length){DB.journal=DB.journal.filter(j=>j!==x);save()}lastEntry=null}closeCard();closeMenu();if(MAPKD){document.removeEventListener('keydown',MAPKD);MAPKD=null}app.dataset.v=view.n;const f={list:vList,person:vPerson,settings:vSettings,mend:vMend,map:vMap,cal:vCal,journal:vJournal,entry:vEntry}[view.n];f();updateNav();scrollTo(0,0)}
+let PK='',PD=0;const DEPTH={list:0,cal:0,journal:0,map:0,person:1,settings:1,entry:1,mend:2};
+function trans(){const k=view.n+(view.id||'');if(k===PK)return;const d=DEPTH[view.n]||0,dir=!PK||view.n==='map'||PD===undefined?'u':d>PD?'f':d<PD?'b':'u';PK=k;PD=d;app.classList.remove('pg-f','pg-b','pg-u');void app.offsetWidth;app.classList.add('pg-'+dir)}
+function render(){if(lastEntry&&!(view.n==='entry'&&view.id===lastEntry)){const x=(DB.journal||[]).find(j=>j.id===lastEntry);if(x&&!x.title.trim()&&!x.body.trim()&&!(x.ai||[]).length){DB.journal=DB.journal.filter(j=>j!==x);save()}lastEntry=null}closeCard();closeMenu();if(MAPKD){document.removeEventListener('keydown',MAPKD);MAPKD=null}app.dataset.v=view.n;const f={list:vList,person:vPerson,settings:vSettings,mend:vMend,map:vMap,cal:vCal,journal:vJournal,entry:vEntry}[view.n];f();updateNav();trans();scrollTo(0,0)}
 function vList(){
  let L=DB.people.filter(p=>(p.name+p.nick+(p.tags||[]).join(' ')).toLowerCase().includes(q.toLowerCase())&&(!FC||(p.circles||[]).includes(FC)));
  const att=DB.people.filter(p=>Date.now()-p.touched>2592e6).length,bd=DB.people.filter(p=>{const d=bdayDays(p.bday);return d!==null&&d<=30}).length;
  if(sort==='recent')L.sort((a,b)=>b.touched-a.touched);
  if(sort==='trust')L.sort((a,b)=>a.tier-b.tier);
  if(sort==='bday')L.sort((a,b)=>(bdayDays(a.bday)??999)-(bdayDays(b.bday)??999));
- app.innerHTML=`<div class="lay"><div class="lcol"><div class="bar"><div class="logo">C</div><div class="t"><em>&gt;_</em> context <span>/ people</span></div><button class="ib" id="st" aria-label="Settings">&#9881;</button><button class="ib" id="lk" aria-label="Lock">&#9211;</button></div>
+ app.innerHTML=`<div class="lay"><div class="lcol"><div class="bar"><div class="logo">C</div><div class="t"><em>&gt;_</em> context <span>/ people</span></div><button class="ib" id="st" aria-label="Settings"><i class="fa-solid fa-gear"></i></button><button class="ib" id="lk" aria-label="Lock"><i class="fa-solid fa-lock"></i></button></div>
  <div class="card"><div class="lab">${new Date().toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long'})}</div>
  <div class="hi">${att?att+' to check in on.':DB.people.length?'All quiet. Nice.':'Add your first person.'}</div>
  <div class="stats"><div class="stt"><b>${DB.people.length}</b><small>people</small></div><div class="stt"><b>${att}</b><small>stale</small></div><div class="stt"><b>${bd}</b><small>bdays / 30d</small></div></div></div>
@@ -247,7 +255,7 @@ function vPerson(){
  const p=DB.people.find(x=>x.id===view.id);if(!p){view={n:'list'};return render()}p.circles=p.circles||[];p.tags=p.tags||[];
  const d=bdayDays(p.bday),T=(k,l,ph='',ta=false)=>`<label>${l}</label>${ta?`<textarea data-k="${k}" placeholder="${ph}">${esc(p[k])}</textarea>`:`<input data-k="${k}" value="${esc(p[k])}" placeholder="${ph}">`}`;
  const S=(k,l)=>`<label>${l} · <span id="v_${k}">${p[k]}</span></label><input type="range" data-r="${k}" min="0" max="100" value="${p[k]}">`;
- app.innerHTML=`<div class="top"><button class="ib" id="back" aria-label="Back">←</button><button class="ib" id="del" aria-label="Delete">×</button></div>
+ app.innerHTML=`<div class="top"><button class="ib" id="back" aria-label="Back"><i class="fa-solid fa-arrow-left"></i></button><button class="ib" id="del" aria-label="Delete"><i class="fa-solid fa-trash"></i></button></div>
  <div class="hero"><div id="ph" title="Tap to reveal photo">${avatar(p,170,'big')}</div><h1 class="dot" style="font-size:26px">${esc(p.name||'new person')}</h1>
  <div class="leds">${TIERS.slice(1).map((t,i)=>`<i class="${i<p.tier?'on':''}"></i>`).join('')}</div><span class="hint">${TIERS[p.tier].toLowerCase()}</span>
  <div><button class="btn" id="pick">${p.photo?'Change photo':'Add photo'}</button>${p.photo?'<button class="btn" id="rmph">Remove</button>':''}</div></div><input type="file" id="pf" accept="image/*" hidden>
@@ -256,9 +264,9 @@ function vPerson(){
  </section><section><h2>basics</h2>${T('name','Name')}${T('nick','Nickname')}${T('met','Where did we meet')}
  <label>When we met</label><input type="date" data-k="metWhen" value="${p.metWhen}">
  <label>Birthday${d!==null?' · in '+d+' days':''}</label><input type="date" data-k="bday" value="${p.bday}">${T('loc','Location')}${T('contact','Contact')}
- </section><section><h2>circles &amp; tags</h2><div class="chips">${circ().map(c=>`<span class="chip cc ${p.circles.includes(c.id)?'on':''}" style="--c:${c.color}" data-c="${c.id}">${esc(c.name)}</span>`).join('')}<span class="chip" id="newc">+ circle</span></div>
+ </section><section><h2>circles &amp; tags</h2><div class="chips">${circ().map(c=>`<span class="chip cc ${p.circles.includes(c.id)?'on':''}" style="--c:${c.color}" data-c="${c.id}">${esc(c.name)}</span>`).join('')}<span class="chip" id="newc"><i class="fa-solid fa-plus"></i> circle</span></div>
  <label>Tags (comma separated)</label><input id="tg" value="${esc(p.tags.join(', '))}" placeholder="neighbor, chess, school">
- </section><section><h2>social links</h2>${SOC.map(([k,n])=>`<label>${n}</label><input data-sc="${k}" value="${esc((p.soc||{})[k]||'')}" placeholder="${k==='wa'?'phone number':'@handle or link'}">`).join('')}
+ </section><section><h2>social links</h2>${SOC.map(([k,n,b,ic])=>`<label><i class="${ic}"></i> ${n}</label><input data-sc="${k}" value="${esc((p.soc||{})[k]||'')}" placeholder="${k==='wa'?'phone number':'@handle or link'}">`).join('')}
  </section><section><h2>love language</h2><div class="chips">${LOVE.map(l=>`<span class="chip ${p.love.includes(l)?'on':''}" data-l="${l}">${l}</span>`).join('')}</div>
  ${T('best','Responds best to','directness, humor, space…')}${T('hates','Hates','being interrupted…')}
  </section><section><h2>read on them</h2>${S('empathy','Empathy')}${S('reliab','Reliability')}${S('trust','Trust')}
@@ -297,7 +305,7 @@ The problem: ${problem}
 Give me: 1) what is probably going on, 2) a step-by-step plan, 3) a short message draft in my voice, 4) what to avoid.`}
 function vMend(){
  const p=DB.people.find(x=>x.id===view.id),s=DB.settings;
- app.innerHTML=`<div class="top"><button class="ib" id="back">←</button><span class="hint">${s.mode==='direct'?'direct ai':'prompt generator'}</span></div>
+ app.innerHTML=`<div class="top"><button class="ib" id="back"><i class="fa-solid fa-arrow-left"></i></button><span class="hint">${s.mode==='direct'?'direct ai':'prompt generator'}</span></div>
  <h1 style="font-size:22px">mend</h1><label>What happened?</label><textarea id="prob" placeholder="Describe the problem…"></textarea>
  <button class="btn r" id="run">${s.mode==='direct'?'Ask Gemini':'Build prompt'}</button><div id="out"></div>`;
  $('#back').onclick=()=>{view={n:'person',id:p.id};render()};
@@ -313,12 +321,12 @@ function vMend(){
 }
 function vSettings(){
  const s=DB.settings;
- app.innerHTML=`<div class="top"><button class="ib" id="back">←</button></div><h1 style="font-size:22px">settings</h1>
+ app.innerHTML=`<div class="top"><button class="ib" id="back"><i class="fa-solid fa-arrow-left"></i></button></div><h1 style="font-size:22px">settings</h1>
  <h2>ai</h2><label>Mode</label><select id="mode"><option value="prompt">Prompt generator (copy to another LLM)</option><option value="direct">Direct (call Gemini)</option></select>
  <label>Google AI Studio API key</label><input id="key" type="password" value="${esc(s.apiKey)}" placeholder="AIza…"><label>Model</label><input id="model" value="${esc(s.model)}">
  <div class="sw"><span>Use alias instead of real name</span><input type="checkbox" id="alias" style="width:auto" ${s.alias?'checked':''}></div>
  <p class="hint">Direct mode sends the profile text to Google. The key is stored encrypted on this device.</p>
- <h2>circles</h2>${circ().map(c=>`<div class="kv"><span style="color:${c.color}">&#9679; ${esc(c.name)}</span><span><button class="btn" style="margin:0 6px 0 0;padding:6px 12px" data-rn="${c.id}">Rename</button><button class="btn" style="margin:0;padding:6px 12px" data-dc="${c.id}">Delete</button></span></div>`).join('')}<button class="btn" id="addc">+ New circle</button>
+ <h2>circles</h2>${circ().map(c=>`<div class="kv"><span style="color:${c.color}">&#9679; ${esc(c.name)}</span><span><button class="btn" style="margin:0 6px 0 0;padding:6px 12px" data-rn="${c.id}">Rename</button><button class="btn" style="margin:0;padding:6px 12px" data-dc="${c.id}">Delete</button></span></div>`).join('')}<button class="btn" id="addc"><i class="fa-solid fa-plus"></i> New circle</button>
  <h2>security</h2><label>Auto-lock (minutes, 0 = off)</label><input id="lock" type="number" min="0" value="${s.lockMin}">
  <button class="btn" id="bio">Fingerprint unlock</button><button class="btn" id="lockNow">Lock now</button><button class="btn" id="chpin">Change PIN</button>
  <h2>data</h2><button class="btn r" id="exp">Encrypted backup</button><button class="btn" id="expj">Plain JSON</button><button class="btn" id="imp">Import</button>
@@ -376,7 +384,7 @@ function showMenu(e,items){closeMenu();const d=document.createElement('div');d.c
  d.oncontextmenu=ev=>ev.preventDefault();d.onclick=ev=>{const b=ev.target.closest('button');if(!b)return;const f=items[b.dataset.i].f;closeMenu();f()};CTX=d}
 function vMap(){
  DB.links=DB.links||[];const people=DB.people;M.sel=M.edge=M.pair=null;M.link=false;M.ms=new Set();M.box=null;
- app.innerHTML=`<div class="mapwrap"><svg id="svg"></svg><div class="mtop"><button class="ib" id="back" aria-label="Back">&larr;</button><div class="t"><em>&gt;_</em> map</div><button class="ib" id="arr" aria-label="Auto arrange">&#10042;</button><button class="ib" id="grp" aria-label="Group by circle">&#11043;</button><button class="ib" id="fit" aria-label="Fit to screen">&#10530;</button><button class="ib" id="meb" aria-label="Show my ties">&#9678;</button></div><div class="mfil chips scroll"></div><div class="sheet" id="sh"></div></div>`;
+ app.innerHTML=`<div class="mapwrap"><svg id="svg"></svg><div class="mtop"><button class="ib" id="back" aria-label="Back"><i class="fa-solid fa-arrow-left"></i></button><div class="t"><em>&gt;_</em> map</div><button class="ib" id="arr" aria-label="Auto arrange"><i class="fa-solid fa-wand-magic-sparkles"></i></button><button class="ib" id="grp" aria-label="Group by circle"><i class="fa-solid fa-object-group"></i></button><button class="ib" id="fit" aria-label="Fit to screen"><i class="fa-solid fa-expand"></i></button><button class="ib" id="meb" aria-label="Show my ties"><i class="fa-solid fa-eye"></i></button></div><div class="mfil chips scroll"></div><div class="sheet" id="sh"></div></div>`;
  const svg=$('#svg'),sh=$('#sh'),nm=id=>people.find(p=>p.id===id),r0=svg.getBoundingClientRect();
  const fresh=people.every(p=>p.gx==null);place();if(fresh)sim();
  V={x:r0.width/2,y:(r0.height-150)/2+30,k:people.length>12?.7:1};
@@ -396,8 +404,8 @@ function vMap(){
  const chips=c=>LT.map(t=>`<span class="chip ${c===t[0]?'on':''}" data-ty="${t[0]}" style="${c===t[0]?'':'border-color:'+t[2]+'66'}">${t[1]}</span>`).join('');
  const sheet=()=>{let c;
   if(M.ms.size){c=`<div class="lab">${M.ms.size} selected</div><div class="hint" style="margin-top:8px">Add / remove circle</div><div class="chips" style="margin:8px 0">${circ().map(k=>`<span class="chip cc" style="--c:${k.color}" data-mc="${k.id}">${esc(k.name)}</span>`).join('')}</div><div class="hint">Link all as</div><div class="chips" style="margin:8px 0">${chips('').replace(/data-ty=/g,'data-mt=')}</div><button class="btn" data-act="row">Row</button><button class="btn" data-act="col">Column</button><button class="btn" data-act="clr">Clear</button>`}
-  else if(M.pair){const[a,b]=M.pair.map(nm);c=`<div class="lab">connect</div><b>${esc(a.name)} &rarr; ${esc(b.name)}</b><div class="chips" style="margin:10px 0">${chips('')}</div><button class="btn" data-act="cancel">Cancel</button>`}
-  else if(M.edge){const l=DB.links.find(x=>x.id===M.edge),a=nm(l.a),b=nm(l.b);c=`<div class="lab">relation</div><b>${esc(a.name)} ${LTm[l.type][4]?'&rarr;':'&harr;'} ${esc(b.name)}</b><div class="chips" style="margin:10px 0">${chips(l.type)}</div><input id="en" placeholder="note (optional)" value="${esc(l.note||'')}"><button class="btn" data-act="swap">Swap</button><button class="btn" data-act="del">Delete</button>`}
+  else if(M.pair){const[a,b]=M.pair.map(nm);c=`<div class="lab">connect</div><b>${esc(a.name)} <i class="fa-solid fa-arrow-right"></i> ${esc(b.name)}</b><div class="chips" style="margin:10px 0">${chips('')}</div><button class="btn" data-act="cancel">Cancel</button>`}
+  else if(M.edge){const l=DB.links.find(x=>x.id===M.edge),a=nm(l.a),b=nm(l.b);c=`<div class="lab">relation</div><b>${esc(a.name)} ${LTm[l.type][4]?'<i class="fa-solid fa-arrow-right"></i>':'<i class="fa-solid fa-arrows-left-right"></i>'} ${esc(b.name)}</b><div class="chips" style="margin:10px 0">${chips(l.type)}</div><input id="en" placeholder="note (optional)" value="${esc(l.note||'')}"><button class="btn" data-act="swap">Swap</button><button class="btn" data-act="del">Delete</button>`}
   else if(M.sel){const p=nm(M.sel),n=DB.links.filter(l=>l.a===p.id||l.b===p.id).length;c=`<b>${esc(p.name||'Unnamed')}</b> <span class="hint">${TIERS[p.tier].toLowerCase()} &middot; ${n} link${n==1?'':'s'}</span><div><button class="btn r" data-act="link">${M.link?'Tap another person&hellip;':'Link to&hellip;'}</button><button class="btn" data-act="open">Profile</button></div>`}
   else c=`<div class="lab">relationship map</div><p class="hint" style="margin:6px 0 10px">${people.length>1?'Drag people &middot; pinch to zoom &middot; tap a person to link them':'Add at least two people to start linking'}</p><div class="chips">${LT.map(t=>`<span class="chip" style="border-color:${t[2]}66;color:${t[2]}">${t[1]}</span>`).join('')}</div>`;
   sh.innerHTML=c};
@@ -448,11 +456,11 @@ function vMap(){
  $('#back').onclick=()=>{view={n:'list'};render()};
  $('#arr').onclick=()=>anim(sim);$('#grp').onclick=()=>anim(groupLayout);$('#fit').onclick=fit;
  svg.oncontextmenu=e=>{e.preventDefault();const n=e.target.closest('[data-n]'),l=e.target.closest('[data-e]');let it;
-  const circs=ids=>circ().map(c=>({t:c.name,c:c.color,k:ids.every(i=>(nm(i).circles||[]).includes(c.id))?'\u2713':'',f:async()=>{await addCircle(ids,c.id);refresh()}}));
+  const circs=ids=>circ().map(c=>({t:c.name,c:c.color,k:ids.every(i=>(nm(i).circles||[]).includes(c.id))?'<i class="fa-solid fa-check"></i>':'',f:async()=>{await addCircle(ids,c.id);refresh()}}));
   if(n){const id=n.dataset.n;if(!M.ms.has(id)){M.ms=new Set();M.sel=id;M.edge=M.pair=null;M.link=false}
    if(M.ms.size>1){const ids=[...M.ms];it=[{h:ids.length+' selected'},{h:'Circles'},...circs(ids),{s:1},{h:'Link all as'},...LT.map(t=>({t:t[1],c:t[2],f:async()=>{await linkAll(ids,t[0]);refresh()}})),{s:1},{t:'Align in a row',f:()=>{align(ids,'h');refresh()}},{t:'Align in a column',f:()=>{align(ids,'v');refresh()}},{t:'Clear selection',k:'Esc',f:()=>{M.ms=new Set();refresh()}}]}
    else it=[{h:nm(id).name||'Unnamed'},{t:'Open profile',f:()=>showCard(id)},{t:'Link to\u2026',k:'L',f:()=>{M.sel=id;M.link=true;refresh()}},{t:'Select connected',f:()=>{const s=new Set([id]);DB.links.forEach(x=>{if(x.a===id)s.add(x.b);if(x.b===id)s.add(x.a)});M.ms=s;M.sel=null;refresh()}},{s:1},{h:'Circles'},...circs([id])]}
-  else if(l){M.edge=l.dataset.e;M.sel=null;M.ms=new Set();const lk=DB.links.find(x=>x.id===M.edge);it=[{h:'Relation'},...LT.map(t=>({t:t[1],c:t[2],k:lk.type===t[0]?'\u2713':'',f:async()=>{lk.type=t[0];await save();refresh()}})),{s:1},{t:'Swap direction',f:async()=>{[lk.a,lk.b]=[lk.b,lk.a];await save();refresh()}},{t:'Delete link',k:'Del',f:async()=>{DB.links=DB.links.filter(x=>x.id!==lk.id);M.edge=null;await save();refresh()}}]}
+  else if(l){M.edge=l.dataset.e;M.sel=null;M.ms=new Set();const lk=DB.links.find(x=>x.id===M.edge);it=[{h:'Relation'},...LT.map(t=>({t:t[1],c:t[2],k:lk.type===t[0]?'<i class="fa-solid fa-check"></i>':'',f:async()=>{lk.type=t[0];await save();refresh()}})),{s:1},{t:'Swap direction',f:async()=>{[lk.a,lk.b]=[lk.b,lk.a];await save();refresh()}},{t:'Delete link',k:'Del',f:async()=>{DB.links=DB.links.filter(x=>x.id!==lk.id);M.edge=null;await save();refresh()}}]}
   else it=[{t:'Select all',k:'Ctrl+A',f:()=>{M.ms=new Set(people.map(p=>p.id));M.sel=M.edge=null;refresh()}},{t:'Arrange',k:'A',f:()=>anim(sim)},{t:'Group by circle',k:'G',f:()=>anim(groupLayout)},{t:'Fit to screen',k:'F',f:fit},{s:1},
    {t:M.me?'Hide my ties':'Show my ties',f:()=>{M.me=!M.me;draw()}},{t:M.zones?'Hide circle zones':'Show circle zones',f:()=>{M.zones=!M.zones;draw()}},{s:1},{t:'Export as PNG',f:exportPng}];
   refresh();showMenu(e,it)};
@@ -493,7 +501,7 @@ function showCard(id){const p=DB.people.find(x=>x.id===id);if(!p)return;closeCar
  const kv=(k,v)=>v?`<div class="kv"><span>${k}</span><span>${esc(v)}</span></div>`:'';
  const mb=(k,v)=>`<div style="padding:11px 0;border-bottom:1px solid var(--line);font-size:13px"><div style="display:flex;justify-content:space-between"><span style="color:var(--dim)">${k}</span><span>${v}</span></div><div class="mb"><i style="width:${v}%"></i></div></div>`;
  const pane=document.getElementById('pane'),split=!!pane&&matchMedia('(min-width:1000px)').matches&&view.n==='list',root=split?pane:m;
- root.innerHTML=`<div class="mc"><button class="ib x" id="cx" aria-label="Close">&times;</button><div class="mg"><div class="mh">
+ root.innerHTML=`<div class="mc"><button class="ib x" id="cx" aria-label="Close"><i class="fa-solid fa-xmark"></i></button><div class="mg"><div class="mh">
  <div class="hero" style="background:none;border:0;padding:0 0 8px">${avatar(p,120,'big')}<h1 class="dot" style="font-size:26px">${esc(p.name||'Unnamed')}</h1>${p.nick?`<span class="hint">&ldquo;${esc(p.nick)}&rdquo;</span>`:''}
  <div class="leds">${TIERS.slice(1).map((t,i)=>`<i class="${i<p.tier?'on':''}"></i>`).join('')}</div><span class="lab">${TIERS[p.tier]}</span></div>
  ${p.love.length?`<div class="chips" style="justify-content:center;margin:10px 0">${p.love.map(l=>`<span class="chip on">${l}</span>`).join('')}</div>`:''}
@@ -502,7 +510,7 @@ function showCard(id){const p=DB.people.find(x=>x.id===id);if(!p)return;closeCar
  ${kv('Met',[p.met,p.metWhen&&new Date(p.metWhen+'T00:00').toLocaleDateString(undefined,{month:'short',year:'numeric'})].filter(Boolean).join(' · '))}
  ${kv('Location',p.loc)}${kv('Contact',p.contact)}${socRow(p)}${kv('Responds to',p.best)}${kv('Hates',p.hates)}
  ${mb('Empathy',p.empathy)}${mb('Reliability',p.reliab)}${mb('Trust',p.trust)}
- ${(DB.journal||[]).filter(j=>j.people.includes(id)).length?`<div class="kv" data-j="1" style="cursor:pointer"><span>Journal</span><span>${(DB.journal||[]).filter(j=>j.people.includes(id)).length} entries &rsaquo;</span></div>`:''}${kv('Last change',h?TIERS[h.from].toLowerCase()+' → '+TIERS[h.to].toLowerCase()+(h.why?' · '+h.why:''):'')}${LK.length?`<h2 style="margin-top:22px">links</h2>${LK.map(k=>`<div class="kv" data-o="${k.o.id}" style="cursor:pointer"><span style="color:${k.t[2]}">${k.ph}</span><span>${esc(k.o.name||'Unnamed')} &rsaquo;${k.l.note?`<br><small style="color:var(--dim)">${esc(k.l.note)}</small>`:''}</span></div>`).join('')}<button class="btn" id="cmap" style="margin-top:12px">Show on map</button>`:''}
+ ${(DB.journal||[]).filter(j=>j.people.includes(id)).length?`<div class="kv" data-j="1" style="cursor:pointer"><span>Journal</span><span>${(DB.journal||[]).filter(j=>j.people.includes(id)).length} entries <i class="fa-solid fa-chevron-right" style="font-size:10px"></i></span></div>`:''}${kv('Last change',h?TIERS[h.from].toLowerCase()+' → '+TIERS[h.to].toLowerCase()+(h.why?' · '+h.why:''):'')}${LK.length?`<h2 style="margin-top:22px">links</h2>${LK.map(k=>`<div class="kv" data-o="${k.o.id}" style="cursor:pointer"><span style="color:${k.t[2]}">${k.ph}</span><span>${esc(k.o.name||'Unnamed')} <i class="fa-solid fa-chevron-right" style="font-size:10px"></i>${k.l.note?`<br><small style="color:var(--dim)">${esc(k.l.note)}</small>`:''}</span></div>`).join('')}<button class="btn" id="cmap" style="margin-top:12px">Show on map</button>`:''}
  ${p.notes?`<div class="kv" style="display:block"><span style="color:var(--dim)">Notes</span><div style="margin-top:6px;white-space:pre-wrap">${esc(p.notes.length>240?p.notes.slice(0,240)+'…':p.notes)}</div></div>`:''}
  </div><div class="acts"><button class="btn" id="ced">Edit</button><button class="btn r" id="cai">Ask AI</button></div></div></div>`;
  if(!split){document.body.appendChild(m);m.onclick=e=>{if(e.target===m)closeCard()}}else{SEL=id;document.querySelectorAll('.row').forEach(r=>r.classList.toggle('sel',r.dataset.id===id))}
@@ -518,7 +526,7 @@ function vCal(){
  const days=CAL.sel?(by[CAL.sel]||[]):Object.keys(by).sort((a,b)=>a-b).flatMap(k=>by[k]);
  let cells='';for(let d=1;d<=nd;d++)cells+=`<button class="cd ${t.getFullYear()===y&&t.getMonth()===m&&t.getDate()===d?'td':''} ${CAL.sel===d?'on':''}" data-d="${d}">${d}${by[d]?'<u></u>':''}</button>`;
  app.innerHTML=`<div class="bar"><div class="logo">C</div><div class="t"><em>&gt;_</em> context <span>/ birthdays</span></div>${TOPR}</div>
- <div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><button class="ib" id="pv">&lsaquo;</button><div class="lab">${first.toLocaleDateString(undefined,{month:'long',year:'numeric'})}</div><button class="ib" id="nx">&rsaquo;</button></div>
+ <div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><button class="ib" id="pv"><i class="fa-solid fa-chevron-left"></i></button><div class="lab">${first.toLocaleDateString(undefined,{month:'long',year:'numeric'})}</div><button class="ib" id="nx"><i class="fa-solid fa-chevron-right"></i></button></div>
  <div class="cal">${'MTWTFSS'.split('').map(c=>`<small>${c}</small>`).join('')}${'<i></i>'.repeat(pad)}${cells}</div></div>
  <h2>${CAL.sel?new Date(y,m,CAL.sel).toLocaleDateString(undefined,{day:'numeric',month:'long'}):'this month'}</h2>
  ${days.length?days.map(p=>{const b=new Date(p.bday+'T00:00'),age=y-b.getFullYear();return`<div class="row" data-id="${p.id}">${avatar(p,64)}<div class="n"><b>${esc(p.name||'Unnamed')}</b><small>${age>0?'turns '+age+' · ':''}${b.toLocaleDateString(undefined,{day:'numeric',month:'short'})}</small></div></div>`}).join(''):'<p class="hint">No birthdays here.</p>'}`;
@@ -557,8 +565,8 @@ function vJournal(){DB.journal=DB.journal||[];
  <div class="card"><div class="lab">${new Date().toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long'})}</div><div class="hi">${days.has(today())?'Written today. Nice.':'Anything on your mind?'}</div>
  <div class="stats"><div class="stt"><b>${all.length}</b><small>entries</small></div><div class="stt"><b>${st}</b><small>day streak</small></div><div class="stt"><b>${wk}</b><small>words / 7d</small></div></div>
  <div style="margin-top:16px"><button class="btn r" id="jn2">Write</button>${aiOn()&&all.length?'<button class="btn" id="jsum">Summarize 7 days</button>':''}${all.length?'<button class="btn" id="jex">Export</button>':''}</div></div><div id="jout"></div>
- <input id="jq" placeholder="search journal" value="${esc(JQ)}" style="margin-top:18px"><div class="chips scroll"><span class="chip ${JF==='all'?'on':''}" data-jf="all">All</span><span class="chip ${JF==='pin'?'on':''}" data-jf="pin">Pinned</span>${jp?`<span class="chip on" id="jpc">${esc(jp.name||'?')} &times;</span>`:''}</div>
- ${Object.entries(grp).map(([k,es])=>`<h2>${k}</h2>${es.map(e=>`<div class="je" data-id="${e.id}"><div style="display:flex;justify-content:space-between;gap:10px"><b style="font-weight:500">${e.pin?'<span style="color:var(--red)">&#9733;</span> ':''}${esc(e.title||'Untitled')}</b>${moodDots(e.mood)}</div><small>${jdate(e.d)}${e.people.length?' &middot; '+esc(e.people.slice(0,3).map(i=>(DB.people.find(p=>p.id===i)||{}).name||'').filter(Boolean).join(', ')):''} &middot; ${words(e.body)} words</small><p>${esc(e.body)}</p></div>`).join('')}`).join('')||'<p class="hint" style="margin-top:30px">No entries yet. Tap Write.</p>'}`;
+ <input id="jq" placeholder="search journal" value="${esc(JQ)}" style="margin-top:18px"><div class="chips scroll"><span class="chip ${JF==='all'?'on':''}" data-jf="all">All</span><span class="chip ${JF==='pin'?'on':''}" data-jf="pin">Pinned</span>${jp?`<span class="chip on" id="jpc">${esc(jp.name||'?')} <i class="fa-solid fa-xmark"></i></span>`:''}</div>
+ ${Object.entries(grp).map(([k,es])=>`<h2>${k}</h2>${es.map(e=>`<div class="je" data-id="${e.id}"><div style="display:flex;justify-content:space-between;gap:10px"><b style="font-weight:500">${e.pin?'<span style="color:var(--red)"><i class="fa-solid fa-star"></i></span> ':''}${esc(e.title||'Untitled')}</b>${moodDots(e.mood)}</div><small>${jdate(e.d)}${e.people.length?' &middot; '+esc(e.people.slice(0,3).map(i=>(DB.people.find(p=>p.id===i)||{}).name||'').filter(Boolean).join(', ')):''} &middot; ${words(e.body)} words</small><p>${esc(e.body)}</p></div>`).join('')}`).join('')||'<p class="hint" style="margin-top:30px">No entries yet. Tap Write.</p>'}`;
  wireTop();
  const nw=async()=>{const e={id:uid(),t:Date.now(),d:today(),title:'',body:'',mood:0,people:JP?[JP]:[],pin:false,ai:[]};DB.journal.push(e);await save();view={n:'entry',id:e.id};render()};$('#jn2').onclick=nw;
  $('#jq').oninput=e=>{JQ=e.target.value;const p=e.target.selectionStart;vJournal();const q=$('#jq');q.focus();q.setSelectionRange(p,p)};
@@ -569,7 +577,7 @@ function vJournal(){DB.journal=DB.journal||[];
  const ex=$('#jex');if(ex)ex.onclick=()=>{if(!confirm('This file is NOT encrypted. Continue?'))return;const md=[...DB.journal].sort((a,b)=>a.d.localeCompare(b.d)).map(e=>`## ${e.d}${e.title?' \u2014 '+e.title:''}\nMood: ${e.mood||'-'}/5\n\n${e.body}`).join('\n\n---\n\n');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([md],{type:'text/markdown'}));a.download='context-journal.md';a.click()}}
 function vEntry(){const e=(DB.journal||[]).find(x=>x.id===view.id);if(!e){view={n:'journal'};return render()}e.ai=e.ai||[];lastEntry=e.id;
- app.innerHTML=`<div class="bar"><button class="ib" id="back" aria-label="Back">&larr;</button><div class="t"><em>&gt;_</em> entry</div><button class="ib" id="pin" aria-label="Pin" style="${e.pin?'color:var(--red);border-color:var(--red)':''}">&#9733;</button><button class="ib" id="del" aria-label="Delete">&times;</button></div>
+ app.innerHTML=`<div class="bar"><button class="ib" id="back" aria-label="Back"><i class="fa-solid fa-arrow-left"></i></button><div class="t"><em>&gt;_</em> entry</div><button class="ib" id="pin" aria-label="Pin" style="${e.pin?'color:var(--red);border-color:var(--red)':''}"><i class="fa-solid fa-star"></i></button><button class="ib" id="del" aria-label="Delete"><i class="fa-solid fa-trash"></i></button></div>
  <input type="date" id="jd" value="${e.d}"><label>Mood</label><div class="chips">${[1,2,3,4,5].map(i=>`<span class="chip ${e.mood===i?'on':''}" data-m="${i}">${MOODS[i]}</span>`).join('')}</div>
  <label>Title</label><input id="jt" value="${esc(e.title)}" placeholder="Optional"><div style="margin:16px 0 6px"><button class="btn" id="pr" style="margin:0">Prompt me</button> <span class="hint" id="pt"></span></div>
  <textarea id="jbody" style="min-height:42vh" placeholder="Write anything&hellip;">${esc(e.body)}</textarea><div class="hint" id="wc">${words(e.body)} words</div>
@@ -589,13 +597,13 @@ function vEntry(){const e=(DB.journal||[]).find(x=>x.id===view.id);if(!e){view={
  const go=(k,pr)=>runAI(pr,$('#aiout'),'Save to entry',async t=>{e.ai.push({k,x:t});await save();vEntry()});
  const a=$('#adv');if(a){a.onclick=()=>go('advice',advPrompt(e));$('#sum').onclick=()=>go('summary',sumPrompt([e],'one entry'))}}
 /* ---------- bottom bar ---------- */
-const TOPR='<button class="ib" id="st" aria-label="Settings">&#9881;</button><button class="ib" id="lk" aria-label="Lock">&#9211;</button>';
+const TOPR='<button class="ib" id="st" aria-label="Settings"><i class="fa-solid fa-gear"></i></button><button class="ib" id="lk" aria-label="Lock"><i class="fa-solid fa-lock"></i></button>';
 function wireTop(){const a=$('#st'),b=$('#lk');if(a)a.onclick=()=>{view={n:'settings'};render()};if(b)b.onclick=()=>lockScreen()}
 async function newEntry(){DB.journal=DB.journal||[];const e={id:uid(),t:Date.now(),d:today(),title:'',body:'',mood:0,people:JP?[JP]:[],pin:false,ai:[]};DB.journal.push(e);await save();view={n:'entry',id:e.id};render()}
 function updateNav(){const n=document.getElementById('nav');if(!n)return;n.style.display=view.n==='map'?'none':'';
  const A={list:'p',person:'p',mend:'p',cal:'c',journal:'j',entry:'j'}[view.n];n.querySelectorAll('[data-nv]').forEach(b=>b.classList.toggle('on',b.dataset.nv===A));
  n.querySelector('#add').setAttribute('aria-label',A==='j'?'New entry':'Add person')}
-document.body.insertAdjacentHTML('beforeend','<nav class="nav" id="nav" style="display:none"><button class="ni" data-nv="p"><span class="g">&#9678;</span>People</button><button class="ni" data-nv="c"><span class="g">&#10022;</span>Birthdays</button><button class="cfab" id="add" aria-label="Add person">+</button><button class="ni" data-nv="m"><span class="g">&#9672;</span>Map</button><button class="ni" data-nv="j"><span class="g">&#9998;</span>Journal</button></nav>');
+document.body.insertAdjacentHTML('beforeend','<nav class="nav" id="nav" style="display:none"><button class="ni" data-nv="p"><span class="g"><i class="fa-solid fa-users"></i></span>People</button><button class="ni" data-nv="c"><span class="g"><i class="fa-solid fa-cake-candles"></i></span>Birthdays</button><button class="cfab" id="add" aria-label="Add person"><i class="fa-solid fa-plus"></i></button><button class="ni" data-nv="m"><span class="g"><i class="fa-solid fa-diagram-project"></i></span>Map</button><button class="ni" data-nv="j"><span class="g"><i class="fa-solid fa-book-open"></i></span>Journal</button></nav>');
 document.getElementById('nav').onclick=async e=>{const b=e.target.closest('button');if(!b)return;vib();
  if(b.id==='add'){if(view.n==='journal'||view.n==='entry')return newEntry();const p=blank();DB.people.push(p);await save();view={n:'person',id:p.id};return render()}
  const k=b.dataset.nv;if(k==='p')view={n:'list'};else if(k==='c'){const n=new Date();CAL={y:n.getFullYear(),m:n.getMonth(),sel:n.getDate()};view={n:'cal'}}else if(k==='m')view={n:'map'};else if(k==='j'){JP=null;view={n:'journal'}}render()};
