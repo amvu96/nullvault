@@ -156,7 +156,7 @@ a.chip{text-decoration:none;color:var(--fg)}
 .nav{z-index:15}
 </style></head><body><div class="wrap" id="app"></div>
 <script>
-const VERSION='1.13';
+const VERSION='1.14';
 const TIERS=['Hated','Disliked','Wary','Neutral','Acquaintance','Friend','Trusted','Best friend'];
 const LOVE=['Gifts','Praise','Quality time','Acts of service','Touch'];
 const $=s=>document.querySelector(s),app=$('#app');
@@ -333,7 +333,11 @@ function vSettings(){
  const bb=$('#bio'),setB=on=>{bb.textContent=on?'Disable fingerprint':'Enable fingerprint';bb.dataset.on=on?'1':''};bb.textContent='Fingerprint…';kvGet('bio').then(b=>setB(!!b));
  bb.onclick=async()=>{const m=$('#msg');try{if(bb.dataset.on){await kvSet('bio',null);setB(false);m.style.color='var(--fg)';m.textContent='Fingerprint unlock off.'}
   else{await bioEnable();setB(true);m.style.color='var(--fg)';m.textContent='Fingerprint unlock on. Your PIN still works.'}}
-  catch(e){m.style.color='';m.textContent=e.message==='prf'?'This device or browser cannot do secure fingerprint unlock. Use your PIN.':'Fingerprint setup cancelled.'}};
+  catch(e){m.style.color='';
+  if(e.message==='prf'){if(confirm('This browser cannot tie your fingerprint to the encryption key (common when Bitwarden handles passkeys).\n\nUse convenience mode instead? A fingerprint or device-lock check will be required to open the app, but the key is kept on this device. It protects against someone using your unlocked phone, not against someone extracting the app data. Your PIN stays the strongest protection.')){
+    try{await bioGate(e.cred);setB(true);m.style.color='var(--fg)';m.textContent='Fingerprint unlock on (convenience mode).'}catch(x){m.textContent=x.name==='NotAllowedError'?'Fingerprint setup cancelled.':'Could not set up fingerprint ('+(x.name||x.message)+').'}}
+   else m.textContent='Secure mode needs a passkey provider that supports it. On Android, try Settings > Passwords > preferred service > Google Password Manager.'}
+  else m.textContent=e.name==='NotAllowedError'?'Fingerprint setup cancelled.':'Fingerprint setup failed ('+(e.name||e.message)+').'}};
  const dl=(name,txt)=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt]));a.download=name;a.click()};
  $('#exp').onclick=async()=>{const pw=prompt('Backup password (separate from your PIN)');if(!pw)return;
   const salt=crypto.getRandomValues(new Uint8Array(16)),k=await derive(pw,salt);dl('context-'+new Date().toISOString().slice(0,10)+'.context',JSON.stringify({v:1,salt:b64(salt),...await enc(DB,k)}))};
@@ -465,13 +469,20 @@ function vMap(){
 const prfGet=async(id,salt)=>{const a=await navigator.credentials.get({publicKey:{challenge:crypto.getRandomValues(new Uint8Array(32)),allowCredentials:[{type:'public-key',id}],userVerification:'required',extensions:{prf:{eval:{first:salt}}}}});
  const r=a.getClientExtensionResults().prf;if(!r||!r.results||!r.results.first)throw new Error('prf');
  return crypto.subtle.importKey('raw',r.results.first,'AES-GCM',false,['wrapKey','unwrapKey'])};
-async function bioEnable(){if(!window.PublicKeyCredential||!KEY)throw new Error('prf');
- const c=await navigator.credentials.create({publicKey:{challenge:crypto.getRandomValues(new Uint8Array(32)),rp:{name:'Context'},user:{id:crypto.getRandomValues(new Uint8Array(16)),name:'context',displayName:'Context'},
-  pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required',residentKey:'preferred'},extensions:{prf:{}}}});
- const e=c.getClientExtensionResults();if(!e.prf||!e.prf.enabled)throw new Error('prf');
- const salt=crypto.getRandomValues(new Uint8Array(32)),iv=crypto.getRandomValues(new Uint8Array(12)),wk=await prfGet(c.rawId,salt);
+const cOpts=prf=>({publicKey:{challenge:crypto.getRandomValues(new Uint8Array(32)),rp:{name:'Context'},user:{id:crypto.getRandomValues(new Uint8Array(16)),name:'context',displayName:'Context'},
+ pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required',residentKey:'preferred'},extensions:prf?{prf:{}}:undefined}});
+const uvGet=id=>navigator.credentials.get({publicKey:{challenge:crypto.getRandomValues(new Uint8Array(32)),allowCredentials:[{type:'public-key',id}],userVerification:'required'}});
+const noPrf=id=>{const e=new Error('prf');e.cred=id;return e};
+async function bioEnable(){if(!window.PublicKeyCredential||!KEY)throw noPrf();
+ let c;try{c=await navigator.credentials.create(cOpts(true))}catch(e){if(e.name==='NotAllowedError')throw e;throw noPrf()}
+ const e=c.getClientExtensionResults();if(!e.prf||!e.prf.enabled)throw noPrf(c.rawId);
+ const salt=crypto.getRandomValues(new Uint8Array(32)),iv=crypto.getRandomValues(new Uint8Array(12));let wk;try{wk=await prfGet(c.rawId,salt)}catch{throw noPrf(c.rawId)}
  const w=await crypto.subtle.wrapKey('raw',KEY,wk,{name:'AES-GCM',iv});await kvSet('bio',{id:b64(c.rawId),salt:b64(salt),iv:b64(iv),w:b64(w)})}
-async function bioUnlock(b){const wk=await prfGet(ub(b.id),ub(b.salt));return crypto.subtle.unwrapKey('raw',ub(b.w),wk,{name:'AES-GCM',iv:ub(b.iv)},'AES-GCM',true,['encrypt','decrypt'])}
+async function bioGate(id){if(!KEY)throw new Error('locked');if(!id)id=(await navigator.credentials.create(cOpts(false))).rawId;await uvGet(id);
+ const dk=await crypto.subtle.generateKey({name:'AES-GCM',length:256},false,['wrapKey','unwrapKey']),iv=crypto.getRandomValues(new Uint8Array(12)),w=await crypto.subtle.wrapKey('raw',KEY,dk,{name:'AES-GCM',iv});
+ await kvSet('bio',{m:'gate',id:b64(id),iv:b64(iv),w:b64(w),dk})}
+async function bioUnlock(b){if(b.m==='gate'){await uvGet(ub(b.id));return crypto.subtle.unwrapKey('raw',ub(b.w),b.dk,{name:'AES-GCM',iv:ub(b.iv)},'AES-GCM',true,['encrypt','decrypt'])}
+ const wk=await prfGet(ub(b.id),ub(b.salt));return crypto.subtle.unwrapKey('raw',ub(b.w),wk,{name:'AES-GCM',iv:ub(b.iv)},'AES-GCM',true,['encrypt','decrypt'])}
 let focusId=null;
 /* ---------- profile popup ---------- */
 function closeCard(){const c=document.getElementById('card');if(c)c.remove()}
