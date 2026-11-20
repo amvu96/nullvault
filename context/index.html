@@ -162,12 +162,15 @@ a.chip{text-decoration:none;color:var(--fg)}
 .je.sel{border-color:var(--red);background:#ff3b4e12}
 @media(min-width:900px){.jlist{max-height:480px;overflow-y:auto;padding-right:6px;scrollbar-width:thin;scrollbar-color:var(--red) transparent;overscroll-behavior:contain}.jlist::-webkit-scrollbar{width:4px}.jlist::-webkit-scrollbar-thumb{background:var(--red);border-radius:4px}}
 @media(min-width:1000px){[data-v=cal],[data-v=journal]{max-width:1320px}}
+.mc{padding-top:62px}.pane .mc{padding-top:26px}
 </style></head><body><div class="wrap" id="app"></div>
 <script>
-const VERSION='1.17';
+const VERSION='1.21';
+// Paste your Google OAuth Client ID here once (it is public, not a secret). Then users only press one button.
+const GCLIENT='671842605028-nbhekhointo25vi0jr9v7vldr6u1jh3t.apps.googleusercontent.com';
 const QS=new URLSearchParams(location.search);let GO=QS.get('go'),SHR=(QS.get('title')||QS.get('text')||QS.get('url'))?[QS.get('title'),QS.get('text'),QS.get('url')].filter(Boolean).join('\n'):null;
 async function startView(){if(SHR){DB.journal=DB.journal||[];const e={id:uid(),t:Date.now(),d:today(),title:'Shared',body:SHR,mood:0,people:[],pin:false,ai:[]};DB.journal.push(e);SHR=null;await save();view={n:'entry',id:e.id}}
- else view=({journal:{n:'journal'},map:{n:'map'},cal:{n:'cal'}}[GO])||{n:'list'};GO=null;if(location.search)history.replaceState(null,'',location.pathname);render()}
+ else view=({journal:{n:'journal'},map:{n:'map'},cal:{n:'cal'}}[GO])||{n:'list'};GO=null;if(location.search)history.replaceState(null,'',location.pathname);render();if(DB.settings.gAuto&&DB.settings.gLast&&gCid())driveSilent().catch(()=>{})}
 const TIERS=['Hated','Disliked','Wary','Neutral','Acquaintance','Friend','Trusted','Best friend'];
 const LOVE=['Gifts','Praise','Quality time','Acts of service','Touch'];
 const $=s=>document.querySelector(s),app=$('#app');
@@ -186,11 +189,11 @@ const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().e
 const dec=async(p,key)=>JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:ub(p.iv)},key,ub(p.ct))));
 /* ---------- state ---------- */
 let KEY=null,DB={people:[],settings:{mode:'prompt',model:'gemini-2.5-flash',apiKey:'',alias:true,lockMin:2}},view={n:'list'},q='',sort='recent',lockT;
-const save=async()=>kvSet('data',await enc(DB,KEY));
+const save=async()=>{await kvSet('data',await enc(DB,KEY));gSched()};
 const uid=()=>crypto.randomUUID();
 /* ---------- lock ---------- */
 async function lockScreen(msg=''){
- KEY=null;const nvx=document.getElementById('nav');if(nvx)nvx.style.display='none';const meta=await kvGet('meta'),bio=await kvGet('bio'),first=!meta;
+ clearTimeout(GT.tm);KEY=null;const nvx=document.getElementById('nav');if(nvx)nvx.style.display='none';const meta=await kvGet('meta'),bio=await kvGet('bio'),first=!meta;
  app.innerHTML=`<div class="lock"><div class="dots" style="color:var(--red);font-size:20px">● ● ●</div><h1 class="dot" style="font-size:44px"><span style="color:var(--red)">&gt;_</span> context</h1>
  <p class="hint">${first?'Create a PIN. It encrypts everything on this device.<br>If you forget it and have no backup, your data is gone.':'Enter your PIN'}</p>
  <input id="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="12" placeholder="••••">
@@ -334,14 +337,26 @@ function vSettings(){
  <h2>circles</h2>${circ().map(c=>`<div class="kv"><span style="color:${c.color}">&#9679; ${esc(c.name)}</span><span><button class="btn" style="margin:0 6px 0 0;padding:6px 12px" data-rn="${c.id}">Rename</button><button class="btn" style="margin:0;padding:6px 12px" data-dc="${c.id}">Delete</button></span></div>`).join('')}<button class="btn" id="addc"><i class="fa-solid fa-plus"></i> New circle</button>
  <h2>security</h2><label>Auto-lock (minutes, 0 = off)</label><input id="lock" type="number" min="0" value="${s.lockMin}">
  <button class="btn" id="bio">Fingerprint unlock</button><button class="btn" id="lockNow">Lock now</button><button class="btn" id="chpin">Change PIN</button>
+ <h2>google drive</h2><p class="hint">Back up everything, photos included, to a private encrypted file in your Google Drive. Only this app can see it.</p>
+ ${GCLIENT?'':`<label>OAuth Client ID (developer setup)</label><input id="gcid" value="${esc(s.gClient||'')}" placeholder="xxxx.apps.googleusercontent.com">`}
+ <div class="sw"><span>Auto-backup after changes</span><input type="checkbox" id="gauto" style="width:auto" ${s.gAuto?'checked':''}></div>
+ <div id="gst" class="hint" style="margin:12px 0"></div>
+ <button class="btn r" id="gcon"><i class="fa-brands fa-google"></i> Connect Google Drive</button><button class="btn" id="gbk">Back up now</button><button class="btn" id="grs">Restore</button><button class="btn" id="gkey"><i class="fa-solid fa-key"></i> Recovery key</button>
  <h2>data</h2><button class="btn r" id="exp">Encrypted backup</button><button class="btn" id="expj">Plain JSON</button><button class="btn" id="imp">Import</button>
  <p class="hint">Context v${VERSION}</p><input type="file" id="file" hidden><p class="hint">Back up regularly. A forgotten PIN cannot be recovered.</p><div class="err" id="msg"></div>`;
  $('#mode').value=s.mode;
- const sv=()=>{s.mode=$('#mode').value;s.apiKey=$('#key').value.trim();s.model=$('#model').value.trim();s.alias=$('#alias').checked;s.lockMin=+$('#lock').value||0;save()};
+ const sv=()=>{s.mode=$('#mode').value;s.apiKey=$('#key').value.trim();s.model=$('#model').value.trim();s.alias=$('#alias').checked;s.lockMin=+$('#lock').value||0;if($('#gcid'))s.gClient=$('#gcid').value.trim();s.gAuto=$('#gauto').checked;save()};
  app.querySelectorAll('input,select').forEach(i=>i.onchange=sv);
  $('#back').onclick=()=>{sv();view={n:'list'};render()};app.querySelectorAll('[data-rn]').forEach(b=>b.onclick=async()=>{const c=circ().find(x=>x.id===b.dataset.rn),n=(prompt('Rename circle',c.name)||'').trim();if(n){c.name=n;sv();await save();vSettings()}});
  app.querySelectorAll('[data-dc]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete this circle? People stay.'))return;const id=b.dataset.dc;DB.circles=circ().filter(c=>c.id!==id);DB.people.forEach(p=>p.circles=(p.circles||[]).filter(x=>x!==id));if(FC===id)FC=null;if(MF===id)MF=null;sv();await save();vSettings()});
  $('#addc').onclick=async()=>{const n=(prompt('Circle name')||'').trim();if(!n)return;const cs=circ();cs.push({id:uid(),name:n,color:CC[cs.length%CC.length]});sv();await save();vSettings()};
+ const gst=()=>{$('#gst').textContent=(gOn()?'Connected':'Not connected')+' \u00b7 '+(s.gLast?'last backup '+new Date(s.gLast).toLocaleString():'no backup yet')},gm=t=>{$('#gst').textContent=t};gst();if(gCid())loadGIS().catch(()=>{});
+ $('#gcon').onclick=async()=>{sv();try{await driveConnect();const f=await gFind();
+   if(f&&!s.gPass&&confirm('A backup was found in this Google Drive. Restore it now?')){const v=prompt('Enter the recovery key from your other device');if(v){s.gPass=v.trim();try{await driveRestore();vSettings();return}catch(e){s.gPass='';throw e}}}
+   if(!s.gPass){s.gPass=genKey();await save();showKey(s.gPass)}gst()}catch(e){gm(e.message)}};
+ $('#gbk').onclick=async()=>{sv();try{if(!gOn())await driveConnect();if(!s.gPass){s.gPass=genKey();await save();showKey(s.gPass)}const f=await gFind();if(f&&!s.gLast&&!confirm('A backup from another device already exists. Overwrite it with this device\'s data?'))return;gm('Backing up\u2026');await driveBackup();gst()}catch(e){gm(e.message)}};
+ $('#grs').onclick=async()=>{sv();const prev=s.gPass;try{if(!s.gPass){const v=prompt('Enter your recovery key');if(!v)return;s.gPass=v.trim()}if(!confirm('Replace ALL local data with the Drive backup?')){s.gPass=prev;return}if(!gOn())await driveConnect();gm('Restoring\u2026');await driveRestore();vSettings()}catch(e){s.gPass=prev;gm(e.message)}};
+ $('#gkey').onclick=async()=>{if(s.gPass)showKey(s.gPass);else{const v=prompt('Enter the recovery key from your other device');if(v){s.gPass=v.trim();await save();gm('Recovery key saved.')}}};
  $('#lockNow').onclick=()=>lockScreen();
  const bb=$('#bio'),setB=on=>{bb.textContent=on?'Disable fingerprint':'Enable fingerprint';bb.dataset.on=on?'1':''};bb.textContent='Fingerprint…';kvGet('bio').then(b=>setB(!!b));
  bb.onclick=async()=>{const m=$('#msg');try{if(bb.dataset.on){await kvSet('bio',null);setB(false);m.style.color='var(--fg)';m.textContent='Fingerprint unlock off.'}
@@ -366,7 +381,7 @@ function vSettings(){
 /* ---------- relationship map ---------- */
 const LT=[['friend','Friends','#e8edf2','',0],['family','Family','#9db4ff','',0],['partner','Partner','#ff8dc7','',0],['work','Colleagues','#8a96a5','6 5',0],['rival','Rivals','#ffb347','2 5',0],['hate','Hates','#ff3b4e','',1]];
 const LTm=Object.fromEntries(LT.map(t=>[t[0],t])),tc=t=>t<=1?'#ff3b4e':t<=3?'#6b7785':'#e8edf2';
-let V={x:0,y:0,k:1},M={sel:null,edge:null,link:false,pair:null,me:true,ms:new Set(),zones:true,box:null},CTX=null,MAPKD=null;
+let V={x:0,y:0,k:1},M={sel:null,edge:null,link:false,pair:null,me:true,ms:new Set(),zones:true,box:null,lbl:true,size:false,hide:new Set(),focus:null,path:null},CTX=null,MAPKD=null;
 function place(){const P=DB.people;P.forEach((p,i)=>{if(p.gx==null){const a=i/P.length*6.283;p.gx=Math.cos(a)*190;p.gy=Math.sin(a)*190}})}
 function sim(){const P=DB.people,I=Object.fromEntries(P.map((p,i)=>[p.id,i]));
  for(let it=0;it<250;it++){const F=P.map(()=>[0,0]);
@@ -388,8 +403,8 @@ function showMenu(e,items){closeMenu();const d=document.createElement('div');d.c
  document.body.appendChild(d);d.style.left=Math.max(8,Math.min(e.clientX,innerWidth-d.offsetWidth-8))+'px';d.style.top=Math.max(8,Math.min(e.clientY,innerHeight-d.offsetHeight-8))+'px';
  d.oncontextmenu=ev=>ev.preventDefault();d.onclick=ev=>{const b=ev.target.closest('button');if(!b)return;const f=items[b.dataset.i].f;closeMenu();f()};CTX=d}
 function vMap(){
- DB.links=DB.links||[];const people=DB.people;M.sel=M.edge=M.pair=null;M.link=false;M.ms=new Set();M.box=null;
- app.innerHTML=`<div class="mapwrap"><svg id="svg"></svg><div class="mtop"><button class="ib" id="back" aria-label="Back"><i class="fa-solid fa-arrow-left"></i></button><div class="t"><em>&gt;_</em> map</div><button class="ib" id="arr" aria-label="Auto arrange"><i class="fa-solid fa-wand-magic-sparkles"></i></button><button class="ib" id="grp" aria-label="Group by circle"><i class="fa-solid fa-object-group"></i></button><button class="ib" id="fit" aria-label="Fit to screen"><i class="fa-solid fa-expand"></i></button><button class="ib" id="meb" aria-label="Show my ties"><i class="fa-solid fa-eye"></i></button></div><div class="mfil chips scroll"></div><div class="sheet" id="sh"></div></div>`;
+ DB.links=DB.links||[];const people=DB.people;M.sel=M.edge=M.pair=null;M.link=false;M.ms=new Set();M.box=null;M.focus=M.path=null;
+ app.innerHTML=`<div class="mapwrap"><svg id="svg"></svg><div class="mtop"><button class="ib" id="back" aria-label="Back"><i class="fa-solid fa-arrow-left"></i></button><div class="t"><em>&gt;_</em> map</div><input id="mfind" placeholder="find person" style="display:none;flex:1;height:40px;padding:0 14px"><button class="ib" id="fnd" aria-label="Find person"><i class="fa-solid fa-magnifying-glass"></i></button><button class="ib" id="zon" aria-label="Circles"><i class="fa-solid fa-layer-group"></i></button><button class="ib" id="lay" aria-label="Layout"><i class="fa-solid fa-wand-magic-sparkles"></i></button><button class="ib" id="lyr" aria-label="Layers"><i class="fa-solid fa-sliders"></i></button></div><div class="mfil chips scroll"></div><div class="sheet" id="sh"></div></div>`;
  const svg=$('#svg'),sh=$('#sh'),nm=id=>people.find(p=>p.id===id),r0=svg.getBoundingClientRect();
  const fresh=people.every(p=>p.gx==null);place();if(fresh)sim();
  V={x:r0.width/2,y:(r0.height-150)/2+30,k:people.length>12?.7:1};
@@ -397,28 +412,37 @@ function vMap(){
  const P=e=>{const r=svg.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}};
  const zones=()=>M.zones?circ().map(c=>{const m=people.filter(p=>(p.circles||[]).includes(c.id));if(!m.length)return'';const cx=m.reduce((a,p)=>a+p.gx,0)/m.length,cy=m.reduce((a,p)=>a+p.gy,0)/m.length,r=Math.max(...m.map(p=>Math.hypot(p.gx-cx,p.gy-cy)))+48;
   return`<g opacity="${MF&&MF!==c.id?.15:1}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="${c.color}" fill-opacity=".06" stroke="${c.color}" stroke-opacity=".4" stroke-dasharray="4 6"/><text x="${cx}" y="${cy-r-8}" text-anchor="middle" font-size="12" style="fill:${c.color}">${esc(c.name)}</text></g>`}).join(''):'';
- const draw=()=>{let h='<defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ff3b4e"/></marker></defs>'+`<g transform="translate(${V.x} ${V.y}) scale(${V.k})">`;
+ const draw=()=>{let lit=null;if(M.path)lit=M.path.nodes;else if(M.focus){lit=new Set([M.focus]);DB.links.forEach(l=>{if(l.a===M.focus)lit.add(l.b);if(l.b===M.focus)lit.add(l.a)})}
+  const dg={};DB.links.forEach(l=>{dg[l.a]=(dg[l.a]||0)+1;dg[l.b]=(dg[l.b]||0)+1});
+  const eo=(l,A,B)=>M.path?(M.path.edges.has(l.id)?1:.08):M.focus?((l.a===M.focus||l.b===M.focus)?1:.08):(!MF||((A.circles||[]).includes(MF)&&(B.circles||[]).includes(MF)))?1:.12;let h='<defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ff3b4e"/></marker></defs>'+`<g transform="translate(${V.x} ${V.y}) scale(${V.k})">`;
   h+=zones();if(M.me)people.forEach(p=>{h+=`<line x1="0" y1="0" x2="${p.gx}" y2="${p.gy}" stroke="${tc(p.tier)}" stroke-dasharray="1 6" opacity=".45"/>`});
-  DB.links.forEach(l=>{const A=nm(l.a),B=nm(l.b);if(!A||!B)return;const t=LTm[l.type],dx=B.gx-A.gx,dy=B.gy-A.gy,d=Math.hypot(dx,dy)||1,ux=dx/d,uy=dy/d,x1=A.gx+ux*30,y1=A.gy+uy*30,x2=B.gx-ux*32,y2=B.gy-uy*32;
-   h+=`<g data-e="${l.id}" opacity="${!MF||((A.circles||[]).includes(MF)&&(B.circles||[]).includes(MF))?1:.12}"><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="transparent" stroke-width="24"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${t[2]}" stroke-width="${M.edge===l.id?4:t[4]?2.6:1.8}" stroke-dasharray="${t[3]}" ${t[4]?'marker-end="url(#ar)"':''}/><text x="${(x1+x2)/2}" y="${(y1+y2)/2-7}" font-size="9" text-anchor="middle" opacity=".75">${t[1].toLowerCase()}</text></g>`});
+  DB.links.forEach(l=>{const A=nm(l.a),B=nm(l.b);if(!A||!B||M.hide.has(l.type))return;const t=LTm[l.type],dx=B.gx-A.gx,dy=B.gy-A.gy,d=Math.hypot(dx,dy)||1,ux=dx/d,uy=dy/d,x1=A.gx+ux*30,y1=A.gy+uy*30,x2=B.gx-ux*32,y2=B.gy-uy*32;
+   h+=`<g data-e="${l.id}" opacity="${eo(l,A,B)}"><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="transparent" stroke-width="24"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${t[2]}" stroke-width="${M.edge===l.id?4:t[4]?2.6:1.8}" stroke-dasharray="${t[3]}" ${t[4]?'marker-end="url(#ar)"':''}/>${M.lbl?`<text x="${(x1+x2)/2}" y="${(y1+y2)/2-7}" font-size="9" text-anchor="middle" opacity=".75">${t[1].toLowerCase()}</text>`:''}</g>`});
   h+='<g><circle r="22" fill="#ff3b4e"/><text y="4" text-anchor="middle" font-size="11" font-weight="700" style="fill:#1b0307">ME</text></g>';
   people.forEach(p=>{const s=M.sel===p.id||M.ms.has(p.id)||(M.pair&&M.pair.includes(p.id));
-   h+=`<g data-n="${p.id}" opacity="${!MF||(p.circles||[]).includes(MF)?1:.15}" transform="translate(${p.gx} ${p.gy})"><title>${esc(p.name)} · ${TIERS[p.tier]}</title>${s?'<circle r="37" fill="none" stroke="#ff3b4e" stroke-dasharray="3 4"/>':''}<circle r="28" fill="#10151c" stroke="${tc(p.tier)}" stroke-width="2.5"/>${p.photo?`<image href="${p.photo}" x="-24" y="-24" width="48" height="48" preserveAspectRatio="xMidYMid slice" style="clip-path:circle(50%)"/>`:`<text y="6" text-anchor="middle" font-size="18" font-weight="600" style="fill:#ff3b4e">${esc((p.name||'?')[0].toUpperCase())}</text>`}<text y="46" text-anchor="middle" font-size="11">${esc((p.nick||p.name||'?').slice(0,14))}</text>${pc(p).slice(0,3).map((c,i)=>`<circle cx="${[21,30,31][i]}" cy="${[-21,-9,6][i]}" r="5.5" fill="${c.color}" stroke="#0a0d12" stroke-width="1.5"/>`).join('')}</g>`});
+   h+=`<g data-n="${p.id}" opacity="${lit?(lit.has(p.id)?1:.15):(!MF||(p.circles||[]).includes(MF)?1:.15)}" transform="translate(${p.gx} ${p.gy})${M.size?` scale(${(.85+.1*Math.min(dg[p.id]||0,6)).toFixed(2)})`:''}"><title>${esc(p.name)} · ${TIERS[p.tier]}</title>${s?'<circle r="37" fill="none" stroke="#ff3b4e" stroke-dasharray="3 4"/>':''}<circle r="28" fill="#10151c" stroke="${tc(p.tier)}" stroke-width="2.5"/>${p.photo?`<image href="${p.photo}" x="-24" y="-24" width="48" height="48" preserveAspectRatio="xMidYMid slice" style="clip-path:circle(50%)"/>`:`<text y="6" text-anchor="middle" font-size="18" font-weight="600" style="fill:#ff3b4e">${esc((p.name||'?')[0].toUpperCase())}</text>`}<text y="46" text-anchor="middle" font-size="11">${esc((p.nick||p.name||'?').slice(0,14))}</text>${M.zones?pc(p).slice(0,3).map((c,i)=>`<circle cx="${[21,30,31][i]}" cy="${[-21,-9,6][i]}" r="5.5" fill="${c.color}" stroke="#0a0d12" stroke-width="1.5"/>`).join(''):''}</g>`});
   svg.innerHTML=h+'</g>'+(M.box?`<rect x="${Math.min(M.box.x0,M.box.x1)}" y="${Math.min(M.box.y0,M.box.y1)}" width="${Math.abs(M.box.x1-M.box.x0)}" height="${Math.abs(M.box.y1-M.box.y0)}" fill="#ff3b4e18" stroke="#ff3b4e" stroke-dasharray="4 4"/>`:'')};
  const fil=()=>{const f=$('.mfil');f.innerHTML=`<span class="chip ${!MF?'on':''}" data-m="">All</span>`+circ().map(c=>`<span class="chip cc ${MF===c.id?'on':''}" style="--c:${c.color}" data-m="${c.id}">${esc(c.name)}</span>`).join('');f.onclick=e=>{const t=e.target.closest('[data-m]');if(!t)return;MF=t.dataset.m||null;fil();draw()}};
  const chips=c=>LT.map(t=>`<span class="chip ${c===t[0]?'on':''}" data-ty="${t[0]}" style="${c===t[0]?'':'border-color:'+t[2]+'66'}">${t[1]}</span>`).join('');
+ const findPath=(a,b)=>{const prev={[a]:null},q=[a];while(q.length){const x=q.shift();if(x===b)break;DB.links.forEach(l=>{const y=l.a===x?l.b:l.b===x?l.a:null;if(y&&!(y in prev)){prev[y]=[x,l.id];q.push(y)}})}
+  if(!(b in prev))return{nodes:new Set([a,b]),edges:new Set(),chain:null};const ch=[b],ed=new Set();let c=b;while(prev[c]){ed.add(prev[c][1]);c=prev[c][0];ch.unshift(c)}return{nodes:new Set(ch),edges:ed,chain:ch}};
+ const pathHTML=()=>{const p=M.path;return p.chain?`<div class="lab">connection</div><div style="margin:8px 0">${p.chain.map(i=>esc(nm(i).name||'?')).join(' <i class="fa-solid fa-arrow-right" style="color:var(--red);font-size:11px"></i> ')}</div><div class="hint">${p.chain.length-1} step${p.chain.length===2?'':'s'}</div><button class="btn" data-act="pclr">Clear</button>`:`<div class="lab">connection</div><p class="hint">No chain of links connects these two.</p><button class="btn" data-act="pclr">Clear</button>`};
+ const statsLine=()=>{const d={};DB.links.forEach(l=>{d[l.a]=(d[l.a]||0)+1;d[l.b]=(d[l.b]||0)+1});const top=people.slice().sort((a,b)=>(d[b.id]||0)-(d[a.id]||0))[0],iso=people.filter(p=>!d[p.id]).length,h=DB.links.filter(l=>l.type==='hate').length;
+  return people.length?`<div class="hint" style="margin:6px 0">${people.length} people &middot; ${DB.links.length} links${h?' &middot; '+h+' conflict'+(h>1?'s':''):''}${top&&d[top.id]?'<br>Most connected: '+esc(top.name||'?')+' ('+d[top.id]+')':''}${iso?'<br>'+iso+' not linked yet':''}</div>`:''};
  const sheet=()=>{let c;
-  if(M.ms.size){c=`<div class="lab">${M.ms.size} selected</div><div class="hint" style="margin-top:8px">Add / remove circle</div><div class="chips" style="margin:8px 0">${circ().map(k=>`<span class="chip cc" style="--c:${k.color}" data-mc="${k.id}">${esc(k.name)}</span>`).join('')}</div><div class="hint">Link all as</div><div class="chips" style="margin:8px 0">${chips('').replace(/data-ty=/g,'data-mt=')}</div><button class="btn" data-act="row">Row</button><button class="btn" data-act="col">Column</button><button class="btn" data-act="clr">Clear</button>`}
+  if(M.path){c=pathHTML()}
+  else if(M.ms.size){c=`<div class="lab">${M.ms.size} selected</div><div class="hint" style="margin-top:8px">Add / remove circle</div><div class="chips" style="margin:8px 0">${circ().map(k=>`<span class="chip cc" style="--c:${k.color}" data-mc="${k.id}">${esc(k.name)}</span>`).join('')}</div><div class="hint">Link all as</div><div class="chips" style="margin:8px 0">${chips('').replace(/data-ty=/g,'data-mt=')}</div>${M.ms.size===2?'<button class="btn r" data-act="path">Find connection</button>':''}<button class="btn" data-act="row">Row</button><button class="btn" data-act="col">Column</button><button class="btn" data-act="clr">Clear</button>`}
   else if(M.pair){const[a,b]=M.pair.map(nm);c=`<div class="lab">connect</div><b>${esc(a.name)} <i class="fa-solid fa-arrow-right"></i> ${esc(b.name)}</b><div class="chips" style="margin:10px 0">${chips('')}</div><button class="btn" data-act="cancel">Cancel</button>`}
   else if(M.edge){const l=DB.links.find(x=>x.id===M.edge),a=nm(l.a),b=nm(l.b);c=`<div class="lab">relation</div><b>${esc(a.name)} ${LTm[l.type][4]?'<i class="fa-solid fa-arrow-right"></i>':'<i class="fa-solid fa-arrows-left-right"></i>'} ${esc(b.name)}</b><div class="chips" style="margin:10px 0">${chips(l.type)}</div><input id="en" placeholder="note (optional)" value="${esc(l.note||'')}"><button class="btn" data-act="swap">Swap</button><button class="btn" data-act="del">Delete</button>`}
-  else if(M.sel){const p=nm(M.sel),n=DB.links.filter(l=>l.a===p.id||l.b===p.id).length;c=`<b>${esc(p.name||'Unnamed')}</b> <span class="hint">${TIERS[p.tier].toLowerCase()} &middot; ${n} link${n==1?'':'s'}</span><div><button class="btn r" data-act="link">${M.link?'Tap another person&hellip;':'Link to&hellip;'}</button><button class="btn" data-act="open">Profile</button></div>`}
-  else c=`<div class="lab">relationship map</div><p class="hint" style="margin:6px 0 10px">${people.length>1?'Drag people &middot; pinch to zoom &middot; tap a person to link them':'Add at least two people to start linking'}</p><div class="chips">${LT.map(t=>`<span class="chip" style="border-color:${t[2]}66;color:${t[2]}">${t[1]}</span>`).join('')}</div>`;
+  else if(M.sel){const p=nm(M.sel),n=DB.links.filter(l=>l.a===p.id||l.b===p.id).length;c=`<b>${esc(p.name||'Unnamed')}</b> <span class="hint">${TIERS[p.tier].toLowerCase()} &middot; ${n} link${n==1?'':'s'}</span><div><button class="btn r" data-act="link">${M.link?'Tap another person&hellip;':'Link to&hellip;'}</button><button class="btn" data-act="focus">${M.focus===p.id?'Unfocus':'Focus'}</button><button class="btn" data-act="open">Profile</button></div>`}
+  else c=`<div class="lab">relationship map</div>${statsLine()}<p class="hint" style="margin:6px 0 10px">${people.length>1?'Drag people &middot; pinch to zoom &middot; tap a person to link them':'Add at least two people to start linking'}</p><div class="chips">${LT.map(t=>`<span class="chip" style="border-color:${t[2]}66;color:${t[2]}">${t[1]}</span>`).join('')}</div>`;
   sh.innerHTML=c};
  sh.onclick=async e=>{const t=e.target.closest('[data-ty],[data-act],[data-mc],[data-mt]');if(!t)return;const ty=t.dataset.ty,ac=t.dataset.act;
   if(ty){if(M.pair){const[a,b]=M.pair;let l=DB.links.find(x=>(x.a===a&&x.b===b)||(x.a===b&&x.b===a));if(l)l.type=ty;else{l={id:uid(),a,b,type:ty,note:''};DB.links.push(l)}M.edge=l.id;M.pair=null;M.sel=null;M.link=false}
    else if(M.edge)DB.links.find(x=>x.id===M.edge).type=ty;await save()}
   if(ac==='cancel'){M.pair=null;M.link=false}
   if(t.dataset.mc)await addCircle([...M.ms],t.dataset.mc);if(t.dataset.mt)await linkAll([...M.ms],t.dataset.mt);
+  if(ac==='path'){const[a,b]=[...M.ms];M.path=findPath(a,b)}if(ac==='pclr')M.path=null;if(ac==='focus')M.focus=M.focus===M.sel?null:M.sel;
   if(ac==='row')align([...M.ms],'h');if(ac==='col')align([...M.ms],'v');if(ac==='clr')M.ms=new Set();
   if(ac==='link')M.link=!M.link;
   if(ac==='open'){showCard(M.sel);return}
@@ -447,35 +471,44 @@ function vMap(){
  svg.onpointerdown=e=>{if(e.button===2)return;closeMenu();svg.setPointerCapture(e.pointerId);const q=P(e);ptr.set(e.pointerId,q);
   if(ptr.size===2){const[a,b]=[...ptr.values()];mode='pinch';st={d:Math.hypot(a.x-b.x,a.y-b.y)||1,k:V.k,mx:(a.x+b.x)/2,my:(a.y+b.y)/2,vx:V.x,vy:V.y,moved:1};return}
   const n=e.target.closest('[data-n]'),l=e.target.closest('[data-e]');mode=n?'node':e.shiftKey?'box':'pan';st={x:q.x,y:q.y,moved:0,n:n&&n.dataset.n,l:l&&l.dataset.e,vx:V.x,vy:V.y,ctrl:e.ctrlKey||e.metaKey};
-  if(n){const p=nm(st.n);st.px=p.gx;st.py=p.gy;if(M.ms.has(st.n))st.g=[...M.ms].map(i=>{const o=nm(i);return[i,o.gx,o.gy]})}};
+  if(n){const p=nm(st.n);st.px=p.gx;st.py=p.gy;if(M.ms.has(st.n))st.g=[...M.ms].map(i=>{const o=nm(i);return[i,o.gx,o.gy]})}
+  if(e.pointerType==='touch'){const tg=e.target,cx=e.clientX,cy=e.clientY;st.lp=setTimeout(()=>{if(!st.moved&&ptr.size===1){st.moved=1;st.lpf=1;if(navigator.vibrate)navigator.vibrate(15);svg.oncontextmenu({preventDefault(){},target:tg,clientX:cx,clientY:cy})}},550)}};
  svg.onpointermove=e=>{if(!ptr.has(e.pointerId))return;const q=P(e);ptr.set(e.pointerId,q);
   if(mode==='pinch'&&ptr.size>=2){const[a,b]=[...ptr.values()],k=Math.max(.3,Math.min(3,st.k*Math.hypot(a.x-b.x,a.y-b.y)/st.d)),wx=(st.mx-st.vx)/st.k,wy=(st.my-st.vy)/st.k;V.k=k;V.x=(a.x+b.x)/2-wx*k;V.y=(a.y+b.y)/2-wy*k;draw();return}
-  const dx=q.x-st.x,dy=q.y-st.y;if(Math.hypot(dx,dy)>6)st.moved=1;if(!st.moved)return;
+  const dx=q.x-st.x,dy=q.y-st.y;if(st.lpf)return;if(Math.hypot(dx,dy)>6){st.moved=1;clearTimeout(st.lp)}if(!st.moved)return;
   if(mode==='node'){if(st.g)st.g.forEach(([i,x,y])=>{const o=nm(i);o.gx=x+dx/V.k;o.gy=y+dy/V.k});else{const p=nm(st.n);p.gx=st.px+dx/V.k;p.gy=st.py+dy/V.k}draw()}else if(mode==='box'){M.box={x0:st.x,y0:st.y,x1:q.x,y1:q.y};draw()}else if(mode==='pan'){V.x=st.vx+dx;V.y=st.vy+dy;draw()}};
- svg.onpointerup=svg.onpointercancel=async e=>{if(!ptr.has(e.pointerId))return;ptr.delete(e.pointerId);if(ptr.size)return;
+ svg.onpointerup=svg.onpointercancel=async e=>{if(!ptr.has(e.pointerId))return;ptr.delete(e.pointerId);clearTimeout(st.lp);if(ptr.size)return;
   if(mode==='box'&&st.moved){const b=M.box,xa=Math.min(b.x0,b.x1),xb=Math.max(b.x0,b.x1),ya=Math.min(b.y0,b.y1),yb=Math.max(b.y0,b.y1);if(!st.ctrl)M.ms=new Set();
    people.forEach(p=>{const sx=V.x+p.gx*V.k,sy=V.y+p.gy*V.k;if(sx>=xa&&sx<=xb&&sy>=ya&&sy<=yb)M.ms.add(p.id)});M.sel=M.edge=null;M.box=null;mode=null;sheet();draw();return}
-  if(!st.moved){if(mode==='node')return tapNode(st.n,st.ctrl);if(st.l){M.ms=new Set();M.edge=st.l;M.sel=null;M.pair=null;M.link=false}else if(!st.ctrl){M.ms=new Set();M.sel=M.edge=M.pair=null;M.link=false}sheet();draw()}
+  if(!st.moved){if(mode==='node')return tapNode(st.n,st.ctrl);if(st.l){M.ms=new Set();M.edge=st.l;M.sel=null;M.pair=null;M.link=false}else if(!st.ctrl){M.ms=new Set();M.sel=M.edge=M.pair=null;M.link=false;M.path=M.focus=null}sheet();draw()}
   else if(mode==='node')await save();mode=null};
  svg.addEventListener('wheel',e=>{e.preventDefault();const q=P(e),k=Math.max(.3,Math.min(3,V.k*(e.deltaY<0?1.1:.91))),wx=(q.x-V.x)/V.k,wy=(q.y-V.y)/V.k;V.k=k;V.x=q.x-wx*k;V.y=q.y-wy*k;draw()},{passive:false});
  $('#back').onclick=()=>{view={n:'list'};render()};
- $('#arr').onclick=()=>anim(sim);$('#grp').onclick=()=>anim(groupLayout);$('#fit').onclick=fit;
+ const CHK='<i class="fa-solid fa-check"></i>',pos=b=>{const r=b.getBoundingClientRect();return{clientX:Math.max(8,r.right-230),clientY:r.bottom+8}};
+ const layers=p=>{const T=(on,t,f)=>({t,k:on?CHK:'',f:()=>{f();draw();layers(p)}});showMenu(p,[{h:'Layers'},T(M.me,'My ties',()=>M.me=!M.me),T(M.zones,'Circle zones',()=>{M.zones=!M.zones;zs()}),T(M.lbl,'Link labels',()=>M.lbl=!M.lbl),T(M.size,'Size by links',()=>M.size=!M.size),{s:1},{h:'Link types'},
+  ...LT.map(t=>({t:t[1],c:t[2],k:M.hide.has(t[0])?'':CHK,f:()=>{M.hide.has(t[0])?M.hide.delete(t[0]):M.hide.add(t[0]);draw();layers(p)}})),{s:1},{t:'Export as PNG',f:exportPng}])};
+ $('#lyr').onclick=e=>layers(pos(e.currentTarget));
+ $('#lay').onclick=e=>showMenu(pos(e.currentTarget),[{h:'Layout'},{t:'Arrange',k:'A',f:()=>anim(sim)},{t:'Group by circle',k:'G',f:()=>anim(groupLayout)},{t:'Fit to screen',k:'F',f:fit},{t:'Reset zoom',k:'0',f:()=>{V.k=1;draw()}}]);
+ const zon=$('#zon'),zs=()=>{zon.style.color=M.zones?'var(--red)':'';zon.style.borderColor=M.zones?'var(--red)':''};zs();zon.onclick=()=>{M.zones=!M.zones;zs();draw()};
+ const fi=$('#mfind'),tt=document.querySelector('.mtop .t'),openFind=()=>{fi.style.display='';tt.style.display='none';fi.focus()},closeFind=()=>{fi.value='';fi.style.display='none';tt.style.display=''};
+ $('#fnd').onclick=()=>fi.style.display==='none'?openFind():closeFind();
+ fi.oninput=()=>{const q=fi.value.trim().toLowerCase();if(!q)return;const p=people.find(x=>(x.name+' '+(x.nick||'')).toLowerCase().includes(q));if(p){M.sel=p.id;M.ms=new Set();M.edge=M.pair=null;V.x=svg.clientWidth/2-p.gx*V.k;V.y=(svg.clientHeight-150)/2+30-p.gy*V.k;refresh()}};
+ fi.onkeydown=e=>{if(e.key==='Escape'||e.key==='Enter')closeFind()};
  svg.oncontextmenu=e=>{e.preventDefault();const n=e.target.closest('[data-n]'),l=e.target.closest('[data-e]');let it;
   const circs=ids=>circ().map(c=>({t:c.name,c:c.color,k:ids.every(i=>(nm(i).circles||[]).includes(c.id))?'<i class="fa-solid fa-check"></i>':'',f:async()=>{await addCircle(ids,c.id);refresh()}}));
   if(n){const id=n.dataset.n;if(!M.ms.has(id)){M.ms=new Set();M.sel=id;M.edge=M.pair=null;M.link=false}
-   if(M.ms.size>1){const ids=[...M.ms];it=[{h:ids.length+' selected'},{h:'Circles'},...circs(ids),{s:1},{h:'Link all as'},...LT.map(t=>({t:t[1],c:t[2],f:async()=>{await linkAll(ids,t[0]);refresh()}})),{s:1},{t:'Align in a row',f:()=>{align(ids,'h');refresh()}},{t:'Align in a column',f:()=>{align(ids,'v');refresh()}},{t:'Clear selection',k:'Esc',f:()=>{M.ms=new Set();refresh()}}]}
-   else it=[{h:nm(id).name||'Unnamed'},{t:'Open profile',f:()=>showCard(id)},{t:'Link to\u2026',k:'L',f:()=>{M.sel=id;M.link=true;refresh()}},{t:'Select connected',f:()=>{const s=new Set([id]);DB.links.forEach(x=>{if(x.a===id)s.add(x.b);if(x.b===id)s.add(x.a)});M.ms=s;M.sel=null;refresh()}},{s:1},{h:'Circles'},...circs([id])]}
+   if(M.ms.size>1){const ids=[...M.ms];it=[{h:ids.length+' selected'},...(ids.length===2?[{t:'Find connection',f:()=>{M.path=findPath(ids[0],ids[1]);refresh()}}]:[]),{h:'Circles'},...circs(ids),{s:1},{h:'Link all as'},...LT.map(t=>({t:t[1],c:t[2],f:async()=>{await linkAll(ids,t[0]);refresh()}})),{s:1},{t:'Align in a row',f:()=>{align(ids,'h');refresh()}},{t:'Align in a column',f:()=>{align(ids,'v');refresh()}},{t:'Clear selection',k:'Esc',f:()=>{M.ms=new Set();refresh()}}]}
+   else it=[{h:nm(id).name||'Unnamed'},{t:'Open profile',f:()=>showCard(id)},{t:M.focus===id?'Unfocus':'Focus on connections',f:()=>{M.focus=M.focus===id?null:id;refresh()}},{t:'Link to\u2026',k:'L',f:()=>{M.sel=id;M.link=true;refresh()}},{t:'Select connected',f:()=>{const s=new Set([id]);DB.links.forEach(x=>{if(x.a===id)s.add(x.b);if(x.b===id)s.add(x.a)});M.ms=s;M.sel=null;refresh()}},{s:1},{h:'Circles'},...circs([id])]}
   else if(l){M.edge=l.dataset.e;M.sel=null;M.ms=new Set();const lk=DB.links.find(x=>x.id===M.edge);it=[{h:'Relation'},...LT.map(t=>({t:t[1],c:t[2],k:lk.type===t[0]?'<i class="fa-solid fa-check"></i>':'',f:async()=>{lk.type=t[0];await save();refresh()}})),{s:1},{t:'Swap direction',f:async()=>{[lk.a,lk.b]=[lk.b,lk.a];await save();refresh()}},{t:'Delete link',k:'Del',f:async()=>{DB.links=DB.links.filter(x=>x.id!==lk.id);M.edge=null;await save();refresh()}}]}
   else it=[{t:'Select all',k:'Ctrl+A',f:()=>{M.ms=new Set(people.map(p=>p.id));M.sel=M.edge=null;refresh()}},{t:'Arrange',k:'A',f:()=>anim(sim)},{t:'Group by circle',k:'G',f:()=>anim(groupLayout)},{t:'Fit to screen',k:'F',f:fit},{s:1},
    {t:M.me?'Hide my ties':'Show my ties',f:()=>{M.me=!M.me;draw()}},{t:M.zones?'Hide circle zones':'Show circle zones',f:()=>{M.zones=!M.zones;draw()}},{s:1},{t:'Export as PNG',f:exportPng}];
   refresh();showMenu(e,it)};
  const kd=e=>{if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;const k=e.key.toLowerCase(),c=e.ctrlKey||e.metaKey;
-  if(k==='escape'){closeMenu();M.ms=new Set();M.sel=M.edge=M.pair=null;M.link=false;refresh()}
+  if(k==='escape'){closeMenu();M.path=M.focus=null;M.ms=new Set();M.sel=M.edge=M.pair=null;M.link=false;refresh()}
   else if(c&&k==='a'){e.preventDefault();M.ms=new Set(people.map(p=>p.id));M.sel=M.edge=null;refresh()}
   else if((k==='delete'||k==='backspace')&&M.edge){DB.links=DB.links.filter(x=>x.id!==M.edge);M.edge=null;save();refresh()}
-  else if(!c){if(k==='f')fit();else if(k==='g')anim(groupLayout);else if(k==='a')anim(sim);else if(k==='l'&&M.sel){M.link=true;refresh()}else if(k==='+'||k==='=')zoom(1.2);else if(k==='-')zoom(.83);else if(k==='0'){V.k=1;draw()}}};
+  else if(!c){if(k==='z'){M.zones=!M.zones;zs();draw()}else if(k==='/'){e.preventDefault();openFind()}else if(k==='f')fit();else if(k==='g')anim(groupLayout);else if(k==='a')anim(sim);else if(k==='l'&&M.sel){M.link=true;refresh()}else if(k==='+'||k==='=')zoom(1.2);else if(k==='-')zoom(.83);else if(k==='0'){V.k=1;draw()}}};
  document.addEventListener('keydown',kd);MAPKD=kd;
- const me=$('#meb');me.style.color=M.me?'var(--red)':'';me.onclick=()=>{M.me=!M.me;me.style.color=M.me?'var(--red)':'';draw()};
  fil();sheet();draw();
 }
 /* ---------- fingerprint (WebAuthn PRF wraps the data key) ---------- */
@@ -637,6 +670,29 @@ document.body.insertAdjacentHTML('beforeend','<nav class="nav" id="nav" style="d
 document.getElementById('nav').onclick=async e=>{const b=e.target.closest('button');if(!b)return;vib();
  if(b.id==='add'){if(view.n==='journal'||view.n==='entry')return newEntry();const p=blank();DB.people.push(p);await save();view={n:'person',id:p.id};return render()}
  const k=b.dataset.nv;if(k==='p')view={n:'list'};else if(k==='c'){const n=new Date();CAL={y:n.getFullYear(),m:n.getMonth(),sel:n.getDate()};view={n:'cal'}}else if(k==='m')view={n:'map'};else if(k==='j'){JP=null;view={n:'journal'}}render()};
+/* ---------- google drive (encrypted backup in the private app folder) ---------- */
+const gCid=()=>(GCLIENT||(typeof DB!=='undefined'&&DB.settings.gClient)||'').trim();
+const genKey=()=>{const A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',r=crypto.getRandomValues(new Uint8Array(20));return[0,1,2,3,4].map(i=>[...r.slice(i*4,i*4+4)].map(x=>A[x%A.length]).join('')).join('-')};
+function showKey(k){try{navigator.clipboard.writeText(k)}catch{}alert('Your recovery key (copied):\n\n'+k+'\n\nSave it in a password manager. You need it to restore on a new device, and it cannot be recovered if lost.')}
+const GT={tok:null,exp:0,tm:null},GSC='https://www.googleapis.com/auth/drive.appdata',GFILE='context-backup.json',gOn=()=>!!GT.tok&&Date.now()<GT.exp;
+const loadGIS=()=>new Promise((res,rej)=>{if(window.google&&google.accounts)return res();const e=document.createElement('script');e.src='https://accounts.google.com/gsi/client';e.onload=res;e.onerror=()=>rej(new Error('Could not load Google sign-in. Are you offline?'));document.head.appendChild(e)});
+async function driveConnect(){const id=gCid();if(!id)throw new Error('Google sign-in is not set up in this copy of the app yet.');await loadGIS();
+ return new Promise((res,rej)=>google.accounts.oauth2.initTokenClient({client_id:id,scope:GSC,callback:r=>{if(r.error)return rej(new Error(r.error_description||r.error));GT.tok=r.access_token;GT.exp=Date.now()+(r.expires_in-60)*1000;res()},error_callback:e=>rej(new Error('Sign-in cancelled or blocked ('+(e.type||'error')+')'))}).requestAccessToken())}
+const gf=async(u,o={})=>{const r=await fetch(u,{...o,headers:{Authorization:'Bearer '+GT.tok,...(o.headers||{})}});if(!r.ok)throw new Error('Drive error '+r.status+(r.status===401?' (reconnect)':r.status===403?' (is the Drive API enabled?)':''));return r};
+const gFind=async()=>(await(await gf('https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q='+encodeURIComponent("name='"+GFILE+"'")+'&fields=files(id,modifiedTime)')).json()).files[0]||null;
+async function driveBackup(auto){if(!gOn())throw new Error('Not connected');const pw=DB.settings.gPass||'';if(pw.length<8)throw new Error('Set a backup passphrase of 8+ characters.');
+ const salt=crypto.getRandomValues(new Uint8Array(16)),k=await derive(pw,salt),body=JSON.stringify({v:1,app:'context',t:Date.now(),salt:b64(salt),...await enc(DB,k)}),f=await gFind();
+ if(auto&&f&&!DB.settings.gLast)throw new Error('skip');
+ if(f)await gf('https://www.googleapis.com/upload/drive/v3/files/'+f.id+'?uploadType=media',{method:'PATCH',headers:{'Content-Type':'application/json'},body});
+ else{const bd='ctx'+Date.now();await gf('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{method:'POST',headers:{'Content-Type':'multipart/related; boundary='+bd},body:`--${bd}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({name:GFILE,parents:['appDataFolder']})}\r\n--${bd}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${bd}--`})}
+ DB.settings.gLast=Date.now();if(KEY)await kvSet('data',await enc(DB,KEY))}
+function driveSilent(){return loadGIS().then(()=>new Promise((res,rej)=>{const t=setTimeout(()=>rej(new Error('timeout')),6000);
+ google.accounts.oauth2.initTokenClient({client_id:gCid(),scope:GSC,callback:r=>{clearTimeout(t);if(r.error)return rej(new Error(r.error));GT.tok=r.access_token;GT.exp=Date.now()+(r.expires_in-60)*1000;res()},error_callback:()=>{clearTimeout(t);rej(new Error('no'))}}).requestAccessToken({prompt:'none'})}))}
+async function driveRestore(){if(!gOn())throw new Error('Not connected');const f=await gFind();if(!f)throw new Error('No backup found on Drive.');
+ const j=await(await gf('https://www.googleapis.com/drive/v3/files/'+f.id+'?alt=media')).json(),keep={gClient:DB.settings.gClient,gPass:DB.settings.gPass};let d;
+ try{d=await dec(j,await derive(keep.gPass||'',ub(j.salt)))}catch{throw new Error('Wrong passphrase for this backup.')}
+ DB=d;DB.settings=Object.assign(DB.settings||{},keep,{gLast:Date.now()});await save()}
+function gSched(){const s=typeof DB!=='undefined'&&DB&&DB.settings;if(!s||!s.gAuto||!gOn()||!KEY)return;clearTimeout(GT.tm);GT.tm=setTimeout(()=>driveBackup(true).catch(()=>{}),20000)}
 if('serviceWorker'in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 navigator.storage?.persist?.();
 lockScreen();
