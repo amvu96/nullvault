@@ -157,8 +157,9 @@ a.chip{text-decoration:none;color:var(--fg)}
 .cfab i{font-size:24px}.ni{transition:color .2s}.ib i{font-size:15px}
 @keyframes pgf{from{opacity:0;transform:translateX(26px)}}@keyframes pgb{from{opacity:0;transform:translateX(-26px)}}@keyframes pgu{from{opacity:0}}
 .pg-f{animation:pgf .26s cubic-bezier(.2,.8,.2,1)}.pg-b{animation:pgb .26s cubic-bezier(.2,.8,.2,1)}.pg-u{animation:pgu .22s ease-out}
-@media(min-width:900px){.plist{max-height:470px;overflow-y:auto;padding-right:6px;scrollbar-width:thin;scrollbar-color:var(--red) transparent;overscroll-behavior:contain}
-.plist::-webkit-scrollbar{width:4px}.plist::-webkit-scrollbar-thumb{background:var(--red);border-radius:4px}}
+.plist{max-height:470px;overflow-y:auto;padding-right:6px;scrollbar-width:thin;scrollbar-color:var(--red) transparent}
+.plist::-webkit-scrollbar{width:4px}.plist::-webkit-scrollbar-thumb{background:var(--red);border-radius:4px}
+@media(min-width:900px){.plist{overscroll-behavior:contain}}
 .je.sel{border-color:var(--red);background:#ff3b4e12}
 @media(min-width:900px){.jlist{max-height:480px;overflow-y:auto;padding-right:6px;scrollbar-width:thin;scrollbar-color:var(--red) transparent;overscroll-behavior:contain}.jlist::-webkit-scrollbar{width:4px}.jlist::-webkit-scrollbar-thumb{background:var(--red);border-radius:4px}}
 @media(min-width:1000px){[data-v=cal],[data-v=journal]{max-width:1320px}}
@@ -169,9 +170,16 @@ a.chip{text-decoration:none;color:var(--fg)}
 .md2 ul,.md2 ol{padding-left:22px;margin:6px 0}.md2 li.tk{list-style:none;margin-left:-20px}.md2 blockquote{border-left:2px solid var(--red);margin:6px 0;padding-left:12px;color:#b6c0cb}
 .md2 h3,.md2 h4,.md2 h5{margin:12px 0 6px;font-weight:600}.md2 h3{font-size:19px}.md2 h4{font-size:16px}.md2 h5{font-size:14px}.md2 p{margin:4px 0}.md2 code{background:#ffffff10;padding:1px 5px;border-radius:5px}.md2 hr{border:0;border-top:1px solid var(--line)}.md2 a{color:var(--red)}
 details.je summary::-webkit-details-marker{display:none}
+.toast{position:fixed;left:50%;top:calc(72px + env(safe-area-inset-top));transform:translateX(-50%);background:#0d1219f2;border:1px solid var(--red);border-radius:14px;padding:10px 16px;z-index:90;font-size:13px;animation:in .2s}
+.seg{display:flex;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:4px;margin-bottom:14px}
+.seg button{flex:1;background:none;border:0;color:var(--dim);font:inherit;font-size:12px;letter-spacing:.08em;text-transform:uppercase;padding:9px 4px;border-radius:12px}.seg button.on{background:#ff3b4e1f;color:var(--red)}
+.cdm.on{box-shadow:0 0 0 2px var(--fg)}.mleg{display:flex;justify-content:space-between;gap:6px;margin-top:14px;font-size:10px;color:var(--dim)}.mleg i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px}
+.hb{display:grid;grid-template-columns:110px 1fr 76px;gap:10px;align-items:center;padding:7px 0;font-size:13px}.hb .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.hb i{display:block;height:8px;border-radius:4px}
+.ch svg{width:100%;height:auto;display:block}.ch text{fill:var(--dim);font-size:10px;font-family:var(--m)}
+@media(min-width:900px){[data-v=jcal],[data-v=jstat]{max-width:900px}}
 </style></head><body><div class="wrap" id="app"></div>
 <script>
-const VERSION='1.22';
+const VERSION='1.24';
 // Paste your Google OAuth Client ID here once (it is public, not a secret). Then users only press one button.
 const GCLIENT='671842605028-nbhekhointo25vi0jr9v7vldr6u1jh3t.apps.googleusercontent.com';
 const QS=new URLSearchParams(location.search);let GO=QS.get('go'),SHR=(QS.get('title')||QS.get('text')||QS.get('url'))?[QS.get('title'),QS.get('text'),QS.get('url')].filter(Boolean).join('\n'):null;
@@ -240,9 +248,9 @@ const SOC=[['ig','Instagram','https://instagram.com/','fa-brands fa-instagram'],
 const sochref=(k,v,b)=>{v=v.trim();if(!v)return'';if(/^https?:\/\//i.test(v))return v;if(k==='web')return'https://'+v;if(k==='wa')v=v.replace(/\D/g,'');return b+v.replace(/^@/,'')};
 const socRow=p=>{const a=SOC.map(([k,n,b,ic])=>{const h=sochref(k,(p.soc||{})[k]||'',b);return h?`<a class="chip" href="${esc(h)}" target="_blank" rel="noopener noreferrer"><i class="${ic}"></i> ${n}</a>`:''}).join('');return a?`<div class="kv"><span>Social</span><span class="chips" style="justify-content:flex-end">${a}</span></div>`:''};
 /* ---------- views ---------- */
-let PK='',PD=0;const DEPTH={list:0,cal:0,journal:0,map:0,person:1,settings:1,entry:1,mend:2};
+let PK='',PD=0;const DEPTH={list:0,cal:0,journal:0,jcal:0,jstat:0,map:0,person:1,settings:1,entry:1,mend:2};
 function trans(){const k=view.n+(view.id||'');if(k===PK)return;const d=DEPTH[view.n]||0,dir=!PK||view.n==='map'||PD===undefined?'u':d>PD?'f':d<PD?'b':'u';PK=k;PD=d;app.classList.remove('pg-f','pg-b','pg-u');void app.offsetWidth;app.classList.add('pg-'+dir)}
-function render(){if(lastEntry&&!(view.n==='entry'&&view.id===lastEntry)){const x=(DB.journal||[]).find(j=>j.id===lastEntry);if(x&&!x.title.trim()&&!x.body.trim()&&!(x.ai||[]).length){DB.journal=DB.journal.filter(j=>j!==x);save()}lastEntry=null}closeCard();closeMenu();if(MAPKD){document.removeEventListener('keydown',MAPKD);MAPKD=null}app.dataset.v=view.n;const f={list:vList,person:vPerson,settings:vSettings,mend:vMend,map:vMap,cal:vCal,journal:vJournal,entry:vEntry}[view.n];f();updateNav();trans();scrollTo(0,0)}
+function render(){if(lastEntry&&!(view.n==='entry'&&view.id===lastEntry)){const x=(DB.journal||[]).find(j=>j.id===lastEntry);if(x&&!x.title.trim()&&!x.body.trim()&&!(x.ai||[]).length){DB.journal=DB.journal.filter(j=>j!==x);save()}lastEntry=null}closeCard();closeMenu();if(MAPKD){document.removeEventListener('keydown',MAPKD);MAPKD=null}app.dataset.v=view.n;const f={list:vList,person:vPerson,settings:vSettings,mend:vMend,map:vMap,cal:vCal,journal:vJournal,entry:vEntry,jcal:vJcal,jstat:vJstat}[view.n];f();updateNav();trans();scrollTo(0,0)}
 function vList(){
  let L=DB.people.filter(p=>(p.name+p.nick+(p.tags||[]).join(' ')).toLowerCase().includes(q.toLowerCase())&&(!FC||(p.circles||[]).includes(FC)));
  const att=DB.people.filter(p=>Date.now()-p.touched>2592e6).length,bd=DB.people.filter(p=>{const d=bdayDays(p.bday);return d!==null&&d<=30}).length;
@@ -385,9 +393,9 @@ function vSettings(){
   KEY=await derive(p,salt);await kvSet('meta',{salt:b64(salt)});await kvSet('bio',null);await save();$('#msg').style.color='var(--fg)';$('#msg').textContent='PIN changed. Re-enable fingerprint if you use it.';setB(false)};
 }
 /* ---------- relationship map ---------- */
-const LT=[['friend','Friends','#e8edf2','',0],['family','Family','#9db4ff','',0],['partner','Partner','#ff8dc7','',0],['work','Colleagues','#8a96a5','6 5',0],['rival','Rivals','#ffb347','2 5',0],['hate','Hates','#ff3b4e','',1]];
+const LT=[['friend','Friends','#e8edf2','',0],['family','Family','#9db4ff','',0],['partner','Partner','#ff8dc7','',0],['crush','Romantic interest','#ff5c8a','3 4',1],['work','Colleagues','#8a96a5','6 5',0],['rival','Rivals','#ffb347','2 5',0],['hate','Hates','#ff3b4e','',1]];
 const LTm=Object.fromEntries(LT.map(t=>[t[0],t])),tc=t=>t<=1?'#ff3b4e':t<=3?'#6b7785':'#e8edf2';
-let V={x:0,y:0,k:1},M={sel:null,edge:null,link:false,pair:null,me:true,ms:new Set(),zones:true,box:null,lbl:true,size:false,hide:new Set(),focus:null,path:null},CTX=null,MAPKD=null;
+let V={x:0,y:0,k:1},M={sel:null,edge:null,link:false,pair:null,me:true,ms:new Set(),zones:true,box:null,lbl:true,size:false,hide:new Set(),focus:null,path:null},CTX=null,MAPKD=null,CV=null;
 function place(){const P=DB.people;P.forEach((p,i)=>{if(p.gx==null){const a=i/P.length*6.283;p.gx=Math.cos(a)*190;p.gy=Math.sin(a)*190}})}
 function sim(){const P=DB.people,I=Object.fromEntries(P.map((p,i)=>[p.id,i]));
  for(let it=0;it<250;it++){const F=P.map(()=>[0,0]);
@@ -402,6 +410,7 @@ function groupLayout(){const P=DB.people,cs=circ(),B=[];
  const rad=B.map(m=>40*Math.sqrt(m.length)+50),R=Math.max(B.length>1?230:0,rad.reduce((a,r)=>a+2*r,0)/6.283+100);
  B.forEach((m,i)=>{const a=i/B.length*6.283-1.571,cx=B.length>1?Math.cos(a)*R:0,cy=B.length>1?Math.sin(a)*R:R*.9;
   m.forEach((p,k)=>{const aa=k*2.4,rr=k?40*Math.sqrt(k)+10:0;p.gx=cx+Math.cos(aa)*rr;p.gy=cy+Math.sin(aa)*rr})})}
+function toast(t){document.querySelectorAll('.toast').forEach(x=>x.remove());const d=document.createElement('div');d.className='toast';d.textContent=t;document.body.appendChild(d);setTimeout(()=>d.remove(),2200)}
 function closeMenu(){if(CTX){CTX.remove();CTX=null}}
 document.addEventListener('pointerdown',e=>{if(CTX&&!CTX.contains(e.target))closeMenu()},true);
 function showMenu(e,items){closeMenu();const d=document.createElement('div');d.className='ctx';
@@ -410,7 +419,7 @@ function showMenu(e,items){closeMenu();const d=document.createElement('div');d.c
  d.oncontextmenu=ev=>ev.preventDefault();d.onclick=ev=>{const b=ev.target.closest('button');if(!b)return;const f=items[b.dataset.i].f;closeMenu();f()};CTX=d}
 function vMap(){
  DB.links=DB.links||[];const people=DB.people;M.sel=M.edge=M.pair=null;M.link=false;M.ms=new Set();M.box=null;M.focus=M.path=null;
- app.innerHTML=`<div class="mapwrap"><svg id="svg"></svg><div class="mtop"><button class="ib" id="back" aria-label="Back"><i class="fa-solid fa-arrow-left"></i></button><div class="t"><em>&gt;_</em> map</div><input id="mfind" placeholder="find person" style="display:none;flex:1;height:40px;padding:0 14px"><button class="ib" id="fnd" aria-label="Find person"><i class="fa-solid fa-magnifying-glass"></i></button><button class="ib" id="zon" aria-label="Circles"><i class="fa-solid fa-layer-group"></i></button><button class="ib" id="lay" aria-label="Layout"><i class="fa-solid fa-wand-magic-sparkles"></i></button><button class="ib" id="lyr" aria-label="Layers"><i class="fa-solid fa-sliders"></i></button></div><div class="mfil chips scroll"></div><div class="sheet" id="sh"></div></div>`;
+ app.innerHTML=`<div class="mapwrap"><svg id="svg"></svg><div class="mtop"><button class="ib" id="back" aria-label="Back"><i class="fa-solid fa-arrow-left"></i></button><div class="t"><em>&gt;_</em> map</div><input id="mfind" placeholder="find person" style="display:none;flex:1;height:40px;padding:0 14px"><button class="ib" id="fnd" aria-label="Find person"><i class="fa-solid fa-magnifying-glass"></i></button><button class="ib" id="zon" aria-label="Circles"><i class="fa-solid fa-layer-group"></i></button><button class="ib" id="lay" aria-label="Layout"><i class="fa-solid fa-wand-magic-sparkles"></i></button><button class="ib" id="lyr" aria-label="Layers"><i class="fa-solid fa-sliders"></i></button><button class="ib" id="vws" aria-label="Saved views"><i class="fa-solid fa-bookmark"></i></button></div><div class="mfil chips scroll"></div><div class="sheet" id="sh"></div></div>`;
  const svg=$('#svg'),sh=$('#sh'),nm=id=>people.find(p=>p.id===id),r0=svg.getBoundingClientRect();
  const fresh=people.every(p=>p.gx==null);place();if(fresh)sim();
  V={x:r0.width/2,y:(r0.height-150)/2+30,k:people.length>12?.7:1};
@@ -420,10 +429,10 @@ function vMap(){
   return`<g opacity="${MF&&MF!==c.id?.15:1}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="${c.color}" fill-opacity=".06" stroke="${c.color}" stroke-opacity=".4" stroke-dasharray="4 6"/><text x="${cx}" y="${cy-r-8}" text-anchor="middle" font-size="12" style="fill:${c.color}">${esc(c.name)}</text></g>`}).join(''):'';
  const draw=()=>{let lit=null;if(M.path)lit=M.path.nodes;else if(M.focus){lit=new Set([M.focus]);DB.links.forEach(l=>{if(l.a===M.focus)lit.add(l.b);if(l.b===M.focus)lit.add(l.a)})}
   const dg={};DB.links.forEach(l=>{dg[l.a]=(dg[l.a]||0)+1;dg[l.b]=(dg[l.b]||0)+1});
-  const eo=(l,A,B)=>M.path?(M.path.edges.has(l.id)?1:.08):M.focus?((l.a===M.focus||l.b===M.focus)?1:.08):(!MF||((A.circles||[]).includes(MF)&&(B.circles||[]).includes(MF)))?1:.12;let h='<defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ff3b4e"/></marker></defs>'+`<g transform="translate(${V.x} ${V.y}) scale(${V.k})">`;
+  const eo=(l,A,B)=>M.path?(M.path.edges.has(l.id)?1:.08):M.focus?((l.a===M.focus||l.b===M.focus)?1:.08):(!MF||((A.circles||[]).includes(MF)&&(B.circles||[]).includes(MF)))?1:.12;let h='<defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ff3b4e"/></marker><marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ff5c8a"/></marker></defs>'+`<g transform="translate(${V.x} ${V.y}) scale(${V.k})">`;
   h+=zones();if(M.me)people.forEach(p=>{h+=`<line x1="0" y1="0" x2="${p.gx}" y2="${p.gy}" stroke="${tc(p.tier)}" stroke-dasharray="1 6" opacity=".45"/>`});
   DB.links.forEach(l=>{const A=nm(l.a),B=nm(l.b);if(!A||!B||M.hide.has(l.type))return;const t=LTm[l.type],dx=B.gx-A.gx,dy=B.gy-A.gy,d=Math.hypot(dx,dy)||1,ux=dx/d,uy=dy/d,x1=A.gx+ux*30,y1=A.gy+uy*30,x2=B.gx-ux*32,y2=B.gy-uy*32;
-   h+=`<g data-e="${l.id}" opacity="${eo(l,A,B)}"><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="transparent" stroke-width="24"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${t[2]}" stroke-width="${M.edge===l.id?4:t[4]?2.6:1.8}" stroke-dasharray="${t[3]}" ${t[4]?'marker-end="url(#ar)"':''}/>${M.lbl?`<text x="${(x1+x2)/2}" y="${(y1+y2)/2-7}" font-size="9" text-anchor="middle" opacity=".75">${t[1].toLowerCase()}</text>`:''}</g>`});
+   h+=`<g data-e="${l.id}" opacity="${eo(l,A,B)}"><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="transparent" stroke-width="24"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${t[2]}" stroke-width="${M.edge===l.id?4:t[4]?2.6:1.8}" stroke-dasharray="${t[3]}" ${t[4]?`marker-end="url(#${l.type==='crush'?'ar2':'ar'})"`:''}/>${M.lbl?`<text x="${(x1+x2)/2}" y="${(y1+y2)/2-7}" font-size="9" text-anchor="middle" opacity=".75">${t[1].toLowerCase()}</text>`:''}</g>`});
   h+='<g><circle r="22" fill="#ff3b4e"/><text y="4" text-anchor="middle" font-size="11" font-weight="700" style="fill:#1b0307">ME</text></g>';
   people.forEach(p=>{const s=M.sel===p.id||M.ms.has(p.id)||(M.pair&&M.pair.includes(p.id));
    h+=`<g data-n="${p.id}" opacity="${lit?(lit.has(p.id)?1:.15):(!MF||(p.circles||[]).includes(MF)?1:.15)}" transform="translate(${p.gx} ${p.gy})${M.size?` scale(${(.85+.1*Math.min(dg[p.id]||0,6)).toFixed(2)})`:''}"><title>${esc(p.name)} · ${TIERS[p.tier]}</title>${s?'<circle r="37" fill="none" stroke="#ff3b4e" stroke-dasharray="3 4"/>':''}<circle r="28" fill="#10151c" stroke="${tc(p.tier)}" stroke-width="2.5"/>${p.photo?`<image href="${p.photo}" x="-24" y="-24" width="48" height="48" preserveAspectRatio="xMidYMid slice" style="clip-path:circle(50%)"/>`:`<text y="6" text-anchor="middle" font-size="18" font-weight="600" style="fill:#ff3b4e">${esc((p.name||'?')[0].toUpperCase())}</text>`}<text y="46" text-anchor="middle" font-size="11">${esc((p.nick||p.name||'?').slice(0,14))}</text>${M.zones?pc(p).slice(0,3).map((c,i)=>`<circle cx="${[21,30,31][i]}" cy="${[-21,-9,6][i]}" r="5.5" fill="${c.color}" stroke="#0a0d12" stroke-width="1.5"/>`).join(''):''}</g>`});
@@ -494,6 +503,15 @@ function vMap(){
  const layers=p=>{const T=(on,t,f)=>({t,k:on?CHK:'',f:()=>{f();draw();layers(p)}});showMenu(p,[{h:'Layers'},T(M.me,'My ties',()=>M.me=!M.me),T(M.zones,'Circle zones',()=>{M.zones=!M.zones;zs()}),T(M.lbl,'Link labels',()=>M.lbl=!M.lbl),T(M.size,'Size by links',()=>M.size=!M.size),{s:1},{h:'Link types'},
   ...LT.map(t=>({t:t[1],c:t[2],k:M.hide.has(t[0])?'':CHK,f:()=>{M.hide.has(t[0])?M.hide.delete(t[0]):M.hide.add(t[0]);draw();layers(p)}})),{s:1},{t:'Export as PNG',f:exportPng}])};
  $('#lyr').onclick=e=>layers(pos(e.currentTarget));
+ DB.mapViews=DB.mapViews||[];
+ const snapView=(name,id)=>({id:id||uid(),name,t:Date.now(),pos:Object.fromEntries(people.map(p=>[p.id,[Math.round(p.gx),Math.round(p.gy)]])),v:{x:V.x,y:V.y,k:V.k},o:{me:M.me,zones:M.zones,lbl:M.lbl,size:M.size,hide:[...M.hide],mf:MF}});
+ const saveView=async()=>{const n=(prompt('Name this view')||'').trim();if(!n)return;const i=DB.mapViews.findIndex(v=>v.name.toLowerCase()===n.toLowerCase());
+  if(i>=0){if(!confirm('Replace the saved view "'+DB.mapViews[i].name+'"?'))return;DB.mapViews[i]=snapView(DB.mapViews[i].name,DB.mapViews[i].id);CV=DB.mapViews[i].id}else{const nv=snapView(n);DB.mapViews.push(nv);CV=nv.id}await save();toast('Saved view "'+n+'"')};
+ const updView=async v=>{const i=DB.mapViews.findIndex(x=>x.id===v.id);DB.mapViews[i]=snapView(v.name,v.id);CV=v.id;await save();toast('Updated "'+v.name+'"')};
+ const loadView=v=>{CV=v.id;Object.assign(M,{me:v.o.me,zones:v.o.zones,lbl:v.o.lbl,size:v.o.size,hide:new Set(v.o.hide||[]),ms:new Set(),sel:null,edge:null,pair:null,link:false,path:null,focus:null});MF=v.o.mf||null;V={...v.v};zs();fil();sheet();
+  anim(()=>{people.forEach(p=>{const q=v.pos[p.id];if(q){p.gx=q[0];p.gy=q[1]}})});toast('Loaded "'+v.name+'"')};
+ const viewsMenu=p=>{const L=DB.mapViews,cur=L.find(v=>v.id===CV);showMenu(p,[{h:'Saved views'},{t:'Save current view\u2026',f:saveView},...(cur?[{t:'Update "'+cur.name+'"',f:()=>updView(cur)}]:[]),...(L.length?[{s:1},{h:'Load'},...L.map(v=>({t:v.name,f:()=>loadView(v)})),{s:1},{t:'Update a view\u2026',f:()=>showMenu(p,[{h:'Update which view?'},...L.map(v=>({t:v.name,f:()=>updView(v)}))])},{t:'Delete a view\u2026',f:()=>showMenu(p,[{h:'Delete which view?'},...L.map(v=>({t:v.name,f:async()=>{if(confirm('Delete "'+v.name+'"?')){DB.mapViews=DB.mapViews.filter(x=>x.id!==v.id);await save();toast('Deleted')}}}))])}]:[{h:'No saved views yet'}])])};
+ $('#vws').onclick=e=>viewsMenu(pos(e.currentTarget));
  $('#lay').onclick=e=>showMenu(pos(e.currentTarget),[{h:'Layout'},{t:'Arrange',k:'A',f:()=>anim(sim)},{t:'Group by circle',k:'G',f:()=>anim(groupLayout)},{t:'Fit to screen',k:'F',f:fit},{t:'Reset zoom',k:'0',f:()=>{V.k=1;draw()}}]);
  const zon=$('#zon'),zs=()=>{zon.style.color=M.zones?'var(--red)':'';zon.style.borderColor=M.zones?'var(--red)':''};zs();zon.onclick=()=>{M.zones=!M.zones;zs();draw()};
  const fi=$('#mfind'),tt=document.querySelector('.mtop .t'),openFind=()=>{fi.style.display='';tt.style.display='none';fi.focus()},closeFind=()=>{fi.value='';fi.style.display='none';tt.style.display=''};
@@ -540,7 +558,7 @@ let focusId=null;
 function closeCard(){const c=document.getElementById('card');if(c)c.remove()}
 addEventListener('keydown',e=>{if(e.key==='Escape')closeCard()});
 function showCard(id){const p=DB.people.find(x=>x.id===id);if(!p)return;closeCard();
- const PH={friend:'Friends with',family:'Family of',partner:'Partner of',work:'Works with',rival:'Rivals with'},LK=(DB.links||[]).filter(l=>l.a===id||l.b===id).map(l=>{const o=DB.people.find(x=>x.id===(l.a===id?l.b:l.a)),t=LTm[l.type];return o?{o,l,t,ph:t[4]?(l.a===id?'Hates':'Hated by'):PH[l.type]}:null}).filter(Boolean);
+ const PH={friend:'Friends with',family:'Family of',partner:'Partner of',work:'Works with',rival:'Rivals with'},LK=(DB.links||[]).filter(l=>l.a===id||l.b===id).map(l=>{const o=DB.people.find(x=>x.id===(l.a===id?l.b:l.a)),t=LTm[l.type];return o?{o,l,t,ph:t[4]?(l.type==='crush'?(l.a===id?'Interested in':'Admired by'):(l.a===id?'Hates':'Hated by')):PH[l.type]}:null}).filter(Boolean);
  const d=bdayDays(p.bday),h=p.history[p.history.length-1],m=document.createElement('div');m.className='modal';m.id='card';
  const kv=(k,v)=>v?`<div class="kv"><span>${k}</span><span>${esc(v)}</span></div>`:'';
  const mb=(k,v)=>`<div style="padding:11px 0;border-bottom:1px solid var(--line);font-size:13px"><div style="display:flex;justify-content:space-between"><span style="color:var(--dim)">${k}</span><span>${v}</span></div><div class="mb"><i style="width:${v}%"></i></div></div>`;
@@ -554,12 +572,12 @@ function showCard(id){const p=DB.people.find(x=>x.id===id);if(!p)return;closeCar
  ${kv('Met',[p.met,p.metWhen&&new Date(p.metWhen+'T00:00').toLocaleDateString(undefined,{month:'short',year:'numeric'})].filter(Boolean).join(' · '))}
  ${kv('Location',p.loc)}${kv('Contact',p.contact)}${socRow(p)}${kv('Responds to',p.best)}${kv('Hates',p.hates)}
  ${mb('Empathy',p.empathy)}${mb('Reliability',p.reliab)}${mb('Trust',p.trust)}
- ${(DB.journal||[]).filter(j=>j.people.includes(id)).length?`<div class="kv" data-j="1" style="cursor:pointer"><span>Journal</span><span>${(DB.journal||[]).filter(j=>j.people.includes(id)).length} entries <i class="fa-solid fa-chevron-right" style="font-size:10px"></i></span></div>`:''}${kv('Last change',h?TIERS[h.from].toLowerCase()+' → '+TIERS[h.to].toLowerCase()+(h.why?' · '+h.why:''):'')}${LK.length?`<h2 style="margin-top:22px">links</h2>${LK.map(k=>`<div class="kv" data-o="${k.o.id}" style="cursor:pointer"><span style="color:${k.t[2]}">${k.ph}</span><span>${esc(k.o.name||'Unnamed')} <i class="fa-solid fa-chevron-right" style="font-size:10px"></i>${k.l.note?`<br><small style="color:var(--dim)">${esc(k.l.note)}</small>`:''}</span></div>`).join('')}<button class="btn" id="cmap" style="margin-top:12px">Show on map</button>`:''}
+ ${(DB.journal||[]).filter(j=>j.people.includes(id)).length?`<div class="kv" data-j="1" style="cursor:pointer"><span>Journal</span><span>${(DB.journal||[]).filter(j=>j.people.includes(id)).length} entries <i class="fa-solid fa-chevron-right" style="font-size:10px"></i></span></div>`:''}${(DB.journal||[]).filter(j=>j.people.includes(id)&&j.mood).length>1?`<div class="kv" data-jm="1" style="cursor:pointer"><span>Mood with them</span><span>see chart <i class="fa-solid fa-chevron-right" style="font-size:10px"></i></span></div>`:''}${kv('Last change',h?TIERS[h.from].toLowerCase()+' → '+TIERS[h.to].toLowerCase()+(h.why?' · '+h.why:''):'')}${LK.length?`<h2 style="margin-top:22px">links</h2>${LK.map(k=>`<div class="kv" data-o="${k.o.id}" style="cursor:pointer"><span style="color:${k.t[2]}">${k.ph}</span><span>${esc(k.o.name||'Unnamed')} <i class="fa-solid fa-chevron-right" style="font-size:10px"></i>${k.l.note?`<br><small style="color:var(--dim)">${esc(k.l.note)}</small>`:''}</span></div>`).join('')}<button class="btn" id="cmap" style="margin-top:12px">Show on map</button>`:''}
  ${p.notes?`<div class="kv" style="display:block"><span style="color:var(--dim)">Notes</span><div style="margin-top:6px;white-space:pre-wrap">${esc(p.notes.length>240?p.notes.slice(0,240)+'…':p.notes)}</div></div>`:''}
  </div><div class="acts"><button class="btn" id="ced">Edit</button><button class="btn r" id="cai">Ask AI</button></div></div></div>`;
  if(!split){document.body.appendChild(m);m.onclick=e=>{if(e.target===m)closeCard()}}else{SEL=id;document.querySelectorAll('.row').forEach(r=>r.classList.toggle('sel',r.dataset.id===id))}
  root.querySelector('#cx').onclick=closeCard;
- root.querySelectorAll('[data-o]').forEach(r=>r.onclick=()=>showCard(r.dataset.o));const jj=root.querySelector('[data-j]');if(jj)jj.onclick=()=>{JP=id;view={n:'journal'};render()};const cm=root.querySelector('#cmap');if(cm)cm.onclick=()=>{focusId=id;view={n:'map'};render()};
+ root.querySelectorAll('[data-o]').forEach(r=>r.onclick=()=>showCard(r.dataset.o));const jm=root.querySelector('[data-jm]');if(jm)jm.onclick=()=>{JS.stat='person';JS.person=id;view={n:'jstat'};render()};const jj=root.querySelector('[data-j]');if(jj)jj.onclick=()=>{JP=id;view={n:'journal'};render()};const cm=root.querySelector('#cmap');if(cm)cm.onclick=()=>{focusId=id;view={n:'map'};render()};
  root.querySelector('#ced').onclick=()=>{view={n:'person',id};render()};
  root.querySelector('#cai').onclick=()=>{view={n:'mend',id};render()}}
 /* ---------- birthday calendar ---------- */
@@ -635,18 +653,82 @@ function histPopup(e,after){const m=ppModal(),V=(e.ver||[]).slice().reverse();
  m.innerHTML=`<div class="mc"><button class="ib x" id="ppx" aria-label="Close"><i class="fa-solid fa-xmark"></i></button><div class="lab">version history &middot; last 5 saves</div><div style="margin-top:14px">${V.map((v,i)=>`<details class="je" style="cursor:default"><summary style="cursor:pointer;list-style:none"><b style="font-weight:500">${i===0?'Latest':'Version '+(V.length-i)}</b><br><small>${new Date(v.t).toLocaleString()} &middot; ${words(v.body)} words</small></summary><div class="md2" style="margin:10px 0">${md(v.body)||'<span class="hint">Empty</span>'}</div><button class="btn" data-r="${V.length-1-i}">Restore this version</button></details>`).join('')||'<p class="hint">No versions yet. Press Save to create one.</p>'}</div></div>`;
  m.querySelector('#ppx').onclick=()=>m.remove();
  m.querySelectorAll('[data-r]').forEach(b=>b.onclick=async()=>{const v=e.ver[+b.dataset.r];snap(e);Object.assign(e,{title:v.title,body:v.body,mood:v.mood,d:v.d,people:[...v.people]});await save();m.remove();after()})}
+/* ---------- journal calendar & insights ---------- */
+const MC=['','#3b4350','#6a3b4c','#9d3a52','#d93a50','#ff5d6e'],avg=l=>l.length?l.reduce((a,x)=>a+x,0)/l.length:0,f1=x=>x.toFixed(1);
+let JC={y:new Date().getFullYear(),m:new Date().getMonth(),sel:new Date().getDate()},JS={stat:'mood',range:90,person:null};
+const jtabs=a=>`<div class="seg">${[['list','Entries'],['cal','Calendar'],['stats','Insights']].map(([k,t])=>`<button data-jt="${k}" class="${a===k?'on':''}">${t}</button>`).join('')}</div>`;
+const wireJT=()=>app.querySelectorAll('[data-jt]').forEach(b=>b.onclick=()=>{const t=b.dataset.jt;view={n:t==='list'?'journal':t==='cal'?'jcal':'jstat'};render()});
+function vJcal(){DB.journal=DB.journal||[];const{y,m}=JC,first=new Date(y,m,1),pad=(first.getDay()+6)%7,nd=new Date(y,m+1,0).getDate(),t=new Date(),by={};
+ DB.journal.forEach(e=>{const d=new Date(e.d+'T00:00');if(d.getFullYear()===y&&d.getMonth()===m)(by[d.getDate()]=by[d.getDate()]||[]).push(e)});
+ const dm=d=>avg((by[d]||[]).filter(e=>e.mood).map(e=>e.mood)),ms=Object.values(by).flat().filter(e=>e.mood).map(e=>e.mood);let cells='';
+ for(let d=1;d<=nd;d++){const a=dm(d);cells+=`<button class="cd ${a?'cdm':''} ${t.getFullYear()===y&&t.getMonth()===m&&t.getDate()===d?'td':''} ${JC.sel===d?'on':''}" data-d="${d}" ${a?`style="background:${MC[Math.round(a)]};border-color:transparent;color:#fff"`:''}>${d}${(by[d]||[]).length&&!a?'<u></u>':''}</button>`}
+ const sel=JC.sel,dl=by[sel]||[],ds=y+'-'+String(m+1).padStart(2,'0')+'-'+String(sel||1).padStart(2,'0'),qm=dl.find(e=>e.title==='Mood check'&&!e.body);
+ app.innerHTML=`<div class="bar"><div class="logo">C</div><div class="t"><em>&gt;_</em> context <span>/ journal</span></div>${TOPR}</div>${jtabs('cal')}
+ <div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><button class="ib" id="pv"><i class="fa-solid fa-chevron-left"></i></button><div class="lab">${first.toLocaleDateString(undefined,{month:'long',year:'numeric'})}</div><button class="ib" id="nx"><i class="fa-solid fa-chevron-right"></i></button></div>
+ <div class="cal">${'MTWTFSS'.split('').map(c=>`<small>${c}</small>`).join('')}${'<i></i>'.repeat(pad)}${cells}</div>
+ <div class="mleg">${[1,2,3,4,5].map(i=>`<span><i style="background:${MC[i]}"></i>${MOODS[i]}</span>`).join('')}</div>
+ <div class="stats"><div class="stt"><b>${Object.values(by).flat().length}</b><small>entries</small></div><div class="stt"><b>${ms.length?f1(avg(ms)):'-'}</b><small>avg mood</small></div><div class="stt"><b>${Object.keys(by).length}</b><small>days written</small></div></div></div>
+ ${sel?`<h2>${new Date(y,m,sel).toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long'})}</h2><div class="hint" style="margin-bottom:8px">Quick mood check</div><div class="chips" style="margin-bottom:14px">${[1,2,3,4,5].map(i=>`<span class="chip ${qm&&qm.mood===i?'on':''}" data-qm="${i}">${MOODS[i]}</span>`).join('')}</div>
+ ${dl.map(e=>`<div class="je" data-id="${e.id}"><div style="display:flex;justify-content:space-between;gap:10px"><b style="font-weight:500">${esc(e.title||'Untitled')}</b>${moodDots(e.mood)}</div>${e.body?`<p>${esc(strip(e.body))}</p>`:''}</div>`).join('')}<button class="btn" id="jw"><i class="fa-solid fa-pen"></i> Write for this day</button>`:''}`;
+ wireTop();wireJT();
+ const go=n=>{JC.m+=n;if(JC.m<0){JC.m=11;JC.y--}if(JC.m>11){JC.m=0;JC.y++}JC.sel=null;vJcal()};$('#pv').onclick=()=>go(-1);$('#nx').onclick=()=>go(1);
+ app.querySelectorAll('[data-d]').forEach(c=>c.onclick=()=>{JC.sel=JC.sel===+c.dataset.d?null:+c.dataset.d;vJcal()});
+ app.querySelectorAll('.je').forEach(c=>c.onclick=()=>showEntry(c.dataset.id));const jw=$('#jw');if(jw)jw.onclick=()=>newEntry(ds);
+ app.querySelectorAll('[data-qm]').forEach(c=>c.onclick=async()=>{const v=+c.dataset.qm;if(qm&&qm.mood===v)DB.journal=DB.journal.filter(x=>x!==qm);else if(qm)qm.mood=v;else DB.journal.push({id:uid(),t:Date.now(),d:ds,title:'Mood check',body:'',mood:v,people:[],pin:false,ai:[]});await save();vJcal()})}
+function lineChart(ser){const W=640,H=230,L=30,R=10,T=10,B=24,pts=ser.flatMap(s=>s.pts);if(!pts.length)return'<p class="hint">Not enough mood entries in this range yet. Set a mood on your entries to see charts.</p>';
+ let t0=Math.min(...pts.map(p=>p[0])),t1=Math.max(...pts.map(p=>p[0]));if(t0===t1){t0-=864e5;t1+=864e5}
+ const X=t=>L+(t-t0)/(t1-t0)*(W-L-R),Y=v=>T+(5-v)/4*(H-T-B);let g='';
+ for(let v=1;v<=5;v++)g+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="#222a33"/><text x="${L-8}" y="${Y(v)+3}" text-anchor="end">${v}</text>`;
+ [t0,(t0+t1)/2,t1].forEach((t,i)=>g+=`<text x="${X(t)}" y="${H-6}" text-anchor="${i?i===2?'end':'middle':'start'}">${new Date(t).toLocaleDateString(undefined,{day:'numeric',month:'short'})}</text>`);
+ ser.forEach(s=>{const P=s.pts.slice().sort((a,b)=>a[0]-b[0]);if(s.line!==false&&P.length>1)g+=`<path d="${P.map((p,i)=>(i?'L':'M')+X(p[0]).toFixed(1)+' '+Y(p[1]).toFixed(1)).join('')}" fill="none" stroke="${s.color}" stroke-width="${s.w||1.5}" ${s.dash?`stroke-dasharray="${s.dash}"`:''} stroke-linejoin="round"/>`;
+  if(s.dots)P.forEach(p=>g+=`<circle cx="${X(p[0]).toFixed(1)}" cy="${Y(p[1]).toFixed(1)}" r="${s.r||3}" fill="${s.color}"><title>${new Date(p[0]).toLocaleDateString()}: ${f1(p[1])}</title></circle>`)});
+ return`<svg viewBox="0 0 ${W} ${H}">${g}</svg>`}
+function barSvg(it,max){const W=640,H=210,L=10,B=30,n=it.length,bw=(W-L*2)/n;if(!n||!it.some(i=>i.v>0))return'<p class="hint">No data in this range yet.</p>';let g='';
+ it.forEach((i,k)=>{const h=Math.max(0,i.v/max*(H-B-24)),x=L+k*bw+bw*.15;g+=`<rect x="${x}" y="${H-B-h}" width="${bw*.7}" height="${h}" rx="5" fill="${i.c||'#ff3b4e'}"/><text x="${x+bw*.35}" y="${H-B-h-6}" text-anchor="middle" style="fill:#e8edf2">${i.t||''}</text><text x="${x+bw*.35}" y="${H-10}" text-anchor="middle">${i.l}</text>`});return`<svg viewBox="0 0 ${W} ${H}">${g}</svg>`}
+const hbars=it=>it.length?it.map(i=>`<div class="hb"><span class="t">${esc(i.l)}</span><span style="background:#ffffff0d;border-radius:4px;display:block"><i style="width:${Math.max(3,i.w)}%;background:${i.c||'var(--red)'}"></i></span><span style="text-align:right">${i.t}</span></div>`).join(''):'<p class="hint">No data in this range yet.</p>';
+function vJstat(){DB.journal=DB.journal||[];const S=JS,cut=S.range?dfmt(new Date(Date.now()-S.range*864e5)):'',all=DB.journal.filter(e=>!cut||e.d>=cut),mo=all.filter(e=>e.mood);
+ const nm=id=>{const p=DB.people.find(x=>x.id===id);return p?(p.nick||p.name||'?'):''},cnt={};all.forEach(e=>e.people.forEach(i=>cnt[i]=(cnt[i]||0)+1));
+ const pl=DB.people.slice().sort((a,b)=>(cnt[b.id]||0)-(cnt[a.id]||0));if(!DB.people.some(p=>p.id===S.person))S.person=pl[0]&&pl[0].id;
+ const dayAvg=l=>{const d={};l.forEach(e=>(d[e.d]=d[e.d]||[]).push(e.mood));return Object.entries(d).map(([k,v])=>[+new Date(k+'T00:00'),avg(v)]).sort((a,b)=>a[0]-b[0])},ma=(p,w)=>p.map(([t])=>[t,avg(p.filter(q=>q[0]<=t&&q[0]>t-w*864e5).map(q=>q[1]))]);
+ const T=(v,l)=>`<div class="stt"><b style="font-size:${String(v).length>7?15:26}px">${v}</b><small>${l}</small></div>`,mavg=l=>l.length?f1(avg(l.map(e=>e.mood))):'-';
+ const byPerson=()=>DB.people.map(p=>{const l=mo.filter(e=>e.people.includes(p.id));return{p,n:l.length,a:avg(l.map(e=>e.mood))}}).filter(x=>x.n>=2).sort((a,b)=>b.a-a.a);
+ let chart='',sum='';
+ if(S.stat==='mood'){const d=dayAvg(mo),l7=mo.filter(e=>e.d>dfmt(new Date(Date.now()-7*864e5)));chart=lineChart([{pts:d,color:'#6b7785',dots:1,line:false,r:2.5},{pts:ma(d,7),color:'#ff3b4e',w:2.5}]);
+  sum=T(mo.length,'mood entries')+T(mavg(mo),'avg mood')+T(l7.length?mavg(l7):'-','last 7 days')}
+ else if(S.stat==='person'){const ps=mo.filter(e=>e.people.includes(S.person)),ot=mo.filter(e=>!e.people.includes(S.person)),pd=dayAvg(ps),diff=ps.length&&ot.length?avg(ps.map(e=>e.mood))-avg(ot.map(e=>e.mood)):null;
+  chart=lineChart([{pts:ma(dayAvg(mo),14),color:'#6b7785',dash:'4 4',w:1.5},{pts:pd.length>1?ma(pd,14):[],color:'#ff3b4e',w:2.5},{pts:pd,color:'#ff3b4e',dots:1,r:4,line:false}])+'<div class="hint" style="margin-top:6px">Red: your mood on days you wrote about '+esc(nm(S.person))+'. Dashed: your overall mood.</div>';
+  sum=T(ps.length?mavg(ps):'-','with them ('+ps.length+')')+T(ot.length?mavg(ot):'-','without')+T(diff===null?'-':(diff>0?'+':'')+f1(diff),'difference')}
+ else if(S.stat==='rank'){const r=byPerson();chart=hbars(r.map(x=>({l:x.p.nick||x.p.name||'?',w:x.a/5*100,c:MC[Math.round(x.a)],t:f1(x.a)+' ('+x.n+')'})))+'<div class="hint">People with at least 2 mood entries.</div>';
+  sum=T(r.length,'people')+T(r[0]?esc(r[0].p.nick||r[0].p.name):'-','lifts me up')+T(r.length>1?esc(r[r.length-1].p.nick||r[r.length-1].p.name):'-','drains me')}
+ else if(S.stat==='mention'){const r=pl.filter(p=>cnt[p.id]).slice(0,12),mx=cnt[r[0]&&r[0].id]||1;chart=hbars(r.map(p=>({l:p.nick||p.name||'?',w:cnt[p.id]/mx*100,t:cnt[p.id]+' entries'})));
+  sum=T(Object.keys(cnt).length,'people')+T(all.filter(e=>e.people.length).length,'entries tagged')+T(r[0]?esc(r[0].nick||r[0].name):'-','most mentioned')}
+ else if(S.stat==='circle'){const r=circ().map(c=>{const l=mo.filter(e=>e.people.some(i=>(DB.people.find(p=>p.id===i)||{circles:[]}).circles.includes(c.id)));return{c,n:l.length,a:avg(l.map(e=>e.mood))}}).filter(x=>x.n).sort((a,b)=>b.a-a.a);
+  chart=hbars(r.map(x=>({l:x.c.name,w:x.a/5*100,c:x.c.color,t:f1(x.a)+' ('+x.n+')'})));sum=T(r.length,'circles')+T(r[0]?esc(r[0].c.name):'-','best mood')+T(r.length>1?esc(r[r.length-1].c.name):'-','lowest mood')}
+ else if(S.stat==='wday'){const b=[[],[],[],[],[],[],[]];mo.forEach(e=>b[(new Date(e.d+'T00:00').getDay()+6)%7].push(e.mood));const N=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],v=b.map(avg),ix=v.map((x,i)=>i).filter(i=>b[i].length);
+  chart=barSvg(v.map((x,i)=>({l:N[i],v:x,t:b[i].length?f1(x):'',c:MC[Math.round(x)||1]})),5);sum=T(mo.length,'mood entries')+T(ix.length?N[ix.reduce((a,i)=>v[i]>v[a]?i:a)]:'-','best day')+T(ix.length?N[ix.reduce((a,i)=>v[i]<v[a]?i:a)]:'-','toughest day')}
+ else if(S.stat==='dist'){const c=[1,2,3,4,5].map(i=>mo.filter(e=>e.mood===i).length),mx=Math.max(...c,1);chart=barSvg(c.map((n,i)=>({l:MOODS[i+1],v:n,t:n||'',c:MC[i+1]})),mx);sum=T(mo.length,'mood entries')+T(mo.length?MOODS[c.indexOf(mx)+1]:'-','most common')+T(mavg(mo),'avg mood')}
+ else{const wk=d=>{const x=new Date(d+'T00:00');x.setDate(x.getDate()-((x.getDay()+6)%7));return dfmt(x)},N=Math.min(26,Math.max(4,S.range?Math.round(S.range/7):26)),ws=[],now=new Date();for(let i=N-1;i>=0;i--){const d=new Date(now);d.setDate(d.getDate()-i*7);ws.push(wk(dfmt(d)))}
+  const tot=ws.map(w=>all.filter(e=>wk(e.d)===w).reduce((a,e)=>a+words(e.body),0)),mx=Math.max(...tot,1);chart=barSvg(tot.map((v,i)=>({l:i%Math.ceil(N/6)===0?new Date(ws[i]+'T00:00').toLocaleDateString(undefined,{day:'numeric',month:'short'}):'',v,t:v?(v>999?(v/1000).toFixed(1)+'k':v):'',c:'#ff3b4e'})),mx);
+  sum=T(tot.reduce((a,b)=>a+b,0),'words')+T(Math.round(tot.reduce((a,b)=>a+b,0)/N),'per week')+T(all.length,'entries')}
+ const STATS=[['mood','Mood over time'],['person','Mood with a person'],['rank','People: average mood'],['mention','Most mentioned people'],['circle','Mood by circle'],['wday','Mood by weekday'],['dist','Mood distribution'],['words','Writing per week']];
+ app.innerHTML=`<div class="bar"><div class="logo">C</div><div class="t"><em>&gt;_</em> context <span>/ journal</span></div>${TOPR}</div>${jtabs('stats')}
+ <div class="card"><label style="margin-top:0">Statistic</label><select id="jst">${STATS.map(([k,t])=>`<option value="${k}" ${S.stat===k?'selected':''}>${t}</option>`).join('')}</select>
+ <div style="display:flex;gap:10px"><div style="flex:1"><label>Range</label><select id="jrg">${[[30,'30 days'],[90,'90 days'],[365,'1 year'],[0,'All time']].map(([k,t])=>`<option value="${k}" ${S.range===k?'selected':''}>${t}</option>`).join('')}</select></div>
+ ${S.stat==='person'?`<div style="flex:1"><label>Person</label><select id="jpp">${pl.map(p=>`<option value="${p.id}" ${S.person===p.id?'selected':''}>${esc(p.name||'?')}</option>`).join('')}</select></div>`:''}</div>
+ <div class="stats">${sum}</div><div class="ch" style="margin-top:18px">${chart}</div></div>`;
+ wireTop();wireJT();$('#jst').onchange=e=>{S.stat=e.target.value;vJstat()};$('#jrg').onchange=e=>{S.range=+e.target.value;vJstat()};const jp=$('#jpp');if(jp)jp.onchange=e=>{S.person=e.target.value;vJstat()}}
 function vJournal(){DB.journal=DB.journal||[];
  const all=[...DB.journal].sort((a,b)=>b.d.localeCompare(a.d)||b.t-a.t),days=new Set(all.map(e=>e.d)),c=new Date();let st=0;if(!days.has(today()))c.setDate(c.getDate()-1);while(days.has(dfmt(c))){st++;c.setDate(c.getDate()-1)}
  const w7=new Date();w7.setDate(w7.getDate()-7);const cut=dfmt(w7),wk=all.filter(e=>e.d>cut).reduce((a,e)=>a+words(e.body),0);
  const L=all.filter(e=>(!JP||e.people.includes(JP))&&(JF!=='pin'||e.pin)&&(e.title+' '+e.body).toLowerCase().includes(JQ.toLowerCase())),grp={},jp=JP&&DB.people.find(p=>p.id===JP);
  L.forEach(e=>{const k=new Date(e.d+'T00:00').toLocaleDateString(undefined,{month:'long',year:'numeric'});(grp[k]=grp[k]||[]).push(e)});
  app.innerHTML=`<div class="lay"><div class="lcol"><div class="bar"><div class="logo">C</div><div class="t"><em>&gt;_</em> context <span>/ journal</span></div>${TOPR}</div>
- <div class="card"><div class="lab">${new Date().toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long'})}</div><div class="hi">${days.has(today())?'Written today. Nice.':'Anything on your mind?'}</div>
+ ${jtabs('list')}<div class="card"><div class="lab">${new Date().toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long'})}</div><div class="hi">${days.has(today())?'Written today. Nice.':'Anything on your mind?'}</div>
  <div class="stats"><div class="stt"><b>${all.length}</b><small>entries</small></div><div class="stt"><b>${st}</b><small>day streak</small></div><div class="stt"><b>${wk}</b><small>words / 7d</small></div></div>
  <div class="jbtns"><button class="btn r" id="jn2"><i class="fa-solid fa-pen"></i> Write</button>${aiOn()&&all.length?'<button class="btn" id="jsum"><i class="fa-solid fa-wand-magic-sparkles"></i> Summarize 7d</button>':''}${all.length?'<button class="btn" id="jex"><i class="fa-solid fa-download"></i> Export</button>':''}</div></div><div id="jout"></div>
  <input id="jq" placeholder="search journal" value="${esc(JQ)}" style="margin-top:18px"><div class="chips scroll"><span class="chip ${JF==='all'?'on':''}" data-jf="all">All</span><span class="chip ${JF==='pin'?'on':''}" data-jf="pin">Pinned</span>${jp?`<span class="chip on" id="jpc">${esc(jp.name||'?')} <i class="fa-solid fa-xmark"></i></span>`:''}</div>
  <div class="jlist">${Object.entries(grp).map(([k,es])=>`<h2>${k}</h2>${es.map(e=>`<div class="je" data-id="${e.id}"><div style="display:flex;justify-content:space-between;gap:10px"><b style="font-weight:500">${e.pin?'<span style="color:var(--red)"><i class="fa-solid fa-star"></i></span> ':''}${esc(e.title||'Untitled')}</b>${moodDots(e.mood)}</div><small>${jdate(e.d)}${e.people.length?' &middot; '+esc(e.people.slice(0,3).map(i=>(DB.people.find(p=>p.id===i)||{}).name||'').filter(Boolean).join(', ')):''} &middot; ${words(e.body)} words</small><p>${esc(strip(e.body))}</p></div>`).join('')}`).join('')||'<p class="hint" style="margin-top:30px">No entries yet. Tap Write.</p>'}</div></div><aside class="pane" id="jpane"></aside></div>`;
- wireTop();
+ wireTop();wireJT();
  const nw=async()=>{const e={id:uid(),t:Date.now(),d:today(),title:'',body:'',mood:0,people:JP?[JP]:[],pin:false,ai:[]};DB.journal.push(e);await save();view={n:'entry',id:e.id};render()};$('#jn2').onclick=nw;
  $('#jq').oninput=e=>{JQ=e.target.value;const p=e.target.selectionStart;vJournal();const q=$('#jq');q.focus();q.setSelectionRange(p,p)};
  app.querySelectorAll('[data-jf]').forEach(c=>c.onclick=()=>{JF=c.dataset.jf;vJournal()});const jc=$('#jpc');if(jc)jc.onclick=()=>{JP=null;vJournal()};
@@ -716,13 +798,13 @@ const put=(t,a,b)=>{ta.focus();ta.setSelectionRange(a,b);if(!document.execComman
 /* ---------- bottom bar ---------- */
 const TOPR='<button class="ib" id="st" aria-label="Settings"><i class="fa-solid fa-gear"></i></button><button class="ib" id="lk" aria-label="Lock"><i class="fa-solid fa-lock"></i></button>';
 function wireTop(){const a=$('#st'),b=$('#lk');if(a)a.onclick=()=>{view={n:'settings'};render()};if(b)b.onclick=()=>lockScreen()}
-async function newEntry(){DB.journal=DB.journal||[];const e={id:uid(),t:Date.now(),d:today(),title:'',body:'',mood:0,people:JP?[JP]:[],pin:false,ai:[]};DB.journal.push(e);await save();view={n:'entry',id:e.id};render()}
+async function newEntry(dd){DB.journal=DB.journal||[];const e={id:uid(),t:Date.now(),d:dd||today(),title:'',body:'',mood:0,people:JP?[JP]:[],pin:false,ai:[]};DB.journal.push(e);await save();view={n:'entry',id:e.id};render()}
 function updateNav(){const n=document.getElementById('nav');if(!n)return;n.style.display=view.n==='map'?'none':'';
- const A={list:'p',person:'p',mend:'p',cal:'c',journal:'j',entry:'j'}[view.n];n.querySelectorAll('[data-nv]').forEach(b=>b.classList.toggle('on',b.dataset.nv===A));
+ const A={list:'p',person:'p',mend:'p',cal:'c',journal:'j',entry:'j',jcal:'j',jstat:'j'}[view.n];n.querySelectorAll('[data-nv]').forEach(b=>b.classList.toggle('on',b.dataset.nv===A));
  n.querySelector('#add').setAttribute('aria-label',A==='j'?'New entry':'Add person')}
 document.body.insertAdjacentHTML('beforeend','<nav class="nav" id="nav" style="display:none"><button class="ni" data-nv="p"><span class="g"><i class="fa-solid fa-users"></i></span>People</button><button class="ni" data-nv="c"><span class="g"><i class="fa-solid fa-cake-candles"></i></span>Birthdays</button><button class="cfab" id="add" aria-label="Add person"><i class="fa-solid fa-plus"></i></button><button class="ni" data-nv="m"><span class="g"><i class="fa-solid fa-diagram-project"></i></span>Map</button><button class="ni" data-nv="j"><span class="g"><i class="fa-solid fa-book-open"></i></span>Journal</button></nav>');
 document.getElementById('nav').onclick=async e=>{const b=e.target.closest('button');if(!b)return;vib();
- if(b.id==='add'){if(view.n==='journal'||view.n==='entry')return newEntry();const p=blank();DB.people.push(p);await save();view={n:'person',id:p.id};return render()}
+ if(b.id==='add'){if(['journal','entry','jcal','jstat'].includes(view.n))return newEntry();const p=blank();DB.people.push(p);await save();view={n:'person',id:p.id};return render()}
  const k=b.dataset.nv;if(k==='p')view={n:'list'};else if(k==='c'){const n=new Date();CAL={y:n.getFullYear(),m:n.getMonth(),sel:n.getDate()};view={n:'cal'}}else if(k==='m')view={n:'map'};else if(k==='j'){JP=null;view={n:'journal'}}render()};
 /* ---------- google drive (encrypted backup in the private app folder) ---------- */
 const gCid=()=>(GCLIENT||(typeof DB!=='undefined'&&DB.settings.gClient)||'').trim();
