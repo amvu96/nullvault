@@ -179,14 +179,27 @@ details.je summary::-webkit-details-marker{display:none}
 @media(min-width:900px){[data-v=jcal],[data-v=jstat]{max-width:900px}}
 @media(max-width:480px){.mtop{gap:6px}.mtop .ib{width:36px;height:36px}.mtop .t{min-width:0;overflow:hidden}}
 .dlg{padding-top:26px!important;width:min(420px,92vw)!important;border-radius:28px!important;max-height:86dvh}
+.sgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:16px;align-items:start}
+.sc{background:linear-gradient(135deg,#ff3b4e10,transparent 60%),var(--card);border:1px solid var(--line);border-radius:24px;padding:18px}
+.sh{display:flex;gap:12px;align-items:center;margin-bottom:10px}.sh b{font-weight:500;font-size:16px}.sh small{display:block;color:var(--dim);font-size:11px;margin-top:2px}
+.si{width:40px;height:40px;flex:none;border-radius:12px;background:#ff3b4e18;color:var(--red);display:grid;place-items:center}
+.srow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--line);font-size:14px}.sr{display:flex;align-items:center;gap:6px;flex:none}
+.mini{width:70px!important;text-align:center;padding:8px!important;display:inline-block}select.mini{width:auto!important}
+.btn.sm{padding:9px 14px;font-size:11px;margin:0}.ib.sm{width:34px;height:34px}.bgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.bgrid .btn{white-space:nowrap}
+input.swt{appearance:none;-webkit-appearance:none;width:46px!important;height:28px;border-radius:14px;background:#2a323c;border:0;padding:0;position:relative;flex:none;cursor:pointer;transition:background .2s}
+input.swt::after{content:'';position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:transform .2s}
+input.swt:checked{background:var(--red)}input.swt:checked::after{transform:translateX(18px)}
+@media(min-width:900px){[data-v=settings]{max-width:1100px}[data-v=trash]{max-width:780px}}
+.toast.u{top:auto;bottom:calc(96px + env(safe-area-inset-bottom))}
+.toast button{margin-left:14px;background:none;border:0;color:var(--red);font:inherit;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:4px}
 </style></head><body><div class="wrap" id="app"></div>
 <script>
-const VERSION='1.26';
+const VERSION='1.28';
 // Paste your Google OAuth Client ID here once (it is public, not a secret). Then users only press one button.
 const GCLIENT='671842605028-nbhekhointo25vi0jr9v7vldr6u1jh3t.apps.googleusercontent.com';
 const QS=new URLSearchParams(location.search);let GO=QS.get('go'),SHR=(QS.get('title')||QS.get('text')||QS.get('url'))?[QS.get('title'),QS.get('text'),QS.get('url')].filter(Boolean).join('\n'):null;
-async function startView(){if(SHR){DB.journal=DB.journal||[];const e={id:uid(),t:Date.now(),d:today(),title:'Shared',body:SHR,mood:0,people:[],pin:false,ai:[]};DB.journal.push(e);SHR=null;await save();view={n:'entry',id:e.id}}
- else view=({journal:{n:'journal'},map:{n:'map'},cal:{n:'cal'}}[GO])||{n:'list'};GO=null;if(location.search)history.replaceState(null,'',location.pathname);render();if(DB.settings.gAuto&&DB.settings.gLast&&gCid())driveSilent().catch(()=>{})}
+async function startView(){purgeTrash();if(SHR){DB.journal=DB.journal||[];const e={id:uid(),t:Date.now(),d:today(),title:'Shared',body:SHR,mood:0,people:[],pin:false,ai:[]};DB.journal.push(e);SHR=null;await save();view={n:'entry',id:e.id}}
+ else view=({journal:{n:'journal'},map:{n:'map'},cal:{n:'cal'}}[GO])||{n:'list'};GO=null;if(location.search)history.replaceState(null,'',location.pathname);render();if(DB.settings.gAuto&&DB.settings.gLast&&gCid())driveSilent().then(async()=>{const f=await gFind();if(f&&+new Date(f.modifiedTime)>(DB.settings.gSeen||0)+3000)toast('Drive has a newer backup. Open Settings > Google Drive to restore it.')}).catch(()=>{})}
 const TIERS=['Hated','Disliked','Wary','Neutral','Acquaintance','Friend','Trusted','Best friend'];
 const LOVE=['Gifts','Praise','Quality time','Acts of service','Touch'];
 const $=s=>document.querySelector(s),app=$('#app');
@@ -209,7 +222,7 @@ const save=async()=>{await kvSet('data',await enc(DB,KEY));gSched()};
 const uid=()=>crypto.randomUUID();
 /* ---------- lock ---------- */
 async function lockScreen(msg=''){
- clearTimeout(GT.tm);KEY=null;const nvx=document.getElementById('nav');if(nvx)nvx.style.display='none';const meta=await kvGet('meta'),bio=await kvGet('bio'),first=!meta;
+ clearTimeout(GT.tm);UD.u=[];UD.r=[];KEY=null;const nvx=document.getElementById('nav');if(nvx)nvx.style.display='none';const meta=await kvGet('meta'),bio=await kvGet('bio'),first=!meta;
  app.innerHTML=`<div class="lock"><div class="dots" style="color:var(--red);font-size:20px">● ● ●</div><h1 class="dot" style="font-size:44px"><span style="color:var(--red)">&gt;_</span> context</h1>
  <p class="hint">${first?'Create a PIN. It encrypts everything on this device.<br>If you forget it and have no backup, your data is gone.':'Enter your PIN'}</p>
  <input id="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="12" placeholder="••••">
@@ -250,16 +263,16 @@ const SOC=[['ig','Instagram','https://instagram.com/','fa-brands fa-instagram'],
 const sochref=(k,v,b)=>{v=v.trim();if(!v)return'';if(/^https?:\/\//i.test(v))return v;if(k==='web')return'https://'+v;if(k==='wa')v=v.replace(/\D/g,'');return b+v.replace(/^@/,'')};
 const socRow=p=>{const a=SOC.map(([k,n,b,ic])=>{const h=sochref(k,(p.soc||{})[k]||'',b);return h?`<a class="chip" href="${esc(h)}" target="_blank" rel="noopener noreferrer"><i class="${ic}"></i> ${n}</a>`:''}).join('');return a?`<div class="kv"><span>Social</span><span class="chips" style="justify-content:flex-end">${a}</span></div>`:''};
 /* ---------- views ---------- */
-let PK='',PD=0;const DEPTH={list:0,cal:0,journal:0,jcal:0,jstat:0,map:0,person:1,settings:1,entry:1,mend:2};
+let PK='',PD=0;const DEPTH={list:0,cal:0,journal:0,jcal:0,jstat:0,map:0,person:1,settings:1,trash:1,entry:1,mend:2};
 function trans(){const k=view.n+(view.id||'');if(k===PK)return;const d=DEPTH[view.n]||0,dir=!PK||view.n==='map'||PD===undefined?'u':d>PD?'f':d<PD?'b':'u';PK=k;PD=d;app.classList.remove('pg-f','pg-b','pg-u');void app.offsetWidth;app.classList.add('pg-'+dir)}
-function render(){if(lastEntry&&!(view.n==='entry'&&view.id===lastEntry)){const x=(DB.journal||[]).find(j=>j.id===lastEntry);if(x&&!x.title.trim()&&!x.body.trim()&&!(x.ai||[]).length){DB.journal=DB.journal.filter(j=>j!==x);save()}lastEntry=null}closeCard();closeMenu();if(MAPKD){document.removeEventListener('keydown',MAPKD);MAPKD=null}app.dataset.v=view.n;const f={list:vList,person:vPerson,settings:vSettings,mend:vMend,map:vMap,cal:vCal,journal:vJournal,entry:vEntry,jcal:vJcal,jstat:vJstat}[view.n];f();updateNav();trans();scrollTo(0,0)}
+function render(){if(lastEntry&&!(view.n==='entry'&&view.id===lastEntry)){const x=(DB.journal||[]).find(j=>j.id===lastEntry);if(x&&!x.title.trim()&&!x.body.trim()&&!(x.ai||[]).length){DB.journal=DB.journal.filter(j=>j!==x);save()}lastEntry=null}closeCard();closeMenu();if(MAPKD){document.removeEventListener('keydown',MAPKD);MAPKD=null}app.dataset.v=view.n;const f={list:vList,person:vPerson,settings:vSettings,mend:vMend,trash:vTrash,map:vMap,cal:vCal,journal:vJournal,entry:vEntry,jcal:vJcal,jstat:vJstat}[view.n];f();updateNav();trans();scrollTo(0,0)}
 function vList(){
  let L=DB.people.filter(p=>(p.name+p.nick+(p.tags||[]).join(' ')).toLowerCase().includes(q.toLowerCase())&&(!FC||(p.circles||[]).includes(FC)));
  const att=DB.people.filter(p=>Date.now()-p.touched>2592e6).length,bd=DB.people.filter(p=>{const d=bdayDays(p.bday);return d!==null&&d<=30}).length;
  if(sort==='recent')L.sort((a,b)=>b.touched-a.touched);
  if(sort==='trust')L.sort((a,b)=>a.tier-b.tier);
  if(sort==='bday')L.sort((a,b)=>(bdayDays(a.bday)??999)-(bdayDays(b.bday)??999));
- app.innerHTML=`<div class="lay"><div class="lcol"><div class="bar"><div class="logo">C</div><div class="t"><em>&gt;_</em> context <span>/ people</span></div><button class="ib" id="st" aria-label="Settings"><i class="fa-solid fa-gear"></i></button><button class="ib" id="lk" aria-label="Lock"><i class="fa-solid fa-lock"></i></button></div>
+ app.innerHTML=`<div class="lay"><div class="lcol"><div class="bar"><div class="logo">C</div><div class="t"><em>&gt;_</em> context <span>/ people</span></div>${undoBtn()}<button class="ib" id="st" aria-label="Settings"><i class="fa-solid fa-gear"></i></button><button class="ib" id="lk" aria-label="Lock"><i class="fa-solid fa-lock"></i></button></div>
  <div class="card"><div class="lab">${new Date().toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long'})}</div>
  <div class="hi">${att?att+' to check in on.':DB.people.length?'All quiet. Nice.':'Add your first person.'}</div>
  <div class="stats"><div class="stt"><b>${DB.people.length}</b><small>people</small></div><div class="stt"><b>${att}</b><small>stale</small></div><div class="stt"><b>${bd}</b><small>bdays / 30d</small></div></div></div>
@@ -301,7 +314,7 @@ function vPerson(){
  app.querySelectorAll('[data-k]').forEach(i=>i.oninput=()=>{p[i.dataset.k]=i.value;touch()});
  app.querySelectorAll('[data-r]').forEach(i=>i.oninput=()=>{p[i.dataset.r]=+i.value;$('#v_'+i.dataset.r).textContent=i.value;touch()});
  app.querySelectorAll('[data-t]').forEach(c=>c.onclick=async()=>{const n=+c.dataset.t;if(n===p.tier)return;vib();
-  const why=await uiPrompt('Why did it change? (optional)')||'';p.history.push({t:Date.now(),from:p.tier,to:n,why});p.tier=n;await touch();vPerson()});
+  const why=await uiPrompt('Why did it change? (optional)')||'';ud('Reputation changed',['people']);p.history.push({t:Date.now(),from:p.tier,to:n,why});p.tier=n;await touch();vPerson()});
  app.querySelectorAll('[data-l]').forEach(c=>c.onclick=()=>{const l=c.dataset.l;p.love=p.love.includes(l)?p.love.filter(x=>x!==l):[...p.love,l];c.classList.toggle('on');touch()});
  const cmp=$('#cmp'),mv=e=>{const r=cmp.getBoundingClientRect();p.cx=Math.max(-100,Math.min(100,Math.round(((e.clientX-r.left)/r.width-.5)*200)));
   p.cy=Math.max(-100,Math.min(100,Math.round(-((e.clientY-r.top)/r.height-.5)*200)));const i=cmp.querySelector('i');i.style.left=50+p.cx/2+'%';i.style.top=50-p.cy/2+'%'};
@@ -314,7 +327,7 @@ function vPerson(){
  $('#tg').oninput=e=>{p.tags=e.target.value.split(',').map(x=>x.trim()).filter(Boolean);touch()};
  $('#pf').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{p.photo=await shrink(f);await touch();vPerson()}catch{await uiAlert('Could not read that image. Try a JPG or PNG.')}};
  const rm=$('#rmph');if(rm)rm.onclick=async()=>{delete p.photo;await touch();vPerson()};
- $('#del').onclick=async()=>{if(await uiConfirm('Delete this person permanently?')){DB.people=DB.people.filter(x=>x.id!==p.id);DB.links=(DB.links||[]).filter(l=>l.a!==p.id&&l.b!==p.id);(DB.journal||[]).forEach(j=>j.people=j.people.filter(x=>x!==p.id));await save();view={n:'list'};render()}};
+ $('#del').onclick=async()=>{if(await uiConfirm('Move this person to the recycle bin? You can restore them for 30 days.')){ud('Person deleted',['people','links','journal','trash']);trashPerson(p);DB.people=DB.people.filter(x=>x.id!==p.id);DB.links=(DB.links||[]).filter(l=>l.a!==p.id&&l.b!==p.id);(DB.journal||[]).forEach(j=>j.people=j.people.filter(x=>x!==p.id));await save();view={n:'list'};render()}};
  $('#mend').onclick=()=>{view={n:'mend',id:p.id};render()};
 }
 function buildPrompt(p,problem){const s=DB.settings,name=s.alias?'Person X':(p.name||'them');
@@ -345,35 +358,48 @@ function vMend(){
 }
 function vSettings(){
  const s=DB.settings;
- app.innerHTML=`<div class="top"><button class="ib" id="back"><i class="fa-solid fa-arrow-left"></i></button></div><h1 style="font-size:22px">settings</h1>
- <h2>ai</h2><label>Mode</label><select id="mode"><option value="prompt">Prompt generator (copy to another LLM)</option><option value="direct">Direct (call Gemini)</option></select>
- <label>Google AI Studio API key</label><input id="key" type="password" value="${esc(s.apiKey)}" placeholder="AIza…"><label>Model</label><input id="model" value="${esc(s.model)}">
- <div class="sw"><span>Use alias instead of real name</span><input type="checkbox" id="alias" style="width:auto" ${s.alias?'checked':''}></div>
- <p class="hint">Direct mode sends the profile text to Google. The key is stored encrypted on this device.</p>
- <h2>circles</h2><p class="hint">Level: L1 = broad circles (e.g. Friends), L2 and L3 = more specific ones. On the map you can show or hide whole levels, or pick just the circles you want.</p>${circ().map(c=>`<div class="kv"><span style="color:${c.color}">&#9679; ${esc(c.name)}</span><span><select data-lv="${c.id}" style="width:auto;display:inline-block;padding:6px 8px;margin-right:6px">${[1,2,3].map(l=>`<option value="${l}" ${(c.level||1)===l?'selected':''}>L${l}</option>`).join('')}</select><button class="btn" style="margin:0 6px 0 0;padding:6px 12px" data-rn="${c.id}">Rename</button><button class="btn" style="margin:0;padding:6px 12px" data-dc="${c.id}">Delete</button></span></div>`).join('')}<button class="btn" id="addc"><i class="fa-solid fa-plus"></i> New circle</button>
- <h2>security</h2><label>Auto-lock (minutes, 0 = off)</label><input id="lock" type="number" min="0" value="${s.lockMin}">
- <button class="btn" id="bio">Fingerprint unlock</button><button class="btn" id="lockNow">Lock now</button><button class="btn" id="chpin">Change PIN</button>
- <h2>google drive</h2><p class="hint">Back up everything, photos included, to a private encrypted file in your Google Drive. Only this app can see it.</p>
- ${GCLIENT?'':`<label>OAuth Client ID (developer setup)</label><input id="gcid" value="${esc(s.gClient||'')}" placeholder="xxxx.apps.googleusercontent.com">`}
- <div class="sw"><span>Auto-backup after changes</span><input type="checkbox" id="gauto" style="width:auto" ${s.gAuto?'checked':''}></div>
- <div id="gst" class="hint" style="margin:12px 0"></div>
- <button class="btn r" id="gcon"><i class="fa-brands fa-google"></i> Connect Google Drive</button><button class="btn" id="gbk">Back up now</button><button class="btn" id="grs">Restore</button><button class="btn" id="gkey"><i class="fa-solid fa-key"></i> Recovery key</button>
- <h2>data</h2><button class="btn r" id="exp">Encrypted backup</button><button class="btn" id="expj">Plain JSON</button><button class="btn" id="imp">Import</button>
- <p class="hint">Context v${VERSION}</p><input type="file" id="file" hidden><p class="hint">Back up regularly. A forgotten PIN cannot be recovered.</p><div class="err" id="msg"></div>`;
+ app.innerHTML=`<div class="bar"><button class="ib" id="back" aria-label="Back"><i class="fa-solid fa-arrow-left"></i></button><div class="t" style="font-size:20px">Settings</div></div>
+ <div class="sgrid">
+ <section class="sc"><div class="sh"><span class="si"><i class="fa-solid fa-shield-halved"></i></span><div><b>Security</b><small>PIN, fingerprint and auto-lock</small></div></div>
+  <div class="srow"><span>Auto-lock after</span><span class="sr"><input id="lock" class="mini" type="number" min="0" value="${s.lockMin}"> min</span></div>
+  <div class="srow"><span>Fingerprint unlock</span><button class="btn sm" id="bio">Fingerprint</button></div>
+  <div class="srow"><span>PIN</span><button class="btn sm" id="chpin">Change</button></div>
+  <div class="srow"><span>Lock the app now</span><button class="btn sm" id="lockNow"><i class="fa-solid fa-lock"></i> Lock</button></div></section>
+ <section class="sc"><div class="sh"><span class="si"><i class="fa-solid fa-wand-magic-sparkles"></i></span><div><b>AI</b><small>Gemini or a prompt for another LLM</small></div></div>
+  <label>Mode</label><select id="mode"><option value="prompt">Prompt generator (copy to another LLM)</option><option value="direct">Direct (call Gemini)</option></select>
+  <label>Google AI Studio API key</label><input id="key" type="password" value="${esc(s.apiKey)}" placeholder="AIza…"><label>Model</label><input id="model" value="${esc(s.model)}">
+  <div class="srow" style="margin-top:14px"><span>Use aliases instead of names</span><input type="checkbox" class="swt" id="alias" ${s.alias?'checked':''}></div>
+  <p class="hint">Direct mode sends profile text to Google. The key is stored encrypted on this device.</p></section>
+ <section class="sc"><div class="sh"><span class="si"><i class="fa-solid fa-cloud"></i></span><div><b>Google Drive</b><small>Encrypted backup in a private app folder</small></div></div>
+  ${GCLIENT?'':`<label>OAuth Client ID (developer setup)</label><input id="gcid" value="${esc(s.gClient||'')}" placeholder="xxxx.apps.googleusercontent.com">`}
+  <div class="srow"><span>Auto-backup after changes</span><input type="checkbox" class="swt" id="gauto" ${s.gAuto?'checked':''}></div>
+  <div id="gst" class="hint" style="margin:12px 0"></div>
+  <div class="bgrid"><button class="btn r sm" id="gcon"><i class="fa-brands fa-google"></i> Connect</button><button class="btn sm" id="gbk"><i class="fa-solid fa-cloud-arrow-up"></i> Back up now</button><button class="btn sm" id="grs"><i class="fa-solid fa-cloud-arrow-down"></i> Restore</button><button class="btn sm" id="gkey"><i class="fa-solid fa-key"></i> Recovery key</button></div></section>
+ <section class="sc"><div class="sh"><span class="si"><i class="fa-solid fa-circle-nodes"></i></span><div><b>Circles</b><small>Levels: L1 broad, L2 and L3 more specific</small></div></div>
+  ${circ().map(c=>`<div class="srow"><span style="color:${c.color};min-width:0;overflow:hidden;text-overflow:ellipsis">&#9679; ${esc(c.name)}</span><span class="sr"><select data-lv="${c.id}" class="mini">${[1,2,3].map(l=>`<option value="${l}" ${(c.level||1)===l?'selected':''}>L${l}</option>`).join('')}</select><button class="ib sm" data-rn="${c.id}" aria-label="Rename"><i class="fa-solid fa-pen"></i></button><button class="ib sm" data-dc="${c.id}" aria-label="Delete"><i class="fa-solid fa-trash"></i></button></span></div>`).join('')}
+  <button class="btn sm" id="addc" style="margin-top:12px;width:100%"><i class="fa-solid fa-plus"></i> New circle</button></section>
+ <section class="sc"><div class="sh"><span class="si"><i class="fa-solid fa-database"></i></span><div><b>Data</b><small>Backups, import and recycle bin</small></div></div>
+  <div class="bgrid"><button class="btn r sm" id="exp"><i class="fa-solid fa-lock"></i> Encrypted backup</button><button class="btn sm" id="expj"><i class="fa-solid fa-file-code"></i> Plain JSON</button><button class="btn sm" id="imp"><i class="fa-solid fa-file-import"></i> Import</button></div>
+  <div class="srow" id="tr" style="cursor:pointer;margin-top:12px"><span><i class="fa-solid fa-trash-can" style="color:var(--dim)"></i> Recycle bin</span><span class="hint">${(DB.trash||[]).length} items <i class="fa-solid fa-chevron-right" style="font-size:10px"></i></span></div>
+  <input type="file" id="file" hidden><div class="err" id="msg"></div></section>
+ <section class="sc"><div class="sh"><span class="si"><i class="fa-solid fa-circle-info"></i></span><div><b>About</b><small>Context v${VERSION}</small></div></div>
+  <p class="hint">Back up regularly. A forgotten PIN cannot be recovered.</p></section>
+ </div>`;
  $('#mode').value=s.mode;
  const sv=()=>{s.mode=$('#mode').value;s.apiKey=$('#key').value.trim();s.model=$('#model').value.trim();s.alias=$('#alias').checked;s.lockMin=+$('#lock').value||0;if($('#gcid'))s.gClient=$('#gcid').value.trim();s.gAuto=$('#gauto').checked;save()};
  app.querySelectorAll('input,select').forEach(i=>i.onchange=sv);
  $('#back').onclick=()=>{sv();view={n:'list'};render()};app.querySelectorAll('[data-rn]').forEach(b=>b.onclick=async()=>{const c=circ().find(x=>x.id===b.dataset.rn),n=(await uiPrompt('Rename circle',c.name)||'').trim();if(n){c.name=n;sv();await save();vSettings()}});
- app.querySelectorAll('[data-dc]').forEach(b=>b.onclick=async()=>{if(!await uiConfirm('Delete this circle? People stay.'))return;const id=b.dataset.dc;DB.circles=circ().filter(c=>c.id!==id);DB.people.forEach(p=>p.circles=(p.circles||[]).filter(x=>x!==id));if(FC===id)FC=null;if(MF===id)MF=null;M.cs.delete(id);sv();await save();vSettings()});
+ app.querySelectorAll('[data-dc]').forEach(b=>b.onclick=async()=>{if(!await uiConfirm('Delete this circle? People stay.'))return;const id=b.dataset.dc;ud('Circle deleted',['circles','people']);DB.circles=circ().filter(c=>c.id!==id);DB.people.forEach(p=>p.circles=(p.circles||[]).filter(x=>x!==id));if(FC===id)FC=null;if(MF===id)MF=null;M.cs.delete(id);sv();await save();vSettings()});
  app.querySelectorAll('[data-lv]').forEach(x=>x.onchange=async()=>{circ().find(c=>c.id===x.dataset.lv).level=+x.value;sv();await save()});
  $('#addc').onclick=async()=>{const n=(await uiPrompt('Circle name')||'').trim();if(!n)return;const cs=circ();cs.push({id:uid(),name:n,color:CC[cs.length%CC.length]});sv();await save();vSettings()};
  const gst=()=>{$('#gst').textContent=(gOn()?'Connected':'Not connected')+' \u00b7 '+(s.gLast?'last backup '+new Date(s.gLast).toLocaleString():'no backup yet')},gm=t=>{$('#gst').textContent=t};gst();if(gCid())loadGIS().catch(()=>{});
  $('#gcon').onclick=async()=>{sv();try{await driveConnect();const f=await gFind();
    if(f&&!s.gPass&&await uiConfirm('A backup was found in this Google Drive. Restore it now?')){const v=await askKey('Enter the recovery key from your other device');if(v){s.gPass=v.trim();try{await driveRestore();vSettings();return}catch(e){s.gPass='';throw e}}}
    if(!s.gPass){s.gPass=genKey();await save();showKey(s.gPass)}gst()}catch(e){gm(e.message)}};
- $('#gbk').onclick=async()=>{sv();try{if(!gOn())await driveConnect();if(!s.gPass){s.gPass=genKey();await save();showKey(s.gPass)}const f=await gFind();if(f&&!s.gLast&&!await uiConfirm('A backup from another device already exists. Overwrite it with this device\'s data?'))return;gm('Backing up\u2026');await driveBackup();gst()}catch(e){gm(e.message)}};
- $('#grs').onclick=async()=>{sv();const prev=s.gPass;try{if(!s.gPass){const v=await askKey('Enter your recovery key');if(!v)return;s.gPass=v.trim()}if(!await uiConfirm('Replace ALL local data with the Drive backup?')){s.gPass=prev;return}if(!gOn())await driveConnect();gm('Restoring\u2026');await driveRestore();vSettings()}catch(e){s.gPass=prev;gm(e.message)}};
+ $('#gbk').onclick=async()=>{sv();try{if(!gOn())await driveConnect();if(!s.gPass){s.gPass=genKey();await save();showKey(s.gPass)}gm('Backing up\u2026');const r=await driveBackup();if(r==='restored'){vSettings();return}gst()}catch(e){gm(e.message)}};
+ $('#grs').onclick=async()=>{sv();const prev=s.gPass;try{if(!s.gPass){const v=await askKey('Enter your recovery key');if(!v)return;s.gPass=v.trim()}if(!await uiConfirm('Replace ALL local data with the Drive backup?')){s.gPass=prev;return}if(!gOn())await driveConnect();gm('Restoring\u2026');let w='latest';const pv=await gFind(GPREV);if(pv){w=await uiDialog({msg:'Which Drive backup should be restored?',buttons:[{t:'Cancel',v:null},{t:'Previous',v:'prev'},{t:'Latest',r:1,v:'latest'}]});if(!w){s.gPass=prev;return}}await driveRestore(w==='prev');vSettings()}catch(e){s.gPass=prev;gm(e.message)}};
  $('#gkey').onclick=async()=>{if(s.gPass)showKey(s.gPass);else{const v=await askKey('Enter the recovery key from your other device');if(v){s.gPass=v.trim();await save();gm('Recovery key saved.')}}};
+ $('#tr').onclick=()=>{sv();view={n:'trash'};render()};
  $('#lockNow').onclick=()=>lockScreen();
  const bb=$('#bio'),setB=on=>{bb.textContent=on?'Disable fingerprint':'Enable fingerprint';bb.dataset.on=on?'1':''};bb.textContent='Fingerprint…';kvGet('bio').then(b=>setB(!!b));
  bb.onclick=async()=>{const m=$('#msg');try{if(bb.dataset.on){await kvSet('bio',null);setB(false);m.style.color='var(--fg)';m.textContent='Fingerprint unlock off.'}
@@ -388,7 +414,7 @@ function vSettings(){
   const salt=crypto.getRandomValues(new Uint8Array(16)),k=await derive(pw,salt);dl('context-'+new Date().toISOString().slice(0,10)+'.context',JSON.stringify({v:1,salt:b64(salt),...await enc(DB,k)}))};
  $('#expj').onclick=async()=>{if(await uiConfirm('This file is NOT encrypted. Continue?'))dl('context.json',JSON.stringify(DB,null,1))};
  $('#imp').onclick=()=>$('#file').click();
- $('#file').onchange=async e=>{try{const t=await e.target.files[0].text(),j=JSON.parse(t);
+ $('#file').onchange=async e=>{try{const t=await e.target.files[0].text(),j=JSON.parse(t);UD.u=[];UD.r=[];
   if(j.people){if(!await uiConfirm('Replace all data with this file?'))return;DB=j}
   else{const pw=await uiPrompt('Backup password','','password');DB=await dec(j,await derive(pw,ub(j.salt)))}
   await save();$('#msg').style.color='var(--fg)';$('#msg').textContent='Imported '+DB.people.length+' people.'}catch{$('#msg').textContent='Could not read file or wrong password.'}};
@@ -415,7 +441,7 @@ function groupLayout(){const P=DB.people,cs=circ(),B=[];
  const rad=B.map(m=>40*Math.sqrt(m.length)+50),R=Math.max(B.length>1?230:0,rad.reduce((a,r)=>a+2*r,0)/6.283+100);
  B.forEach((m,i)=>{const a=i/B.length*6.283-1.571,cx=B.length>1?Math.cos(a)*R:0,cy=B.length>1?Math.sin(a)*R:R*.9;
   m.forEach((p,k)=>{const aa=k*2.4,rr=k?40*Math.sqrt(k)+10:0;p.gx=cx+Math.cos(aa)*rr;p.gy=cy+Math.sin(aa)*rr})})}
-function toast(t){document.querySelectorAll('.toast').forEach(x=>x.remove());const d=document.createElement('div');d.className='toast';d.textContent=t;document.body.appendChild(d);setTimeout(()=>d.remove(),2200)}
+function toast(t,a){document.querySelectorAll('.toast').forEach(x=>x.remove());const n=document.getElementById('nav'),d=document.createElement('div');d.className='toast'+(a&&n&&n.style.display!=='none'?' u':'');d.textContent=t;if(a){const b=document.createElement('button');b.textContent=a.label;b.onclick=()=>{d.remove();a.f()};d.appendChild(b)}document.body.appendChild(d);setTimeout(()=>d.remove(),a?7000:2200)}
 function closeMenu(){if(CTX){CTX.remove();CTX=null}}
 document.addEventListener('pointerdown',e=>{if(CTX&&!CTX.contains(e.target))closeMenu()},true);
 function showMenu(e,items){closeMenu();const d=document.createElement('div');d.className='ctx';
@@ -477,7 +503,7 @@ function vMap(){
   else c=`<div class="lab">relationship map</div>${statsLine()}<p class="hint" style="margin:6px 0 10px">${people.length>1?'Drag people &middot; pinch to zoom &middot; tap a person to link them':'Add at least two people to start linking'}</p><div class="chips">${LT.map(t=>`<span class="chip" style="border-color:${t[2]}66;color:${t[2]}">${t[1]}</span>`).join('')}</div>`;
   sh.innerHTML=c};
  sh.onclick=async e=>{const t=e.target.closest('[data-ty],[data-act],[data-mc],[data-mt]');if(!t)return;const ty=t.dataset.ty,ac=t.dataset.act;
-  if(ty){if(M.pair){const[a,b]=M.pair;let l=DB.links.find(x=>(x.a===a&&x.b===b)||(x.a===b&&x.b===a));if(l)l.type=ty;else{l={id:uid(),a,b,type:ty,note:''};DB.links.push(l)}M.edge=l.id;M.pair=null;M.sel=null;M.link=false}
+  if(ty){ud('Link changed',['links']);if(M.pair){const[a,b]=M.pair;let l=DB.links.find(x=>(x.a===a&&x.b===b)||(x.a===b&&x.b===a));if(l)l.type=ty;else{l={id:uid(),a,b,type:ty,note:''};DB.links.push(l)}M.edge=l.id;M.pair=null;M.sel=null;M.link=false}
    else if(M.edge)DB.links.find(x=>x.id===M.edge).type=ty;await save()}
   if(ac==='cancel'){M.pair=null;M.link=false}
   if(t.dataset.mc)await addCircle([...M.ms],t.dataset.mc);if(t.dataset.mt)await linkAll([...M.ms],t.dataset.mt);
@@ -485,16 +511,16 @@ function vMap(){
   if(ac==='row')align([...M.ms],'h');if(ac==='col')align([...M.ms],'v');if(ac==='clr')M.ms=new Set();
   if(ac==='link')M.link=!M.link;
   if(ac==='open'){showCard(M.sel);return}
-  if(ac==='swap'){const l=DB.links.find(x=>x.id===M.edge);[l.a,l.b]=[l.b,l.a];await save()}
-  if(ac==='del'){DB.links=DB.links.filter(x=>x.id!==M.edge);M.edge=null;await save()}
+  if(ac==='swap'){ud('Link swapped',['links']);const l=DB.links.find(x=>x.id===M.edge);[l.a,l.b]=[l.b,l.a];await save()}
+  if(ac==='del'){ud('Link deleted',['links']);DB.links=DB.links.filter(x=>x.id!==M.edge);M.edge=null;await save()}
   sheet();draw()};
  sh.oninput=e=>{if(e.target.id==='en'){DB.links.find(x=>x.id===M.edge).note=e.target.value;save()}};
  const refresh=()=>{sheet();draw()};
- const addCircle=async(ids,cid)=>{const ps=ids.map(nm),all=ps.every(p=>(p.circles||[]).includes(cid));ps.forEach(p=>{p.circles=p.circles||[];if(all)p.circles=p.circles.filter(x=>x!==cid);else if(!p.circles.includes(cid))p.circles.push(cid)});await save()};
- const linkAll=async(ids,ty)=>{const pr=[];for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++)pr.push([ids[i],ids[j]]);if(pr.length>28&&!await uiConfirm('Create '+pr.length+' links?'))return;
+ const addCircle=async(ids,cid)=>{ud('Circles changed',['people']);const ps=ids.map(nm),all=ps.every(p=>(p.circles||[]).includes(cid));ps.forEach(p=>{p.circles=p.circles||[];if(all)p.circles=p.circles.filter(x=>x!==cid);else if(!p.circles.includes(cid))p.circles.push(cid)});await save()};
+ const linkAll=async(ids,ty)=>{const pr=[];for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++)pr.push([ids[i],ids[j]]);if(pr.length>28&&!await uiConfirm('Create '+pr.length+' links?'))return;ud('Links created',['links']);
   pr.forEach(([a,b])=>{const l=DB.links.find(x=>(x.a===a&&x.b===b)||(x.a===b&&x.b===a));if(l)l.type=ty;else DB.links.push({id:uid(),a,b,type:ty,note:''})});await save()};
- const align=(ids,ax)=>{const ps=ids.map(nm).sort((a,b)=>ax==='h'?a.gx-b.gx:a.gy-b.gy),n=ps.length,cx=ps.reduce((a,p)=>a+p.gx,0)/n,cy=ps.reduce((a,p)=>a+p.gy,0)/n;ps.forEach((p,i)=>{if(ax==='h'){p.gy=cy;p.gx=cx+(i-(n-1)/2)*95}else{p.gx=cx;p.gy=cy+(i-(n-1)/2)*95}});save()};
- const anim=fn=>{const o=people.map(p=>[p.gx,p.gy]);fn();const t=people.map(p=>[p.gx,p.gy]);let f=0;people.forEach((p,i)=>{p.gx=o[i][0];p.gy=o[i][1]});
+ const align=(ids,ax)=>{ud('Aligned',['pos']);const ps=ids.map(nm).sort((a,b)=>ax==='h'?a.gx-b.gx:a.gy-b.gy),n=ps.length,cx=ps.reduce((a,p)=>a+p.gx,0)/n,cy=ps.reduce((a,p)=>a+p.gy,0)/n;ps.forEach((p,i)=>{if(ax==='h'){p.gy=cy;p.gx=cx+(i-(n-1)/2)*95}else{p.gx=cx;p.gy=cy+(i-(n-1)/2)*95}});save()};
+ const anim=fn=>{ud('Layout changed',['pos']);const o=people.map(p=>[p.gx,p.gy]);fn();const t=people.map(p=>[p.gx,p.gy]);let f=0;people.forEach((p,i)=>{p.gx=o[i][0];p.gy=o[i][1]});
   const step=()=>{f++;const k=1-Math.pow(1-f/20,3);people.forEach((p,i)=>{p.gx=o[i][0]+(t[i][0]-o[i][0])*k;p.gy=o[i][1]+(t[i][1]-o[i][1])*k});draw();if(f<20)requestAnimationFrame(step);else save()};step()};
  const fit=()=>{if(!people.length)return;const xs=people.map(p=>p.gx).concat(0),ys=people.map(p=>p.gy).concat(0),x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys),r=svg.getBoundingClientRect();
   V.k=Math.max(.3,Math.min(1.6,(r.width-120)/(x1-x0+120),(r.height-270)/(y1-y0+140)));V.x=r.width/2-(x0+x1)/2*V.k;V.y=(r.height-120)/2+20-(y0+y1)/2*V.k;draw()};
@@ -510,7 +536,7 @@ function vMap(){
  svg.onpointerdown=e=>{if(e.button===2)return;closeMenu();svg.setPointerCapture(e.pointerId);const q=P(e);ptr.set(e.pointerId,q);
   if(ptr.size===2){const[a,b]=[...ptr.values()];mode='pinch';st={d:Math.hypot(a.x-b.x,a.y-b.y)||1,k:V.k,mx:(a.x+b.x)/2,my:(a.y+b.y)/2,vx:V.x,vy:V.y,moved:1};return}
   const n=e.target.closest('[data-n]'),l=e.target.closest('[data-e]');mode=n&&!M.td?'node':e.shiftKey&&!M.td?'box':'pan';st={x:q.x,y:q.y,moved:0,n:n&&n.dataset.n,l:l&&l.dataset.e,vx:V.x,vy:V.y,ctrl:e.ctrlKey||e.metaKey,yaw0:CAM.yaw,pitch0:CAM.pitch};
-  if(n){const p=nm(st.n);st.px=p.gx;st.py=p.gy;if(M.ms.has(st.n))st.g=[...M.ms].map(i=>{const o=nm(i);return[i,o.gx,o.gy]})}
+  if(n){const p=nm(st.n);st.px=p.gx;st.py=p.gy;st.pre=udCap(['pos']);if(M.ms.has(st.n))st.g=[...M.ms].map(i=>{const o=nm(i);return[i,o.gx,o.gy]})}
   if(e.pointerType==='touch'){const tg=e.target,cx=e.clientX,cy=e.clientY;st.lp=setTimeout(()=>{if(!st.moved&&ptr.size===1){st.moved=1;st.lpf=1;if(navigator.vibrate)navigator.vibrate(15);svg.oncontextmenu({preventDefault(){},target:tg,clientX:cx,clientY:cy})}},550)}};
  svg.onpointermove=e=>{if(!ptr.has(e.pointerId))return;const q=P(e);ptr.set(e.pointerId,q);
   if(mode==='pinch'&&ptr.size>=2){const[a,b]=[...ptr.values()],k=Math.max(.3,Math.min(3,st.k*Math.hypot(a.x-b.x,a.y-b.y)/st.d)),wx=(st.mx-st.vx)/st.k,wy=(st.my-st.vy)/st.k;V.k=k;V.x=(a.x+b.x)/2-wx*k;V.y=(a.y+b.y)/2-wy*k;draw();return}
@@ -520,7 +546,7 @@ function vMap(){
   if(mode==='box'&&st.moved){const b=M.box,xa=Math.min(b.x0,b.x1),xb=Math.max(b.x0,b.x1),ya=Math.min(b.y0,b.y1),yb=Math.max(b.y0,b.y1);if(!st.ctrl)M.ms=new Set();
    people.forEach(p=>{const sx=V.x+p.gx*V.k,sy=V.y+p.gy*V.k;if(sx>=xa&&sx<=xb&&sy>=ya&&sy<=yb)M.ms.add(p.id)});M.sel=M.edge=null;M.box=null;mode=null;sheet();draw();return}
   if(!st.moved){if(mode==='node'||(M.td&&st.n))return tapNode(st.n,st.ctrl);if(st.l){M.ms=new Set();M.edge=st.l;M.sel=null;M.pair=null;M.link=false}else if(!st.ctrl){M.ms=new Set();M.sel=M.edge=M.pair=null;M.link=false;M.path=M.focus=null}sheet();draw()}
-  else if(mode==='node')await save();mode=null};
+  else if(mode==='node'){if(st.pre)ud('Moved',['pos'],st.pre,true);await save()}mode=null};
  svg.addEventListener('wheel',e=>{e.preventDefault();const q=P(e),k=Math.max(.3,Math.min(3,V.k*(e.deltaY<0?1.1:.91))),wx=(q.x-V.x)/V.k,wy=(q.y-V.y)/V.k;V.k=k;V.x=q.x-wx*k;V.y=q.y-wy*k;draw()},{passive:false});
  $('#back').onclick=()=>{view={n:'list'};render()};
  const CHK='<i class="fa-solid fa-check"></i>',pos=b=>{const r=b.getBoundingClientRect();return{clientX:Math.max(8,r.right-230),clientY:r.bottom+8}};
@@ -550,17 +576,17 @@ function vMap(){
   if(n){const id=n.dataset.n;if(!M.ms.has(id)){M.ms=new Set();M.sel=id;M.edge=M.pair=null;M.link=false}
    if(M.ms.size>1){const ids=[...M.ms];it=[{h:ids.length+' selected'},...(ids.length===2?[{t:'Find connection',f:()=>{M.path=findPath(ids[0],ids[1]);refresh()}}]:[]),{h:'Circles'},...circs(ids),{s:1},{h:'Link all as'},...LT.map(t=>({t:t[1],c:t[2],f:async()=>{await linkAll(ids,t[0]);refresh()}})),{s:1},{t:'Align in a row',f:()=>{align(ids,'h');refresh()}},{t:'Align in a column',f:()=>{align(ids,'v');refresh()}},{t:'Clear selection',k:'Esc',f:()=>{M.ms=new Set();refresh()}}]}
    else it=[{h:nm(id).name||'Unnamed'},{t:'Open profile',f:()=>showCard(id)},{t:M.focus===id?'Unfocus':'Focus on connections',f:()=>{M.focus=M.focus===id?null:id;refresh()}},{t:'Link to\u2026',k:'L',f:()=>{M.sel=id;M.link=true;refresh()}},{t:'Select connected',f:()=>{const s=new Set([id]);DB.links.forEach(x=>{if(x.a===id)s.add(x.b);if(x.b===id)s.add(x.a)});M.ms=s;M.sel=null;refresh()}},{s:1},{h:'Circles'},...circs([id])]}
-  else if(l){M.edge=l.dataset.e;M.sel=null;M.ms=new Set();const lk=DB.links.find(x=>x.id===M.edge);it=[{h:'Relation'},...LT.map(t=>({t:t[1],c:t[2],k:lk.type===t[0]?'<i class="fa-solid fa-check"></i>':'',f:async()=>{lk.type=t[0];await save();refresh()}})),{s:1},{t:'Swap direction',f:async()=>{[lk.a,lk.b]=[lk.b,lk.a];await save();refresh()}},{t:'Delete link',k:'Del',f:async()=>{DB.links=DB.links.filter(x=>x.id!==lk.id);M.edge=null;await save();refresh()}}]}
+  else if(l){M.edge=l.dataset.e;M.sel=null;M.ms=new Set();const lk=DB.links.find(x=>x.id===M.edge);it=[{h:'Relation'},...LT.map(t=>({t:t[1],c:t[2],k:lk.type===t[0]?'<i class="fa-solid fa-check"></i>':'',f:async()=>{ud('Link changed',['links']);lk.type=t[0];await save();refresh()}})),{s:1},{t:'Swap direction',f:async()=>{ud('Link swapped',['links']);[lk.a,lk.b]=[lk.b,lk.a];await save();refresh()}},{t:'Delete link',k:'Del',f:async()=>{ud('Link deleted',['links']);DB.links=DB.links.filter(x=>x.id!==lk.id);M.edge=null;await save();refresh()}}]}
   else it=[{t:'Select all',k:'Ctrl+A',f:()=>{M.ms=new Set(people.map(p=>p.id));M.sel=M.edge=null;refresh()}},{t:'Arrange',k:'A',f:()=>anim(sim)},{t:'Group by circle',k:'G',f:()=>anim(groupLayout)},{t:'Fit to screen',k:'F',f:fit},{s:1},
    {t:M.me?'Hide my ties':'Show my ties',f:()=>{M.me=!M.me;draw()}},{t:M.zones?'Hide circle zones':'Show circle zones',f:()=>{M.zones=!M.zones;draw()}},{s:1},{t:'Export as PNG',f:exportPng}];
   refresh();showMenu(e,it)};
  const kd=e=>{if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;const k=e.key.toLowerCase(),c=e.ctrlKey||e.metaKey;
   if(k==='escape'){closeMenu();M.path=M.focus=null;M.ms=new Set();M.sel=M.edge=M.pair=null;M.link=false;refresh()}
   else if(c&&k==='a'){e.preventDefault();M.ms=new Set(people.map(p=>p.id));M.sel=M.edge=null;refresh()}
-  else if((k==='delete'||k==='backspace')&&M.edge){DB.links=DB.links.filter(x=>x.id!==M.edge);M.edge=null;save();refresh()}
+  else if((k==='delete'||k==='backspace')&&M.edge){ud('Link deleted',['links']);DB.links=DB.links.filter(x=>x.id!==M.edge);M.edge=null;save();refresh()}
   else if(!c){if(k==='z'){M.zones=!M.zones;zs();draw()}else if(k==='/'){e.preventDefault();openFind()}else if(k==='f')fit();else if(k==='g')anim(groupLayout);else if(k==='a')anim(sim);else if(k==='l'&&M.sel){M.link=true;refresh()}else if(k==='+'||k==='=')zoom(1.2);else if(k==='-')zoom(.83);else if(k==='0'){V.k=1;draw()}}};
  document.addEventListener('keydown',kd);MAPKD=kd;
- fil();sheet();draw();startSpin();
+ fil();sheet();draw();startSpin();UREF=()=>{fil();sheet();draw()};
 }
 /* ---------- fingerprint (WebAuthn PRF wraps the data key) ---------- */
 const prfGet=async(id,salt)=>{const a=await navigator.credentials.get({publicKey:{challenge:crypto.getRandomValues(new Uint8Array(32)),allowCredentials:[{type:'public-key',id}],userVerification:'required',extensions:{prf:{eval:{first:salt}}}}});
@@ -614,7 +640,7 @@ function vCal(){
  DB.people.forEach(p=>{if(!p.bday)return;const b=new Date(p.bday+'T00:00');if(b.getMonth()===m)(by[b.getDate()]=by[b.getDate()]||[]).push(p)});
  const days=CAL.sel?(by[CAL.sel]||[]):Object.keys(by).sort((a,b)=>a-b).flatMap(k=>by[k]);
  let cells='';for(let d=1;d<=nd;d++)cells+=`<button class="cd ${t.getFullYear()===y&&t.getMonth()===m&&t.getDate()===d?'td':''} ${CAL.sel===d?'on':''}" data-d="${d}">${d}${by[d]?'<u></u>':''}</button>`;
- app.innerHTML=`<div class="lay"><div class="lcol"><div class="bar"><div class="logo">C</div><div class="t"><em>&gt;_</em> context <span>/ birthdays</span></div>${TOPR}</div>
+ app.innerHTML=`<div class="lay"><div class="lcol"><div class="bar"><div class="logo">C</div><div class="t"><em>&gt;_</em> context <span>/ birthdays</span></div>${topr()}</div>
  <div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><button class="ib" id="pv"><i class="fa-solid fa-chevron-left"></i></button><div class="lab">${first.toLocaleDateString(undefined,{month:'long',year:'numeric'})}</div><button class="ib" id="nx"><i class="fa-solid fa-chevron-right"></i></button></div>
  <div class="cal">${'MTWTFSS'.split('').map(c=>`<small>${c}</small>`).join('')}${'<i></i>'.repeat(pad)}${cells}</div></div>
  <h2>${CAL.sel?new Date(y,m,CAL.sel).toLocaleDateString(undefined,{day:'numeric',month:'long'}):'this month'}</h2>
@@ -655,6 +681,34 @@ async function runAI(pr,out,lab,onSave){const s=DB.settings;
  try{const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${s.model}:generateContent`,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':s.apiKey},body:JSON.stringify({contents:[{parts:[{text:pr}]}]})});
   const j=await r.json();if(!r.ok)throw new Error(j.error?.message||r.status);const t=j.candidates[0].content.parts.map(x=>x.text).join('');
   out.innerHTML=`<pre>${esc(t)}</pre><button class="btn r" id="sv">${lab}</button>`;out.querySelector('#sv').onclick=()=>onSave(t)}catch(e){out.innerHTML=`<p class="err">${esc(e.message)}</p>`}}
+/* ---------- undo / redo (in memory, cleared on lock) ---------- */
+const UD={u:[],r:[]};
+const clP=p=>({...p,love:[...(p.love||[])],circles:[...(p.circles||[])],tags:[...(p.tags||[])],history:(p.history||[]).map(h=>({...h})),soc:{...(p.soc||{})}});
+function udCap(keys){const o={};keys.forEach(k=>{if(k==='pos')o.pos=Object.fromEntries(DB.people.map(p=>[p.id,[p.gx,p.gy]]));else if(k==='people')o.people=DB.people.map(clP);else o[k]=structuredClone(DB[k]||[])});return o}
+function udApply(o){for(const k in o){if(k==='pos'){DB.people.forEach(p=>{const q=o.pos[p.id];if(q){p.gx=q[0];p.gy=q[1]}})}else{const v=k==='people'?o[k].map(clP):structuredClone(o[k]);if(!Array.isArray(DB[k]))DB[k]=[];const a=DB[k];a.length=0;a.push(...v)}}}
+function ud(label,keys,pre,quiet){UD.u.push({label,keys,before:pre||udCap(keys)});if(UD.u.length>12)UD.u.shift();UD.r=[];if(!quiet)setTimeout(()=>toast(label,{label:'Undo',f:udUndo}),150)}
+function udShow(t,lab,f){if(view.n==='map'&&typeof UREF==='function')UREF();else render();toast(t,{label:lab,f})}
+async function udUndo(){const e=UD.u.pop();if(!e)return;UD.r.push({label:e.label,keys:e.keys,before:udCap(e.keys)});udApply(e.before);await save();udShow('Undone: '+e.label,'Redo',udRedo)}
+async function udRedo(){const e=UD.r.pop();if(!e)return;UD.u.push({label:e.label,keys:e.keys,before:udCap(e.keys)});udApply(e.before);await save();udShow('Redone: '+e.label,'Undo',udUndo)}
+document.addEventListener('click',e=>{if(e.target.closest('#und'))UD.u.length?udUndo():udRedo()});
+document.addEventListener('keydown',e=>{if(!(e.ctrlKey||e.metaKey)||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;const k=e.key.toLowerCase();if(k==='z'){e.preventDefault();e.shiftKey?udRedo():udUndo()}else if(k==='y'){e.preventDefault();udRedo()}});
+let UREF=null;
+/* ---------- recycle bin ---------- */
+function trashAdd(kind,item,extra){DB.trash=DB.trash||[];DB.trash.push({id:uid(),kind,t:Date.now(),item,...extra})}
+function trashPerson(p){trashAdd('person',p,{links:(DB.links||[]).filter(l=>l.a===p.id||l.b===p.id),jrefs:(DB.journal||[]).filter(j=>j.people.includes(p.id)).map(j=>j.id)})}
+function purgeTrash(){if(DB.trash)DB.trash=DB.trash.filter(x=>Date.now()-x.t<30*864e5)}
+function vTrash(){purgeTrash();DB.links=DB.links||[];const T=(DB.trash||[]).slice().sort((a,b)=>b.t-a.t);
+ app.innerHTML=`<div class="bar"><button class="ib" id="back" aria-label="Back"><i class="fa-solid fa-arrow-left"></i></button><div class="t" style="font-size:20px">Recycle bin</div>${T.length?'<button class="btn sm" id="empty">Empty</button>':''}</div>
+ <p class="hint" style="margin-bottom:14px">Deleted people and journal entries stay here for 30 days.</p>
+ ${T.map(x=>{const d=Math.max(0,30-Math.floor((Date.now()-x.t)/864e5)),nm=x.kind==='person'?(x.item.name||'Unnamed'):(x.item.title||strip(x.item.body).slice(0,40)||'Untitled');
+  return`<div class="je" style="cursor:default"><div style="display:flex;gap:12px;align-items:center"><span class="si"><i class="fa-solid fa-${x.kind==='person'?'user':'book-open'}"></i></span><div style="flex:1;min-width:0"><b style="font-weight:500">${esc(nm)}</b><br><small>${x.kind==='person'?'Person':'Journal entry'} &middot; deleted ${new Date(x.t).toLocaleDateString()} &middot; ${d} days left</small></div></div><div class="acts"><button class="btn sm" data-rs="${x.id}"><i class="fa-solid fa-rotate-left"></i> Restore</button><button class="btn sm" data-df="${x.id}"><i class="fa-solid fa-xmark"></i> Delete forever</button></div></div>`}).join('')||'<p class="hint" style="margin-top:40px;text-align:center"><i class="fa-solid fa-trash-can" style="font-size:26px;display:block;margin-bottom:10px"></i>The recycle bin is empty.</p>'}`;
+ $('#back').onclick=()=>{view={n:'settings'};render()};
+ app.querySelectorAll('[data-rs]').forEach(b=>b.onclick=async()=>{const x=DB.trash.find(t=>t.id===b.dataset.rs);if(!x)return;
+  if(x.kind==='person'){if(!DB.people.some(p=>p.id===x.item.id)){DB.people.push(x.item);(x.links||[]).forEach(l=>{if(DB.people.some(p=>p.id===l.a)&&DB.people.some(p=>p.id===l.b)&&!DB.links.some(k=>k.id===l.id))DB.links.push(l)});(x.jrefs||[]).forEach(id=>{const e=(DB.journal||[]).find(j=>j.id===id);if(e&&!e.people.includes(x.item.id))e.people.push(x.item.id)})}}
+  else{DB.journal=DB.journal||[];if(!DB.journal.some(e=>e.id===x.item.id))DB.journal.push(x.item)}
+  DB.trash=DB.trash.filter(t=>t!==x);await save();toast('Restored');vTrash()});
+ app.querySelectorAll('[data-df]').forEach(b=>b.onclick=async()=>{if(!await uiConfirm('Delete this item forever? This cannot be undone.'))return;DB.trash=DB.trash.filter(t=>t.id!==b.dataset.df);await save();vTrash()});
+ const em=$('#empty');if(em)em.onclick=async()=>{if(!await uiConfirm('Empty the recycle bin? Everything in it will be deleted forever.'))return;DB.trash=[];await save();vTrash()}}
 /* ---------- journal writing helpers ---------- */
 function md(t){const inl=x=>esc(x).replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>').replace(/(^|[^*])\*([^*\n]+)\*/g,'$1<i>$2</i>').replace(/~~([^~]+)~~/g,'<s>$1</s>').replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,'<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
  let o='',list=null;const close=()=>{if(list){o+='</'+list+'>';list=null}};
@@ -679,7 +733,7 @@ function peoplePopup(ids,onRemove){const m=ppModal(),draw=()=>{const L=ids.map(i
 function histPopup(e,after){const m=ppModal(),V=(e.ver||[]).slice().reverse();
  m.innerHTML=`<div class="mc"><button class="ib x" id="ppx" aria-label="Close"><i class="fa-solid fa-xmark"></i></button><div class="lab">version history &middot; last 5 saves</div><div style="margin-top:14px">${V.map((v,i)=>`<details class="je" style="cursor:default"><summary style="cursor:pointer;list-style:none"><b style="font-weight:500">${i===0?'Latest':'Version '+(V.length-i)}</b><br><small>${new Date(v.t).toLocaleString()} &middot; ${words(v.body)} words</small></summary><div class="md2" style="margin:10px 0">${md(v.body)||'<span class="hint">Empty</span>'}</div><button class="btn" data-r="${V.length-1-i}">Restore this version</button></details>`).join('')||'<p class="hint">No versions yet. Press Save to create one.</p>'}</div></div>`;
  m.querySelector('#ppx').onclick=()=>m.remove();
- m.querySelectorAll('[data-r]').forEach(b=>b.onclick=async()=>{const v=e.ver[+b.dataset.r];snap(e);Object.assign(e,{title:v.title,body:v.body,mood:v.mood,d:v.d,people:[...v.people]});await save();m.remove();after()})}
+ m.querySelectorAll('[data-r]').forEach(b=>b.onclick=async()=>{const v=e.ver[+b.dataset.r];ud('Version restored',['journal']);snap(e);Object.assign(e,{title:v.title,body:v.body,mood:v.mood,d:v.d,people:[...v.people]});await save();m.remove();after()})}
 /* ---------- journal calendar & insights ---------- */
 const MC=['','#3b4350','#6a3b4c','#9d3a52','#d93a50','#ff5d6e'],avg=l=>l.length?l.reduce((a,x)=>a+x,0)/l.length:0,f1=x=>x.toFixed(1);
 let JC={y:new Date().getFullYear(),m:new Date().getMonth(),sel:new Date().getDate()},JS={stat:'mood',range:90,person:null};
@@ -690,7 +744,7 @@ function vJcal(){DB.journal=DB.journal||[];const{y,m}=JC,first=new Date(y,m,1),p
  const dm=d=>avg((by[d]||[]).filter(e=>e.mood).map(e=>e.mood)),ms=Object.values(by).flat().filter(e=>e.mood).map(e=>e.mood);let cells='';
  for(let d=1;d<=nd;d++){const a=dm(d);cells+=`<button class="cd ${a?'cdm':''} ${t.getFullYear()===y&&t.getMonth()===m&&t.getDate()===d?'td':''} ${JC.sel===d?'on':''}" data-d="${d}" ${a?`style="background:${MC[Math.round(a)]};border-color:transparent;color:#fff"`:''}>${d}${(by[d]||[]).length&&!a?'<u></u>':''}</button>`}
  const sel=JC.sel,dl=by[sel]||[],ds=y+'-'+String(m+1).padStart(2,'0')+'-'+String(sel||1).padStart(2,'0'),qm=dl.find(e=>e.title==='Mood check'&&!e.body);
- app.innerHTML=`<div class="bar"><div class="logo">C</div><div class="t"><em>&gt;_</em> context <span>/ journal</span></div>${TOPR}</div>${jtabs('cal')}
+ app.innerHTML=`<div class="bar"><div class="logo">C</div><div class="t"><em>&gt;_</em> context <span>/ journal</span></div>${topr()}</div>${jtabs('cal')}
  <div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><button class="ib" id="pv"><i class="fa-solid fa-chevron-left"></i></button><div class="lab">${first.toLocaleDateString(undefined,{month:'long',year:'numeric'})}</div><button class="ib" id="nx"><i class="fa-solid fa-chevron-right"></i></button></div>
  <div class="cal">${'MTWTFSS'.split('').map(c=>`<small>${c}</small>`).join('')}${'<i></i>'.repeat(pad)}${cells}</div>
  <div class="mleg">${[1,2,3,4,5].map(i=>`<span><i style="background:${MC[i]}"></i>${MOODS[i]}</span>`).join('')}</div>
@@ -738,7 +792,7 @@ function vJstat(){DB.journal=DB.journal||[];const S=JS,cut=S.range?dfmt(new Date
   const tot=ws.map(w=>all.filter(e=>wk(e.d)===w).reduce((a,e)=>a+words(e.body),0)),mx=Math.max(...tot,1);chart=barSvg(tot.map((v,i)=>({l:i%Math.ceil(N/6)===0?new Date(ws[i]+'T00:00').toLocaleDateString(undefined,{day:'numeric',month:'short'}):'',v,t:v?(v>999?(v/1000).toFixed(1)+'k':v):'',c:'#ff3b4e'})),mx);
   sum=T(tot.reduce((a,b)=>a+b,0),'words')+T(Math.round(tot.reduce((a,b)=>a+b,0)/N),'per week')+T(all.length,'entries')}
  const STATS=[['mood','Mood over time'],['person','Mood with a person'],['rank','People: average mood'],['mention','Most mentioned people'],['circle','Mood by circle'],['wday','Mood by weekday'],['dist','Mood distribution'],['words','Writing per week']];
- app.innerHTML=`<div class="bar"><div class="logo">C</div><div class="t"><em>&gt;_</em> context <span>/ journal</span></div>${TOPR}</div>${jtabs('stats')}
+ app.innerHTML=`<div class="bar"><div class="logo">C</div><div class="t"><em>&gt;_</em> context <span>/ journal</span></div>${topr()}</div>${jtabs('stats')}
  <div class="card"><label style="margin-top:0">Statistic</label><select id="jst">${STATS.map(([k,t])=>`<option value="${k}" ${S.stat===k?'selected':''}>${t}</option>`).join('')}</select>
  <div style="display:flex;gap:10px"><div style="flex:1"><label>Range</label><select id="jrg">${[[30,'30 days'],[90,'90 days'],[365,'1 year'],[0,'All time']].map(([k,t])=>`<option value="${k}" ${S.range===k?'selected':''}>${t}</option>`).join('')}</select></div>
  ${S.stat==='person'?`<div style="flex:1"><label>Person</label><select id="jpp">${pl.map(p=>`<option value="${p.id}" ${S.person===p.id?'selected':''}>${esc(p.name||'?')}</option>`).join('')}</select></div>`:''}</div>
@@ -749,7 +803,7 @@ function vJournal(){DB.journal=DB.journal||[];
  const w7=new Date();w7.setDate(w7.getDate()-7);const cut=dfmt(w7),wk=all.filter(e=>e.d>cut).reduce((a,e)=>a+words(e.body),0);
  const L=all.filter(e=>(!JP||e.people.includes(JP))&&(JF!=='pin'||e.pin)&&(e.title+' '+e.body).toLowerCase().includes(JQ.toLowerCase())),grp={},jp=JP&&DB.people.find(p=>p.id===JP);
  L.forEach(e=>{const k=new Date(e.d+'T00:00').toLocaleDateString(undefined,{month:'long',year:'numeric'});(grp[k]=grp[k]||[]).push(e)});
- app.innerHTML=`<div class="lay"><div class="lcol"><div class="bar"><div class="logo">C</div><div class="t"><em>&gt;_</em> context <span>/ journal</span></div>${TOPR}</div>
+ app.innerHTML=`<div class="lay"><div class="lcol"><div class="bar"><div class="logo">C</div><div class="t"><em>&gt;_</em> context <span>/ journal</span></div>${topr()}</div>
  ${jtabs('list')}<div class="card"><div class="lab">${new Date().toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long'})}</div><div class="hi">${days.has(today())?'Written today. Nice.':'Anything on your mind?'}</div>
  <div class="stats"><div class="stt"><b>${all.length}</b><small>entries</small></div><div class="stt"><b>${st}</b><small>day streak</small></div><div class="stt"><b>${wk}</b><small>words / 7d</small></div></div>
  <div class="jbtns"><button class="btn r" id="jn2"><i class="fa-solid fa-pen"></i> Write</button>${aiOn()&&all.length?'<button class="btn" id="jsum"><i class="fa-solid fa-wand-magic-sparkles"></i> Summarize 7d</button>':''}${all.length?'<button class="btn" id="jex"><i class="fa-solid fa-download"></i> Export</button>':''}</div></div><div id="jout"></div>
@@ -803,7 +857,7 @@ function vEntry(){const e=(DB.journal||[]).find(x=>x.id===view.id);if(!e){view={
  $('#ps').oninput=filt;selRow();
  let pi=Math.floor(Math.random()*PROMPTS.length);$('#pr').onclick=()=>{$('#pt').textContent=PROMPTS[pi++%PROMPTS.length]};
  $('#pin').onclick=async()=>{e.pin=!e.pin;await save();vEntry()};
- $('#del').onclick=async()=>{if(await uiConfirm('Delete this entry?')){DB.journal=DB.journal.filter(x=>x.id!==e.id);await save();view={n:'journal'};render()}};
+ $('#del').onclick=async()=>{if(await uiConfirm('Move this entry to the recycle bin? You can restore it for 30 days.')){ud('Entry deleted',['journal','trash']);trashAdd('entry',e);DB.journal=DB.journal.filter(x=>x.id!==e.id);await save();view={n:'journal'};render()}};
  $('#back').onclick=async()=>{clearTimeout(tm);snap(e);if(!e.title.trim()&&!e.body.trim()&&!e.ai.length)DB.journal=DB.journal.filter(x=>x.id!==e.id);await save();view={n:'journal'};render()};
  const ta=$('#jbody');
 const put=(t,a,b)=>{ta.focus();ta.setSelectionRange(a,b);if(!document.execCommand('insertText',false,t))ta.setRangeText(t,a,b,'end');ta.dispatchEvent(new Event('input'))};
@@ -823,7 +877,8 @@ const put=(t,a,b)=>{ta.focus();ta.setSelectionRange(a,b);if(!document.execComman
  const go=(k,pr)=>runAI(pr,$('#aiout'),'Save to entry',async t=>{e.ai.push({k,x:t});await save();vEntry()});
  const a=$('#adv');if(a){a.onclick=()=>go('advice',advPrompt(e));$('#sum').onclick=()=>go('summary',sumPrompt([e],'one entry'))}}
 /* ---------- bottom bar ---------- */
-const TOPR='<button class="ib" id="st" aria-label="Settings"><i class="fa-solid fa-gear"></i></button><button class="ib" id="lk" aria-label="Lock"><i class="fa-solid fa-lock"></i></button>';
+const undoBtn=()=>UD.u.length||UD.r.length?`<button class="ib" id="und" aria-label="${UD.u.length?'Undo':'Redo'}"><i class="fa-solid fa-rotate-${UD.u.length?'left':'right'}"></i></button>`:'';
+const topr=()=>undoBtn()+'<button class="ib" id="st" aria-label="Settings"><i class="fa-solid fa-gear"></i></button><button class="ib" id="lk" aria-label="Lock"><i class="fa-solid fa-lock"></i></button>';
 function wireTop(){const a=$('#st'),b=$('#lk');if(a)a.onclick=()=>{view={n:'settings'};render()};if(b)b.onclick=()=>lockScreen()}
 async function newEntry(dd){DB.journal=DB.journal||[];const e={id:uid(),t:Date.now(),d:dd||today(),title:'',body:'',mood:0,people:JP?[JP]:[],pin:false,ai:[]};DB.journal.push(e);await save();view={n:'entry',id:e.id};render()}
 function updateNav(){const n=document.getElementById('nav');if(!n)return;n.style.display=view.n==='map'?'none':'';
@@ -864,20 +919,30 @@ const loadGIS=()=>new Promise((res,rej)=>{if(window.google&&google.accounts)retu
 async function driveConnect(){const id=gCid();if(!id)throw new Error('Google sign-in is not set up in this copy of the app yet.');await loadGIS();
  return new Promise((res,rej)=>google.accounts.oauth2.initTokenClient({client_id:id,scope:GSC,callback:r=>{if(r.error)return rej(new Error(r.error_description||r.error));GT.tok=r.access_token;GT.exp=Date.now()+(r.expires_in-60)*1000;res()},error_callback:e=>rej(new Error('Sign-in cancelled or blocked ('+(e.type||'error')+')'))}).requestAccessToken())}
 const gf=async(u,o={})=>{const r=await fetch(u,{...o,headers:{Authorization:'Bearer '+GT.tok,...(o.headers||{})}});if(!r.ok)throw new Error('Drive error '+r.status+(r.status===401?' (reconnect)':r.status===403?' (is the Drive API enabled?)':''));return r};
-const gFind=async()=>(await(await gf('https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q='+encodeURIComponent("name='"+GFILE+"'")+'&fields=files(id,modifiedTime)')).json()).files[0]||null;
+const GPREV='context-backup-prev.json';
+const gFind=async(name=GFILE)=>(await(await gf('https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q='+encodeURIComponent("name='"+name+"'")+'&fields=files(id,modifiedTime,appProperties)')).json()).files[0]||null;
+const gStat=()=>({people:String(DB.people.length),journal:String((DB.journal||[]).length)});
+async function gKeepPrev(f){try{const old=await gFind(GPREV);if(old)await gf('https://www.googleapis.com/drive/v3/files/'+old.id,{method:'DELETE'});await gf('https://www.googleapis.com/drive/v3/files/'+f.id+'/copy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:GPREV,parents:['appDataFolder']})})}catch{}}
 async function driveBackup(auto){if(!gOn())throw new Error('Not connected');const pw=DB.settings.gPass||'';if(pw.length<8)throw new Error('Set a backup passphrase of 8+ characters.');
- const salt=crypto.getRandomValues(new Uint8Array(16)),k=await derive(pw,salt),body=JSON.stringify({v:1,app:'context',t:Date.now(),salt:b64(salt),...await enc(DB,k)}),f=await gFind();
- if(auto&&f&&!DB.settings.gLast)throw new Error('skip');
- if(f)await gf('https://www.googleapis.com/upload/drive/v3/files/'+f.id+'?uploadType=media',{method:'PATCH',headers:{'Content-Type':'application/json'},body});
- else{const bd='ctx'+Date.now();await gf('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{method:'POST',headers:{'Content-Type':'multipart/related; boundary='+bd},body:`--${bd}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({name:GFILE,parents:['appDataFolder']})}\r\n--${bd}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${bd}--`})}
- DB.settings.gLast=Date.now();if(KEY)await kvSet('data',await enc(DB,KEY))}
+ const f=await gFind();
+ if(f){const rt=+new Date(f.modifiedTime),ap=f.appProperties||{},rp=+ap.people||0,rj=+ap.journal||0,lp=DB.people.length,lj=(DB.journal||[]).length,newer=rt>(DB.settings.gSeen||0)+3000,fewer=lp<rp||lj<rj;
+  if(newer||fewer){
+   if(auto)throw new Error('conflict');
+   const w=await uiDialog({msg:'Google Drive already has a backup from '+new Date(rt).toLocaleString()+' with '+rp+' people and '+rj+' journal entries.\n\nThis device has '+lp+' people and '+lj+' entries.'+(newer?'\n\nThe Drive backup is newer than what this device last synced.':'')+(fewer?'\n\nThis device has LESS data than the backup.':'')+'\n\nOverwriting could lose data.',buttons:[{t:'Cancel',v:null},{t:'Restore Drive backup',v:'restore'},{t:'Overwrite',r:1,v:'overwrite'}]});
+   if(w==='restore'){await driveRestore();return'restored'}if(w!=='overwrite')throw new Error('Backup cancelled.')}
+  await gKeepPrev(f)}
+ const salt=crypto.getRandomValues(new Uint8Array(16)),k=await derive(pw,salt),body=JSON.stringify({v:1,app:'context',t:Date.now(),salt:b64(salt),...await enc(DB,k)});let id=f&&f.id;
+ if(f)await gf('https://www.googleapis.com/upload/drive/v3/files/'+id+'?uploadType=media',{method:'PATCH',headers:{'Content-Type':'application/json'},body});
+ else{const bd='ctx'+Date.now(),r=await gf('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{method:'POST',headers:{'Content-Type':'multipart/related; boundary='+bd},body:`--${bd}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({name:GFILE,parents:['appDataFolder']})}\r\n--${bd}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${bd}--`});id=(await r.json()).id}
+ const m=await(await gf('https://www.googleapis.com/drive/v3/files/'+id+'?fields=modifiedTime',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({appProperties:gStat()})})).json();
+ DB.settings.gSeen=+new Date(m.modifiedTime);DB.settings.gLast=Date.now();if(KEY)await kvSet('data',await enc(DB,KEY))}
 function driveSilent(){return loadGIS().then(()=>new Promise((res,rej)=>{const t=setTimeout(()=>rej(new Error('timeout')),6000);
  google.accounts.oauth2.initTokenClient({client_id:gCid(),scope:GSC,callback:r=>{clearTimeout(t);if(r.error)return rej(new Error(r.error));GT.tok=r.access_token;GT.exp=Date.now()+(r.expires_in-60)*1000;res()},error_callback:()=>{clearTimeout(t);rej(new Error('no'))}}).requestAccessToken({prompt:'none'})}))}
-async function driveRestore(){if(!gOn())throw new Error('Not connected');const f=await gFind();if(!f)throw new Error('No backup found on Drive.');
+async function driveRestore(prev){if(!gOn())throw new Error('Not connected');const f=await gFind(prev?GPREV:GFILE);if(!f)throw new Error('No backup found on Drive.');
  const j=await(await gf('https://www.googleapis.com/drive/v3/files/'+f.id+'?alt=media')).json(),keep={gClient:DB.settings.gClient,gPass:DB.settings.gPass};let d;
  try{d=await dec(j,await derive(keep.gPass||'',ub(j.salt)))}catch{throw new Error('Wrong passphrase for this backup.')}
- DB=d;DB.settings=Object.assign(DB.settings||{},keep,{gLast:Date.now()});await save()}
-function gSched(){const s=typeof DB!=='undefined'&&DB&&DB.settings;if(!s||!s.gAuto||!gOn()||!KEY)return;clearTimeout(GT.tm);GT.tm=setTimeout(()=>driveBackup(true).catch(()=>{}),20000)}
+ UD.u=[];UD.r=[];DB=d;DB.settings=Object.assign(DB.settings||{},keep,{gLast:Date.now(),gSeen:prev?0:+new Date(f.modifiedTime)});await save()}
+function gSched(){const s=typeof DB!=='undefined'&&DB&&DB.settings;if(!s||!s.gAuto||!gOn()||!KEY)return;clearTimeout(GT.tm);GT.tm=setTimeout(()=>driveBackup(true).catch(e=>{if(e.message==='conflict'&&!GT.warned){GT.warned=1;toast('Drive has newer or more data. Open Settings > Google Drive to sync.')}}),20000)}
 if('serviceWorker'in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 navigator.storage?.persist?.();
 lockScreen();
