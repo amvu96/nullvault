@@ -178,9 +178,10 @@ details.je summary::-webkit-details-marker{display:none}
 .ch svg{width:100%;height:auto;display:block}.ch text{fill:var(--dim);font-size:10px;font-family:var(--m)}
 @media(min-width:900px){[data-v=jcal],[data-v=jstat]{max-width:900px}}
 @media(max-width:480px){.mtop{gap:6px}.mtop .ib{width:36px;height:36px}.mtop .t{min-width:0;overflow:hidden}}
+.dlg{padding-top:26px!important;width:min(420px,92vw)!important;border-radius:28px!important;max-height:86dvh}
 </style></head><body><div class="wrap" id="app"></div>
 <script>
-const VERSION='1.25';
+const VERSION='1.26';
 // Paste your Google OAuth Client ID here once (it is public, not a secret). Then users only press one button.
 const GCLIENT='671842605028-nbhekhointo25vi0jr9v7vldr6u1jh3t.apps.googleusercontent.com';
 const QS=new URLSearchParams(location.search);let GO=QS.get('go'),SHR=(QS.get('title')||QS.get('text')||QS.get('url'))?[QS.get('title'),QS.get('text'),QS.get('url')].filter(Boolean).join('\n'):null;
@@ -300,7 +301,7 @@ function vPerson(){
  app.querySelectorAll('[data-k]').forEach(i=>i.oninput=()=>{p[i.dataset.k]=i.value;touch()});
  app.querySelectorAll('[data-r]').forEach(i=>i.oninput=()=>{p[i.dataset.r]=+i.value;$('#v_'+i.dataset.r).textContent=i.value;touch()});
  app.querySelectorAll('[data-t]').forEach(c=>c.onclick=async()=>{const n=+c.dataset.t;if(n===p.tier)return;vib();
-  const why=prompt('Why did it change? (optional)')||'';p.history.push({t:Date.now(),from:p.tier,to:n,why});p.tier=n;await touch();vPerson()});
+  const why=await uiPrompt('Why did it change? (optional)')||'';p.history.push({t:Date.now(),from:p.tier,to:n,why});p.tier=n;await touch();vPerson()});
  app.querySelectorAll('[data-l]').forEach(c=>c.onclick=()=>{const l=c.dataset.l;p.love=p.love.includes(l)?p.love.filter(x=>x!==l):[...p.love,l];c.classList.toggle('on');touch()});
  const cmp=$('#cmp'),mv=e=>{const r=cmp.getBoundingClientRect();p.cx=Math.max(-100,Math.min(100,Math.round(((e.clientX-r.left)/r.width-.5)*200)));
   p.cy=Math.max(-100,Math.min(100,Math.round(-((e.clientY-r.top)/r.height-.5)*200)));const i=cmp.querySelector('i');i.style.left=50+p.cx/2+'%';i.style.top=50-p.cy/2+'%'};
@@ -308,12 +309,12 @@ function vPerson(){
  $('#back').onclick=()=>{view={n:'list'};render()};
  $('#ph').onclick=()=>$('#ph .av').classList.toggle('rev');$('#pick').onclick=()=>$('#pf').click();
  app.querySelectorAll('[data-c]').forEach(c=>c.onclick=()=>{const i=c.dataset.c;p.circles=p.circles.includes(i)?p.circles.filter(x=>x!==i):[...p.circles,i];c.classList.toggle('on');touch()});
- $('#newc').onclick=async()=>{const n=(prompt('Circle name')||'').trim();if(!n)return;const cs=circ();const c={id:uid(),name:n,color:CC[cs.length%CC.length]};cs.push(c);p.circles.push(c.id);await save();vPerson()};
+ $('#newc').onclick=async()=>{const n=(await uiPrompt('Circle name')||'').trim();if(!n)return;const cs=circ();const c={id:uid(),name:n,color:CC[cs.length%CC.length]};cs.push(c);p.circles.push(c.id);await save();vPerson()};
  app.querySelectorAll('[data-sc]').forEach(i=>i.oninput=()=>{p.soc=p.soc||{};p.soc[i.dataset.sc]=i.value;touch()});
  $('#tg').oninput=e=>{p.tags=e.target.value.split(',').map(x=>x.trim()).filter(Boolean);touch()};
- $('#pf').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{p.photo=await shrink(f);await touch();vPerson()}catch{alert('Could not read that image. Try a JPG or PNG.')}};
+ $('#pf').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{p.photo=await shrink(f);await touch();vPerson()}catch{await uiAlert('Could not read that image. Try a JPG or PNG.')}};
  const rm=$('#rmph');if(rm)rm.onclick=async()=>{delete p.photo;await touch();vPerson()};
- $('#del').onclick=async()=>{if(confirm('Delete this person permanently?')){DB.people=DB.people.filter(x=>x.id!==p.id);DB.links=(DB.links||[]).filter(l=>l.a!==p.id&&l.b!==p.id);(DB.journal||[]).forEach(j=>j.people=j.people.filter(x=>x!==p.id));await save();view={n:'list'};render()}};
+ $('#del').onclick=async()=>{if(await uiConfirm('Delete this person permanently?')){DB.people=DB.people.filter(x=>x.id!==p.id);DB.links=(DB.links||[]).filter(l=>l.a!==p.id&&l.b!==p.id);(DB.journal||[]).forEach(j=>j.people=j.people.filter(x=>x!==p.id));await save();view={n:'list'};render()}};
  $('#mend').onclick=()=>{view={n:'mend',id:p.id};render()};
 }
 function buildPrompt(p,problem){const s=DB.settings,name=s.alias?'Person X':(p.name||'them');
@@ -362,36 +363,36 @@ function vSettings(){
  $('#mode').value=s.mode;
  const sv=()=>{s.mode=$('#mode').value;s.apiKey=$('#key').value.trim();s.model=$('#model').value.trim();s.alias=$('#alias').checked;s.lockMin=+$('#lock').value||0;if($('#gcid'))s.gClient=$('#gcid').value.trim();s.gAuto=$('#gauto').checked;save()};
  app.querySelectorAll('input,select').forEach(i=>i.onchange=sv);
- $('#back').onclick=()=>{sv();view={n:'list'};render()};app.querySelectorAll('[data-rn]').forEach(b=>b.onclick=async()=>{const c=circ().find(x=>x.id===b.dataset.rn),n=(prompt('Rename circle',c.name)||'').trim();if(n){c.name=n;sv();await save();vSettings()}});
- app.querySelectorAll('[data-dc]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete this circle? People stay.'))return;const id=b.dataset.dc;DB.circles=circ().filter(c=>c.id!==id);DB.people.forEach(p=>p.circles=(p.circles||[]).filter(x=>x!==id));if(FC===id)FC=null;if(MF===id)MF=null;M.cs.delete(id);sv();await save();vSettings()});
+ $('#back').onclick=()=>{sv();view={n:'list'};render()};app.querySelectorAll('[data-rn]').forEach(b=>b.onclick=async()=>{const c=circ().find(x=>x.id===b.dataset.rn),n=(await uiPrompt('Rename circle',c.name)||'').trim();if(n){c.name=n;sv();await save();vSettings()}});
+ app.querySelectorAll('[data-dc]').forEach(b=>b.onclick=async()=>{if(!await uiConfirm('Delete this circle? People stay.'))return;const id=b.dataset.dc;DB.circles=circ().filter(c=>c.id!==id);DB.people.forEach(p=>p.circles=(p.circles||[]).filter(x=>x!==id));if(FC===id)FC=null;if(MF===id)MF=null;M.cs.delete(id);sv();await save();vSettings()});
  app.querySelectorAll('[data-lv]').forEach(x=>x.onchange=async()=>{circ().find(c=>c.id===x.dataset.lv).level=+x.value;sv();await save()});
- $('#addc').onclick=async()=>{const n=(prompt('Circle name')||'').trim();if(!n)return;const cs=circ();cs.push({id:uid(),name:n,color:CC[cs.length%CC.length]});sv();await save();vSettings()};
+ $('#addc').onclick=async()=>{const n=(await uiPrompt('Circle name')||'').trim();if(!n)return;const cs=circ();cs.push({id:uid(),name:n,color:CC[cs.length%CC.length]});sv();await save();vSettings()};
  const gst=()=>{$('#gst').textContent=(gOn()?'Connected':'Not connected')+' \u00b7 '+(s.gLast?'last backup '+new Date(s.gLast).toLocaleString():'no backup yet')},gm=t=>{$('#gst').textContent=t};gst();if(gCid())loadGIS().catch(()=>{});
  $('#gcon').onclick=async()=>{sv();try{await driveConnect();const f=await gFind();
-   if(f&&!s.gPass&&confirm('A backup was found in this Google Drive. Restore it now?')){const v=prompt('Enter the recovery key from your other device');if(v){s.gPass=v.trim();try{await driveRestore();vSettings();return}catch(e){s.gPass='';throw e}}}
+   if(f&&!s.gPass&&await uiConfirm('A backup was found in this Google Drive. Restore it now?')){const v=await askKey('Enter the recovery key from your other device');if(v){s.gPass=v.trim();try{await driveRestore();vSettings();return}catch(e){s.gPass='';throw e}}}
    if(!s.gPass){s.gPass=genKey();await save();showKey(s.gPass)}gst()}catch(e){gm(e.message)}};
- $('#gbk').onclick=async()=>{sv();try{if(!gOn())await driveConnect();if(!s.gPass){s.gPass=genKey();await save();showKey(s.gPass)}const f=await gFind();if(f&&!s.gLast&&!confirm('A backup from another device already exists. Overwrite it with this device\'s data?'))return;gm('Backing up\u2026');await driveBackup();gst()}catch(e){gm(e.message)}};
- $('#grs').onclick=async()=>{sv();const prev=s.gPass;try{if(!s.gPass){const v=prompt('Enter your recovery key');if(!v)return;s.gPass=v.trim()}if(!confirm('Replace ALL local data with the Drive backup?')){s.gPass=prev;return}if(!gOn())await driveConnect();gm('Restoring\u2026');await driveRestore();vSettings()}catch(e){s.gPass=prev;gm(e.message)}};
- $('#gkey').onclick=async()=>{if(s.gPass)showKey(s.gPass);else{const v=prompt('Enter the recovery key from your other device');if(v){s.gPass=v.trim();await save();gm('Recovery key saved.')}}};
+ $('#gbk').onclick=async()=>{sv();try{if(!gOn())await driveConnect();if(!s.gPass){s.gPass=genKey();await save();showKey(s.gPass)}const f=await gFind();if(f&&!s.gLast&&!await uiConfirm('A backup from another device already exists. Overwrite it with this device\'s data?'))return;gm('Backing up\u2026');await driveBackup();gst()}catch(e){gm(e.message)}};
+ $('#grs').onclick=async()=>{sv();const prev=s.gPass;try{if(!s.gPass){const v=await askKey('Enter your recovery key');if(!v)return;s.gPass=v.trim()}if(!await uiConfirm('Replace ALL local data with the Drive backup?')){s.gPass=prev;return}if(!gOn())await driveConnect();gm('Restoring\u2026');await driveRestore();vSettings()}catch(e){s.gPass=prev;gm(e.message)}};
+ $('#gkey').onclick=async()=>{if(s.gPass)showKey(s.gPass);else{const v=await askKey('Enter the recovery key from your other device');if(v){s.gPass=v.trim();await save();gm('Recovery key saved.')}}};
  $('#lockNow').onclick=()=>lockScreen();
  const bb=$('#bio'),setB=on=>{bb.textContent=on?'Disable fingerprint':'Enable fingerprint';bb.dataset.on=on?'1':''};bb.textContent='Fingerprint…';kvGet('bio').then(b=>setB(!!b));
  bb.onclick=async()=>{const m=$('#msg');try{if(bb.dataset.on){await kvSet('bio',null);setB(false);m.style.color='var(--fg)';m.textContent='Fingerprint unlock off.'}
   else{await bioEnable();setB(true);m.style.color='var(--fg)';m.textContent='Fingerprint unlock on. Your PIN still works.'}}
   catch(e){m.style.color='';
-  if(e.message==='prf'){if(confirm('This browser cannot tie your fingerprint to the encryption key (common when Bitwarden handles passkeys).\n\nUse convenience mode instead? A fingerprint or device-lock check will be required to open the app, but the key is kept on this device. It protects against someone using your unlocked phone, not against someone extracting the app data. Your PIN stays the strongest protection.')){
+  if(e.message==='prf'){if(await uiConfirm('This browser cannot tie your fingerprint to the encryption key (common when Bitwarden handles passkeys).\n\nUse convenience mode instead? A fingerprint or device-lock check will be required to open the app, but the key is kept on this device. It protects against someone using your unlocked phone, not against someone extracting the app data. Your PIN stays the strongest protection.')){
     try{await bioGate(e.cred);setB(true);m.style.color='var(--fg)';m.textContent='Fingerprint unlock on (convenience mode).'}catch(x){m.textContent=x.name==='NotAllowedError'?'Fingerprint setup cancelled.':'Could not set up fingerprint ('+(x.name||x.message)+').'}}
    else m.textContent='Secure mode needs a passkey provider that supports it. On Android, try Settings > Passwords > preferred service > Google Password Manager.'}
   else m.textContent=e.name==='NotAllowedError'?'Fingerprint setup cancelled.':'Fingerprint setup failed ('+(e.name||e.message)+').'}};
  const dl=(name,txt)=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt]));a.download=name;a.click()};
- $('#exp').onclick=async()=>{const pw=prompt('Backup password (separate from your PIN)');if(!pw)return;
+ $('#exp').onclick=async()=>{const pw=await uiPrompt('Backup password (separate from your PIN)','','password');if(!pw)return;
   const salt=crypto.getRandomValues(new Uint8Array(16)),k=await derive(pw,salt);dl('context-'+new Date().toISOString().slice(0,10)+'.context',JSON.stringify({v:1,salt:b64(salt),...await enc(DB,k)}))};
- $('#expj').onclick=()=>{if(confirm('This file is NOT encrypted. Continue?'))dl('context.json',JSON.stringify(DB,null,1))};
+ $('#expj').onclick=async()=>{if(await uiConfirm('This file is NOT encrypted. Continue?'))dl('context.json',JSON.stringify(DB,null,1))};
  $('#imp').onclick=()=>$('#file').click();
  $('#file').onchange=async e=>{try{const t=await e.target.files[0].text(),j=JSON.parse(t);
-  if(j.people){if(!confirm('Replace all data with this file?'))return;DB=j}
-  else{const pw=prompt('Backup password');DB=await dec(j,await derive(pw,ub(j.salt)))}
+  if(j.people){if(!await uiConfirm('Replace all data with this file?'))return;DB=j}
+  else{const pw=await uiPrompt('Backup password','','password');DB=await dec(j,await derive(pw,ub(j.salt)))}
   await save();$('#msg').style.color='var(--fg)';$('#msg').textContent='Imported '+DB.people.length+' people.'}catch{$('#msg').textContent='Could not read file or wrong password.'}};
- $('#chpin').onclick=async()=>{const p=prompt('New PIN (4+ digits)');if(!p||p.length<4)return;const salt=crypto.getRandomValues(new Uint8Array(16));
+ $('#chpin').onclick=async()=>{const p=await uiPrompt('New PIN (4+ digits)','','password');if(!p||p.length<4)return;const salt=crypto.getRandomValues(new Uint8Array(16));
   KEY=await derive(p,salt);await kvSet('meta',{salt:b64(salt)});await kvSet('bio',null);await save();$('#msg').style.color='var(--fg)';$('#msg').textContent='PIN changed. Re-enable fingerprint if you use it.';setB(false)};
 }
 /* ---------- relationship map ---------- */
@@ -490,7 +491,7 @@ function vMap(){
  sh.oninput=e=>{if(e.target.id==='en'){DB.links.find(x=>x.id===M.edge).note=e.target.value;save()}};
  const refresh=()=>{sheet();draw()};
  const addCircle=async(ids,cid)=>{const ps=ids.map(nm),all=ps.every(p=>(p.circles||[]).includes(cid));ps.forEach(p=>{p.circles=p.circles||[];if(all)p.circles=p.circles.filter(x=>x!==cid);else if(!p.circles.includes(cid))p.circles.push(cid)});await save()};
- const linkAll=async(ids,ty)=>{const pr=[];for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++)pr.push([ids[i],ids[j]]);if(pr.length>28&&!confirm('Create '+pr.length+' links?'))return;
+ const linkAll=async(ids,ty)=>{const pr=[];for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++)pr.push([ids[i],ids[j]]);if(pr.length>28&&!await uiConfirm('Create '+pr.length+' links?'))return;
   pr.forEach(([a,b])=>{const l=DB.links.find(x=>(x.a===a&&x.b===b)||(x.a===b&&x.b===a));if(l)l.type=ty;else DB.links.push({id:uid(),a,b,type:ty,note:''})});await save()};
  const align=(ids,ax)=>{const ps=ids.map(nm).sort((a,b)=>ax==='h'?a.gx-b.gx:a.gy-b.gy),n=ps.length,cx=ps.reduce((a,p)=>a+p.gx,0)/n,cy=ps.reduce((a,p)=>a+p.gy,0)/n;ps.forEach((p,i)=>{if(ax==='h'){p.gy=cy;p.gx=cx+(i-(n-1)/2)*95}else{p.gx=cx;p.gy=cy+(i-(n-1)/2)*95}});save()};
  const anim=fn=>{const o=people.map(p=>[p.gx,p.gy]);fn();const t=people.map(p=>[p.gx,p.gy]);let f=0;people.forEach((p,i)=>{p.gx=o[i][0];p.gy=o[i][1]});
@@ -528,12 +529,12 @@ function vMap(){
  $('#lyr').onclick=e=>layers(pos(e.currentTarget));
  DB.mapViews=DB.mapViews||[];
  const snapView=(name,id)=>({id:id||uid(),name,t:Date.now(),pos:Object.fromEntries(people.map(p=>[p.id,[Math.round(p.gx),Math.round(p.gy)]])),v:{x:V.x,y:V.y,k:V.k},o:{me:M.me,zones:M.zones,lbl:M.lbl,size:M.size,hide:[...M.hide],mf:MF,cs:[...M.cs],dim:M.dim,td:M.td}});
- const saveView=async()=>{const n=(prompt('Name this view')||'').trim();if(!n)return;const i=DB.mapViews.findIndex(v=>v.name.toLowerCase()===n.toLowerCase());
-  if(i>=0){if(!confirm('Replace the saved view "'+DB.mapViews[i].name+'"?'))return;DB.mapViews[i]=snapView(DB.mapViews[i].name,DB.mapViews[i].id);CV=DB.mapViews[i].id}else{const nv=snapView(n);DB.mapViews.push(nv);CV=nv.id}await save();toast('Saved view "'+n+'"')};
+ const saveView=async()=>{const n=(await uiPrompt('Name this view')||'').trim();if(!n)return;const i=DB.mapViews.findIndex(v=>v.name.toLowerCase()===n.toLowerCase());
+  if(i>=0){if(!await uiConfirm('Replace the saved view "'+DB.mapViews[i].name+'"?'))return;DB.mapViews[i]=snapView(DB.mapViews[i].name,DB.mapViews[i].id);CV=DB.mapViews[i].id}else{const nv=snapView(n);DB.mapViews.push(nv);CV=nv.id}await save();toast('Saved view "'+n+'"')};
  const updView=async v=>{const i=DB.mapViews.findIndex(x=>x.id===v.id);DB.mapViews[i]=snapView(v.name,v.id);CV=v.id;await save();toast('Updated "'+v.name+'"')};
  const loadView=v=>{CV=v.id;Object.assign(M,{me:v.o.me,zones:v.o.zones,lbl:v.o.lbl,size:v.o.size,hide:new Set(v.o.hide||[]),cs:new Set(v.o.cs||[]),dim:!!v.o.dim,td:!!v.o.td,ms:new Set(),sel:null,edge:null,pair:null,link:false,path:null,focus:null});MF=v.o.mf||null;V={...v.v};zs();ds3();startSpin();fil();sheet();
   anim(()=>{people.forEach(p=>{const q=v.pos[p.id];if(q){p.gx=q[0];p.gy=q[1]}})});toast('Loaded "'+v.name+'"')};
- const viewsMenu=p=>{const L=DB.mapViews,cur=L.find(v=>v.id===CV);showMenu(p,[{h:'Saved views'},{t:'Save current view\u2026',f:saveView},...(cur?[{t:'Update "'+cur.name+'"',f:()=>updView(cur)}]:[]),...(L.length?[{s:1},{h:'Load'},...L.map(v=>({t:v.name,f:()=>loadView(v)})),{s:1},{t:'Update a view\u2026',f:()=>showMenu(p,[{h:'Update which view?'},...L.map(v=>({t:v.name,f:()=>updView(v)}))])},{t:'Delete a view\u2026',f:()=>showMenu(p,[{h:'Delete which view?'},...L.map(v=>({t:v.name,f:async()=>{if(confirm('Delete "'+v.name+'"?')){DB.mapViews=DB.mapViews.filter(x=>x.id!==v.id);await save();toast('Deleted')}}}))])}]:[{h:'No saved views yet'}])])};
+ const viewsMenu=p=>{const L=DB.mapViews,cur=L.find(v=>v.id===CV);showMenu(p,[{h:'Saved views'},{t:'Save current view\u2026',f:saveView},...(cur?[{t:'Update "'+cur.name+'"',f:()=>updView(cur)}]:[]),...(L.length?[{s:1},{h:'Load'},...L.map(v=>({t:v.name,f:()=>loadView(v)})),{s:1},{t:'Update a view\u2026',f:()=>showMenu(p,[{h:'Update which view?'},...L.map(v=>({t:v.name,f:()=>updView(v)}))])},{t:'Delete a view\u2026',f:()=>showMenu(p,[{h:'Delete which view?'},...L.map(v=>({t:v.name,f:async()=>{if(await uiConfirm('Delete "'+v.name+'"?')){DB.mapViews=DB.mapViews.filter(x=>x.id!==v.id);await save();toast('Deleted')}}}))])}]:[{h:'No saved views yet'}])])};
  $('#vws').onclick=e=>viewsMenu(pos(e.currentTarget));
  $('#lay').onclick=e=>showMenu(pos(e.currentTarget),[{h:'Layout'},{t:'Arrange',k:'A',f:()=>anim(sim)},{t:'Group by circle',k:'G',f:()=>anim(groupLayout)},{t:'Fit to screen',k:'F',f:fit},{t:'Reset zoom',k:'0',f:()=>{V.k=1;draw()}}]);
  const zon=$('#zon'),zs=()=>{zon.style.color=M.zones?'var(--red)':'';zon.style.borderColor=M.zones?'var(--red)':''};zs();zon.onclick=()=>{M.zones=!M.zones;zs();draw()};
@@ -761,7 +762,7 @@ function vJournal(){DB.journal=DB.journal||[];
  app.querySelectorAll('.je').forEach(c=>c.onclick=()=>{vib();showEntry(c.dataset.id)});
  const sm=$('#jsum');if(sm)sm.onclick=()=>{const es=all.filter(e=>e.d>cut).reverse();if(!es.length){$('#jout').innerHTML='<p class="hint">No entries in the last 7 days.</p>';return}
   runAI(sumPrompt(es,'last 7 days'),$('#jout'),'Save as entry',async t=>{DB.journal.push({id:uid(),t:Date.now(),d:today(),title:'Weekly summary',body:t,mood:0,people:[],pin:false,ai:[]});await save();vJournal()})};
- const ex=$('#jex');if(ex)ex.onclick=()=>{if(!confirm('This file is NOT encrypted. Continue?'))return;const md=[...DB.journal].sort((a,b)=>a.d.localeCompare(b.d)).map(e=>`## ${e.d}${e.title?' \u2014 '+e.title:''}\nMood: ${e.mood||'-'}/5\n\n${e.body}`).join('\n\n---\n\n');
+ const ex=$('#jex');if(ex)ex.onclick=async()=>{if(!await uiConfirm('This file is NOT encrypted. Continue?'))return;const md=[...DB.journal].sort((a,b)=>a.d.localeCompare(b.d)).map(e=>`## ${e.d}${e.title?' \u2014 '+e.title:''}\nMood: ${e.mood||'-'}/5\n\n${e.body}`).join('\n\n---\n\n');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([md],{type:'text/markdown'}));a.download='context-journal.md';a.click()};
  if(matchMedia('(min-width:1000px)').matches){const sx=JSEL&&(DB.journal||[]).find(x=>x.id===JSEL);if(sx)showEntry(JSEL);else $('#jpane').innerHTML=emptyPane('Select an entry')}
 }
@@ -802,7 +803,7 @@ function vEntry(){const e=(DB.journal||[]).find(x=>x.id===view.id);if(!e){view={
  $('#ps').oninput=filt;selRow();
  let pi=Math.floor(Math.random()*PROMPTS.length);$('#pr').onclick=()=>{$('#pt').textContent=PROMPTS[pi++%PROMPTS.length]};
  $('#pin').onclick=async()=>{e.pin=!e.pin;await save();vEntry()};
- $('#del').onclick=async()=>{if(confirm('Delete this entry?')){DB.journal=DB.journal.filter(x=>x.id!==e.id);await save();view={n:'journal'};render()}};
+ $('#del').onclick=async()=>{if(await uiConfirm('Delete this entry?')){DB.journal=DB.journal.filter(x=>x.id!==e.id);await save();view={n:'journal'};render()}};
  $('#back').onclick=async()=>{clearTimeout(tm);snap(e);if(!e.title.trim()&&!e.body.trim()&&!e.ai.length)DB.journal=DB.journal.filter(x=>x.id!==e.id);await save();view={n:'journal'};render()};
  const ta=$('#jbody');
 const put=(t,a,b)=>{ta.focus();ta.setSelectionRange(a,b);if(!document.execCommand('insertText',false,t))ta.setRangeText(t,a,b,'end');ta.dispatchEvent(new Event('input'))};
@@ -832,10 +833,32 @@ document.body.insertAdjacentHTML('beforeend','<nav class="nav" id="nav" style="d
 document.getElementById('nav').onclick=async e=>{const b=e.target.closest('button');if(!b)return;vib();
  if(b.id==='add'){if(['journal','entry','jcal','jstat'].includes(view.n))return newEntry();const p=blank();DB.people.push(p);await save();view={n:'person',id:p.id};return render()}
  const k=b.dataset.nv;if(k==='p')view={n:'list'};else if(k==='c'){const n=new Date();CAL={y:n.getFullYear(),m:n.getMonth(),sel:n.getDate()};view={n:'cal'}}else if(k==='m')view={n:'map'};else if(k==='j'){JP=null;view={n:'journal'}}render()};
+/* ---------- in-app dialogs (replace alert / confirm / prompt) ---------- */
+function uiDialog(o){return new Promise(res=>{const m=document.createElement('div');m.className='modal';m.style.zIndex=100;m.style.alignItems='center';m.tabIndex=-1;
+ m.innerHTML=`<div class="mc dlg"><div style="font-size:15px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere">${o.html||esc(o.msg||'')}</div>${o.input?`<input id="dlgi" ${o.type?`type="${o.type}"`:''} ${o.type==='password'?'inputmode="text"':''} value="${esc(o.value||'')}" placeholder="${esc(o.ph||'')}" style="margin-top:14px" autocomplete="off">`:''}<div class="acts">${o.buttons.map((b,i)=>`<button class="btn ${b.r?'r':''}" data-i="${i}">${b.t}</button>`).join('')}</div></div>`;
+ document.body.appendChild(m);const inp=m.querySelector('#dlgi'),done=v=>{m.remove();res(v)},ok=o.buttons.find(b=>b.r)||o.buttons[0],cancel=o.buttons.find(b=>!b.r&&!b.keep),val=b=>b.v==='__input'?inp.value:b.v;
+ m.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{const bt=o.buttons[+b.dataset.i];if(bt.keep){if(bt.f)bt.f(m);return}done(val(bt))});
+ m.onclick=e=>{if(e.target===m&&cancel)done(val(cancel))};
+ m.onkeydown=e=>{if(e.key==='Enter'&&!e.target.closest('button')){e.preventDefault();done(val(ok))}else if(e.key==='Escape'){e.stopPropagation();done(cancel?val(cancel):val(ok))}};
+ (inp||m).focus();if(inp)inp.select()})}
+const uiAlert=msg=>uiDialog({msg,buttons:[{t:'OK',r:1,v:true}]});
+const uiConfirm=msg=>uiDialog({msg,buttons:[{t:'Cancel',v:false},{t:'OK',r:1,v:true}]});
+const uiPrompt=(msg,val,type)=>uiDialog({msg,input:1,value:val||'',type,buttons:[{t:'Cancel',v:null},{t:'OK',r:1,v:'__input'}]});
+const askKey=msg=>uiDialog({msg,input:1,ph:'XXXX-XXXX-XXXX-XXXX-XXXX',buttons:[{t:'Cancel',v:null},{t:'Scan QR',keep:1,f:async m=>{try{const r=await scanQR();if(r)m.querySelector('#dlgi').value=r.trim()}catch(e){toast(e.message)}}},{t:'OK',r:1,v:'__input'}]});
+const loadQR=()=>new Promise((res,rej)=>{if(window.qrcode)return res();const e=document.createElement('script');e.src='https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js';e.onload=res;e.onerror=()=>rej(new Error('Could not load the QR library. Are you offline?'));document.head.appendChild(e)});
+async function showQR(m,k){const box=m.querySelector('#qrbox');if(box.innerHTML){box.innerHTML='';return}box.innerHTML='<span class="hint">loading&hellip;</span>';
+ try{await loadQR();const q=qrcode(0,'M');q.addData(k);q.make();const n=q.getModuleCount();let d='';for(let r=0;r<n;r++)for(let c=0;c<n;c++)if(q.isDark(r,c))d+=`M${c+2} ${r+2}h1v1h-1z`;
+  box.innerHTML=`<div style="background:#fff;padding:10px;border-radius:14px;display:inline-block;line-height:0"><svg viewBox="0 0 ${n+4} ${n+4}" width="220" height="220" shape-rendering="crispEdges"><rect width="100%" height="100%" fill="#fff"/><path d="${d}" fill="#000"/></svg></div><div class="hint" style="margin-top:8px">Anyone who scans this can read your key. Hide it when you are done.</div>`}catch(e){box.innerHTML=`<span class="err">${esc(e.message)}</span>`}}
+async function scanQR(){if(!('BarcodeDetector' in window)||!navigator.mediaDevices)throw new Error('QR scanning is not supported in this browser. Type the key instead.');
+ const det=new BarcodeDetector({formats:['qr_code']});let stream;try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}})}catch{throw new Error('Camera access was denied.')}
+ return new Promise(async res=>{const m=document.createElement('div');m.className='modal';m.style.zIndex=110;m.style.alignItems='center';m.innerHTML='<div class="mc dlg"><div>Point the camera at the QR code</div><video playsinline muted style="width:100%;border-radius:16px;margin-top:12px;background:#000"></video><div class="acts"><button class="btn" id="qc">Cancel</button></div></div>';document.body.appendChild(m);
+  const v=m.querySelector('video');v.srcObject=stream;try{await v.play()}catch{}let on=true;const end=r=>{on=false;stream.getTracks().forEach(t=>t.stop());m.remove();res(r)};m.querySelector('#qc').onclick=()=>end(null);
+  const loop=async()=>{if(!on)return;try{const c=await det.detect(v);if(c.length)return end(c[0].rawValue)}catch{}setTimeout(loop,250)};loop()})}
+async function showKey(k){try{navigator.clipboard.writeText(k)}catch{}
+ return uiDialog({html:`<b>Your recovery key</b> (copied)<div style="font-size:17px;letter-spacing:.08em;margin:14px 0;padding:14px;border:1px solid var(--line);border-radius:14px;text-align:center;user-select:all">${esc(k)}</div><div class="hint">Save it in a password manager. You need it to restore on a new device, and it cannot be recovered if lost.</div><div id="qrbox" style="margin-top:14px;text-align:center"></div>`,buttons:[{t:'<i class="fa-solid fa-qrcode"></i> QR code',keep:1,f:m=>showQR(m,k)},{t:'Done',r:1,v:true}]})}
 /* ---------- google drive (encrypted backup in the private app folder) ---------- */
 const gCid=()=>(GCLIENT||(typeof DB!=='undefined'&&DB.settings.gClient)||'').trim();
 const genKey=()=>{const A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',r=crypto.getRandomValues(new Uint8Array(20));return[0,1,2,3,4].map(i=>[...r.slice(i*4,i*4+4)].map(x=>A[x%A.length]).join('')).join('-')};
-function showKey(k){try{navigator.clipboard.writeText(k)}catch{}alert('Your recovery key (copied):\n\n'+k+'\n\nSave it in a password manager. You need it to restore on a new device, and it cannot be recovered if lost.')}
 const GT={tok:null,exp:0,tm:null},GSC='https://www.googleapis.com/auth/drive.appdata',GFILE='context-backup.json',gOn=()=>!!GT.tok&&Date.now()<GT.exp;
 const loadGIS=()=>new Promise((res,rej)=>{if(window.google&&google.accounts)return res();const e=document.createElement('script');e.src='https://accounts.google.com/gsi/client';e.onload=res;e.onerror=()=>rej(new Error('Could not load Google sign-in. Are you offline?'));document.head.appendChild(e)});
 async function driveConnect(){const id=gCid();if(!id)throw new Error('Google sign-in is not set up in this copy of the app yet.');await loadGIS();
