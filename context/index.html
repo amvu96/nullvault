@@ -192,9 +192,12 @@ input.swt:checked{background:var(--red)}input.swt:checked::after{transform:trans
 @media(min-width:900px){[data-v=settings]{max-width:1100px}[data-v=trash]{max-width:780px}}
 .toast.u{top:auto;bottom:calc(96px + env(safe-area-inset-bottom))}
 .toast button{margin-left:14px;background:none;border:0;color:var(--red);font:inherit;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:4px}
+.acts{flex-wrap:wrap}
+.nrow{display:flex;align-items:center;gap:8px;padding:10px 0;border-top:1px solid var(--line)}.nrow:first-of-type{border-top:0}
+.nrow .n{flex:1;display:flex;gap:10px;align-items:center;min-width:0;cursor:pointer}.nrow small{display:block;color:var(--dim);font-size:11px}
 </style></head><body><div class="wrap" id="app"></div>
 <script>
-const VERSION='1.28';
+const VERSION='1.29';
 // Paste your Google OAuth Client ID here once (it is public, not a secret). Then users only press one button.
 const GCLIENT='671842605028-nbhekhointo25vi0jr9v7vldr6u1jh3t.apps.googleusercontent.com';
 const QS=new URLSearchParams(location.search);let GO=QS.get('go'),SHR=(QS.get('title')||QS.get('text')||QS.get('url'))?[QS.get('title'),QS.get('text'),QS.get('url')].filter(Boolean).join('\n'):null;
@@ -268,24 +271,28 @@ function trans(){const k=view.n+(view.id||'');if(k===PK)return;const d=DEPTH[vie
 function render(){if(lastEntry&&!(view.n==='entry'&&view.id===lastEntry)){const x=(DB.journal||[]).find(j=>j.id===lastEntry);if(x&&!x.title.trim()&&!x.body.trim()&&!(x.ai||[]).length){DB.journal=DB.journal.filter(j=>j!==x);save()}lastEntry=null}closeCard();closeMenu();if(MAPKD){document.removeEventListener('keydown',MAPKD);MAPKD=null}app.dataset.v=view.n;const f={list:vList,person:vPerson,settings:vSettings,mend:vMend,trash:vTrash,map:vMap,cal:vCal,journal:vJournal,entry:vEntry,jcal:vJcal,jstat:vJstat}[view.n];f();updateNav();trans();scrollTo(0,0)}
 function vList(){
  let L=DB.people.filter(p=>(p.name+p.nick+(p.tags||[]).join(' ')).toLowerCase().includes(q.toLowerCase())&&(!FC||(p.circles||[]).includes(FC)));
- const att=DB.people.filter(p=>Date.now()-p.touched>2592e6).length,bd=DB.people.filter(p=>{const d=bdayDays(p.bday);return d!==null&&d<=30}).length;
+ const att=DB.people.filter(isStale).length,bd=DB.people.filter(p=>{const d=bdayDays(p.bday);return d!==null&&d<=30}).length;
  if(sort==='recent')L.sort((a,b)=>b.touched-a.touched);
  if(sort==='trust')L.sort((a,b)=>a.tier-b.tier);
  if(sort==='bday')L.sort((a,b)=>(bdayDays(a.bday)??999)-(bdayDays(b.bday)??999));
  app.innerHTML=`<div class="lay"><div class="lcol"><div class="bar"><div class="logo">C</div><div class="t"><em>&gt;_</em> context <span>/ people</span></div>${undoBtn()}<button class="ib" id="st" aria-label="Settings"><i class="fa-solid fa-gear"></i></button><button class="ib" id="lk" aria-label="Lock"><i class="fa-solid fa-lock"></i></button></div>
  <div class="card"><div class="lab">${new Date().toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long'})}</div>
  <div class="hi">${att?att+' to check in on.':DB.people.length?'All quiet. Nice.':'Add your first person.'}</div>
- <div class="stats"><div class="stt"><b>${DB.people.length}</b><small>people</small></div><div class="stt"><b>${att}</b><small>stale</small></div><div class="stt"><b>${bd}</b><small>bdays / 30d</small></div></div></div>
+ <div class="stats"><div class="stt"><b>${DB.people.length}</b><small>people</small></div><div class="stt"><b>${att}</b><small>check in</small></div><div class="stt"><b>${bd}</b><small>bdays / 30d</small></div></div></div>
+ ${(()=>{const due=DB.people.filter(isStale).sort((a,b)=>lcOf(a)-lcOf(b));return due.length?`<div class="card nudge" style="margin-top:14px"><div class="lab">check in</div>${due.slice(0,3).map(p=>`<div class="nrow"><div class="n" data-id="${p.id}">${avatar(p,40)}<div><b style="font-weight:500">${esc(p.nick||p.name||'Unnamed')}</b><small>last talked ${lcOf(p)?ago(lcOf(p)):'never'}${p.every?' &middot; every '+p.every+'w':''}</small></div></div><button class="ib sm" data-tk="${p.id}" aria-label="I talked to them"><i class="fa-solid fa-check"></i></button><button class="ib sm" data-sz="${p.id}" aria-label="Remind me later"><i class="fa-regular fa-clock"></i></button></div>`).join('')}${due.length>3?`<div class="hint" style="margin-top:8px">+${due.length-3} more</div>`:''}</div>`:''})()}
  <input id="q" placeholder="search" value="${esc(q)}" style="margin-top:18px"><div class="chips scroll"><span class="chip ${!FC?'on':''}" data-f="">All</span>${circ().map(c=>`<span class="chip cc ${FC===c.id?'on':''}" style="--c:${c.color}" data-f="${c.id}">${esc(c.name)}</span>`).join('')}</div><h2 id="sorth" style="cursor:pointer">${{recent:'recent',trust:'lowest trust',bday:'birthdays soon'}[sort]}<span class="hint" style="margin-left:auto;text-transform:none;letter-spacing:0">tap to sort</span></h2>
  <div class="plist">${L.length?L.map(p=>{const d=bdayDays(p.bday);return`<div class="row" data-id="${p.id}">${avatar(p,64)}<div class="n"><b>${esc(p.name||'Unnamed')}</b>${pc(p).map(c=>`<i class="cdot" style="background:${c.color}"></i>`).join('')}
- <small>${TIERS[p.tier].toLowerCase()}${d!==null&&d<=30?' · birthday in '+d+'d':''}</small></div></div>`}).join(''):
+ <small>${TIERS[p.tier].toLowerCase()}${d!==null&&d<=30?' · birthday in '+d+'d':''}${lcOf(p)?' &middot; talked '+ago(lcOf(p)):''}${isStale(p)?' <i class="fa-solid fa-circle" style="color:var(--red);font-size:6px;vertical-align:middle"></i>':''}</small></div><button class="ib sm" data-tk="${p.id}" aria-label="I talked to ${esc(p.name)}"><i class="fa-solid fa-comment-dots"></i></button></div>`}).join(''):
  `<p class="hint" style="margin-top:40px">${DB.people.length?'No matches.':'No one here yet. Tap + to add the first person.'}</p>`}
  </div></div><aside class="pane" id="pane"></aside></div>
  `;
  $('#q').oninput=e=>{q=e.target.value;const p=e.target.selectionStart;vList();$('#q').focus();$('#q').setSelectionRange(p,p)};
  app.querySelectorAll('[data-s]').forEach(c=>c.onclick=()=>{sort=c.dataset.s;vList()});
  app.querySelectorAll('.row').forEach(r=>r.onclick=()=>{vib();showCard(r.dataset.id)});
- app.querySelectorAll('[data-f]').forEach(c=>c.onclick=()=>{FC=c.dataset.f||null;vList()});$('#lk').onclick=()=>lockScreen();$('#sorth').onclick=()=>{sort={recent:'trust',trust:'bday',bday:'recent'}[sort];vList()};$('#st').onclick=()=>{view={n:'settings'};render()};
+ app.querySelectorAll('[data-f]').forEach(c=>c.onclick=()=>{FC=c.dataset.f||null;vList()});
+ app.querySelectorAll('[data-tk]').forEach(b=>b.onclick=async e=>{e.stopPropagation();await talked(b.dataset.tk);vList()});
+ app.querySelectorAll('[data-sz]').forEach(b=>b.onclick=async e=>{e.stopPropagation();await snooze(b.dataset.sz);vList()});
+ app.querySelectorAll('.nrow .n').forEach(n=>n.onclick=()=>showCard(n.dataset.id));$('#lk').onclick=()=>lockScreen();$('#sorth').onclick=()=>{sort={recent:'trust',trust:'bday',bday:'recent'}[sort];vList()};$('#st').onclick=()=>{view={n:'settings'};render()};
   if(matchMedia('(min-width:1000px)').matches){if(SEL&&DB.people.some(p=>p.id===SEL))showCard(SEL);else $('#pane').innerHTML='<div class="empty"><div><div class="dots" style="color:var(--red)">&#9679; &#9679; &#9679;</div><p class="hint">Select a person</p></div></div>'}
 }
 function vPerson(){
@@ -301,6 +308,8 @@ function vPerson(){
  </section><section><h2>basics</h2>${T('name','Name')}${T('nick','Nickname')}${T('met','Where did we meet')}
  <label>When we met</label><input type="date" data-k="metWhen" value="${p.metWhen}">
  <label>Birthday${d!==null?' · in '+d+' days':''}</label><input type="date" data-k="bday" value="${p.bday}">${T('loc','Location')}${T('contact','Contact')}
+ </section><section><h2>stay in touch</h2><label>Keep in touch every</label><select data-ev>${[[0,'Off'],[1,'1 week'],[2,'2 weeks'],[3,'3 weeks'],[4,'4 weeks'],[6,'6 weeks'],[8,'2 months'],[13,'3 months']].map(([v,t])=>`<option value="${v}" ${(p.every||0)===v?'selected':''}>${t}</option>`).join('')}</select>
+ <label>Last talked</label><input type="date" id="lcd" value="${p.lastContact?dfmt(new Date(p.lastContact)):''}"><button class="btn" id="talk" style="margin-top:10px"><i class="fa-solid fa-comment-dots"></i> I talked today</button>
  </section><section><h2>circles &amp; tags</h2><div class="chips">${circ().map(c=>`<span class="chip cc ${p.circles.includes(c.id)?'on':''}" style="--c:${c.color}" data-c="${c.id}">${esc(c.name)}</span>`).join('')}<span class="chip" id="newc"><i class="fa-solid fa-plus"></i> circle</span></div>
  <label>Tags (comma separated)</label><input id="tg" value="${esc(p.tags.join(', '))}" placeholder="neighbor, chess, school">
  </section><section><h2>social links</h2>${SOC.map(([k,n,b,ic])=>`<label><i class="${ic}"></i> ${n}</label><input data-sc="${k}" value="${esc((p.soc||{})[k]||'')}" placeholder="${k==='wa'?'phone number':'@handle or link'}">`).join('')}
@@ -324,6 +333,9 @@ function vPerson(){
  app.querySelectorAll('[data-c]').forEach(c=>c.onclick=()=>{const i=c.dataset.c;p.circles=p.circles.includes(i)?p.circles.filter(x=>x!==i):[...p.circles,i];c.classList.toggle('on');touch()});
  $('#newc').onclick=async()=>{const n=(await uiPrompt('Circle name')||'').trim();if(!n)return;const cs=circ();const c={id:uid(),name:n,color:CC[cs.length%CC.length]};cs.push(c);p.circles.push(c.id);await save();vPerson()};
  app.querySelectorAll('[data-sc]').forEach(i=>i.oninput=()=>{p.soc=p.soc||{};p.soc[i.dataset.sc]=i.value;touch()});
+ app.querySelectorAll('[data-ev]').forEach(x=>x.onchange=()=>{p.every=+x.value;touch()});
+ $('#lcd').onchange=x=>{p.lastContact=x.target.value?new Date(x.target.value+'T12:00').getTime():0;touch()};
+ $('#talk').onclick=async()=>{await talked(p.id);vPerson()};
  $('#tg').oninput=e=>{p.tags=e.target.value.split(',').map(x=>x.trim()).filter(Boolean);touch()};
  $('#pf').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{p.photo=await shrink(f);await touch();vPerson()}catch{await uiAlert('Could not read that image. Try a JPG or PNG.')}};
  const rm=$('#rmph');if(rm)rm.onclick=async()=>{delete p.photo;await touch();vPerson()};
@@ -379,7 +391,7 @@ function vSettings(){
   ${circ().map(c=>`<div class="srow"><span style="color:${c.color};min-width:0;overflow:hidden;text-overflow:ellipsis">&#9679; ${esc(c.name)}</span><span class="sr"><select data-lv="${c.id}" class="mini">${[1,2,3].map(l=>`<option value="${l}" ${(c.level||1)===l?'selected':''}>L${l}</option>`).join('')}</select><button class="ib sm" data-rn="${c.id}" aria-label="Rename"><i class="fa-solid fa-pen"></i></button><button class="ib sm" data-dc="${c.id}" aria-label="Delete"><i class="fa-solid fa-trash"></i></button></span></div>`).join('')}
   <button class="btn sm" id="addc" style="margin-top:12px;width:100%"><i class="fa-solid fa-plus"></i> New circle</button></section>
  <section class="sc"><div class="sh"><span class="si"><i class="fa-solid fa-database"></i></span><div><b>Data</b><small>Backups, import and recycle bin</small></div></div>
-  <div class="bgrid"><button class="btn r sm" id="exp"><i class="fa-solid fa-lock"></i> Encrypted backup</button><button class="btn sm" id="expj"><i class="fa-solid fa-file-code"></i> Plain JSON</button><button class="btn sm" id="imp"><i class="fa-solid fa-file-import"></i> Import</button></div>
+  <div class="bgrid"><button class="btn r sm" id="exp"><i class="fa-solid fa-lock"></i> Encrypted backup</button><button class="btn sm" id="expj"><i class="fa-solid fa-file-code"></i> Plain JSON</button><button class="btn sm" id="imp"><i class="fa-solid fa-file-import"></i> Import</button><button class="btn sm" id="ics"><i class="fa-solid fa-calendar-plus"></i> Calendar file</button></div>
   <div class="srow" id="tr" style="cursor:pointer;margin-top:12px"><span><i class="fa-solid fa-trash-can" style="color:var(--dim)"></i> Recycle bin</span><span class="hint">${(DB.trash||[]).length} items <i class="fa-solid fa-chevron-right" style="font-size:10px"></i></span></div>
   <input type="file" id="file" hidden><div class="err" id="msg"></div></section>
  <section class="sc"><div class="sh"><span class="si"><i class="fa-solid fa-circle-info"></i></span><div><b>About</b><small>Context v${VERSION}</small></div></div>
@@ -399,7 +411,7 @@ function vSettings(){
  $('#gbk').onclick=async()=>{sv();try{if(!gOn())await driveConnect();if(!s.gPass){s.gPass=genKey();await save();showKey(s.gPass)}gm('Backing up\u2026');const r=await driveBackup();if(r==='restored'){vSettings();return}gst()}catch(e){gm(e.message)}};
  $('#grs').onclick=async()=>{sv();const prev=s.gPass;try{if(!s.gPass){const v=await askKey('Enter your recovery key');if(!v)return;s.gPass=v.trim()}if(!await uiConfirm('Replace ALL local data with the Drive backup?')){s.gPass=prev;return}if(!gOn())await driveConnect();gm('Restoring\u2026');let w='latest';const pv=await gFind(GPREV);if(pv){w=await uiDialog({msg:'Which Drive backup should be restored?',buttons:[{t:'Cancel',v:null},{t:'Previous',v:'prev'},{t:'Latest',r:1,v:'latest'}]});if(!w){s.gPass=prev;return}}await driveRestore(w==='prev');vSettings()}catch(e){s.gPass=prev;gm(e.message)}};
  $('#gkey').onclick=async()=>{if(s.gPass)showKey(s.gPass);else{const v=await askKey('Enter the recovery key from your other device');if(v){s.gPass=v.trim();await save();gm('Recovery key saved.')}}};
- $('#tr').onclick=()=>{sv();view={n:'trash'};render()};
+ $('#ics').onclick=exportICS;$('#tr').onclick=()=>{sv();view={n:'trash'};render()};
  $('#lockNow').onclick=()=>lockScreen();
  const bb=$('#bio'),setB=on=>{bb.textContent=on?'Disable fingerprint':'Enable fingerprint';bb.dataset.on=on?'1':''};bb.textContent='Fingerprint…';kvGet('bio').then(b=>setB(!!b));
  bb.onclick=async()=>{const m=$('#msg');try{if(bb.dataset.on){await kvSet('bio',null);setB(false);m.style.color='var(--fg)';m.textContent='Fingerprint unlock off.'}
@@ -625,13 +637,13 @@ function showCard(id){const p=DB.people.find(x=>x.id===id);if(!p)return;closeCar
  ${kv('Met',[p.met,p.metWhen&&new Date(p.metWhen+'T00:00').toLocaleDateString(undefined,{month:'short',year:'numeric'})].filter(Boolean).join(' · '))}
  ${kv('Location',p.loc)}${kv('Contact',p.contact)}${socRow(p)}${kv('Responds to',p.best)}${kv('Hates',p.hates)}
  ${mb('Empathy',p.empathy)}${mb('Reliability',p.reliab)}${mb('Trust',p.trust)}
- ${(DB.journal||[]).filter(j=>j.people.includes(id)).length?`<div class="kv" data-j="1" style="cursor:pointer"><span>Journal</span><span>${(DB.journal||[]).filter(j=>j.people.includes(id)).length} entries <i class="fa-solid fa-chevron-right" style="font-size:10px"></i></span></div>`:''}${(DB.journal||[]).filter(j=>j.people.includes(id)&&j.mood).length>1?`<div class="kv" data-jm="1" style="cursor:pointer"><span>Mood with them</span><span>see chart <i class="fa-solid fa-chevron-right" style="font-size:10px"></i></span></div>`:''}${kv('Last change',h?TIERS[h.from].toLowerCase()+' → '+TIERS[h.to].toLowerCase()+(h.why?' · '+h.why:''):'')}${LK.length?`<h2 style="margin-top:22px">links</h2>${LK.map(k=>`<div class="kv" data-o="${k.o.id}" style="cursor:pointer"><span style="color:${k.t[2]}">${k.ph}</span><span>${esc(k.o.name||'Unnamed')} <i class="fa-solid fa-chevron-right" style="font-size:10px"></i>${k.l.note?`<br><small style="color:var(--dim)">${esc(k.l.note)}</small>`:''}</span></div>`).join('')}<button class="btn" id="cmap" style="margin-top:12px">Show on map</button>`:''}
+ ${(DB.journal||[]).filter(j=>j.people.includes(id)).length?`<div class="kv" data-j="1" style="cursor:pointer"><span>Journal</span><span>${(DB.journal||[]).filter(j=>j.people.includes(id)).length} entries <i class="fa-solid fa-chevron-right" style="font-size:10px"></i></span></div>`:''}${(DB.journal||[]).filter(j=>j.people.includes(id)&&j.mood).length>1?`<div class="kv" data-jm="1" style="cursor:pointer"><span>Mood with them</span><span>see chart <i class="fa-solid fa-chevron-right" style="font-size:10px"></i></span></div>`:''}${kv('Last talked',lcOf(p)?ago(lcOf(p)):'Never')}${p.every?kv('Keep in touch','every '+p.every+' week'+(p.every>1?'s':'')+(isStale(p)?' (overdue)':'')):''}${kv('Last change',h?TIERS[h.from].toLowerCase()+' → '+TIERS[h.to].toLowerCase()+(h.why?' · '+h.why:''):'')}${LK.length?`<h2 style="margin-top:22px">links</h2>${LK.map(k=>`<div class="kv" data-o="${k.o.id}" style="cursor:pointer"><span style="color:${k.t[2]}">${k.ph}</span><span>${esc(k.o.name||'Unnamed')} <i class="fa-solid fa-chevron-right" style="font-size:10px"></i>${k.l.note?`<br><small style="color:var(--dim)">${esc(k.l.note)}</small>`:''}</span></div>`).join('')}<button class="btn" id="cmap" style="margin-top:12px">Show on map</button>`:''}
  ${p.notes?`<div class="kv" style="display:block"><span style="color:var(--dim)">Notes</span><div style="margin-top:6px;white-space:pre-wrap">${esc(p.notes.length>240?p.notes.slice(0,240)+'…':p.notes)}</div></div>`:''}
- </div><div class="acts"><button class="btn" id="ced">Edit</button><button class="btn r" id="cai">Ask AI</button></div></div></div>`;
+ </div><div class="acts"><button class="btn" id="ctk" style="flex:1 1 100%"><i class="fa-solid fa-comment-dots"></i> I talked to ${esc(p.nick||p.name||'them')}</button><button class="btn" id="ced">Edit</button><button class="btn r" id="cai">Ask AI</button></div></div></div>`;
  if(!split){document.body.appendChild(m);m.onclick=e=>{if(e.target===m)closeCard()}}else{SEL=id;document.querySelectorAll('.row').forEach(r=>r.classList.toggle('sel',r.dataset.id===id))}
  root.querySelector('#cx').onclick=closeCard;
  root.querySelectorAll('[data-o]').forEach(r=>r.onclick=()=>showCard(r.dataset.o));const jm=root.querySelector('[data-jm]');if(jm)jm.onclick=()=>{JS.stat='person';JS.person=id;view={n:'jstat'};render()};const jj=root.querySelector('[data-j]');if(jj)jj.onclick=()=>{JP=id;view={n:'journal'};render()};const cm=root.querySelector('#cmap');if(cm)cm.onclick=()=>{focusId=id;view={n:'map'};render()};
- root.querySelector('#ced').onclick=()=>{view={n:'person',id};render()};
+ root.querySelector('#ctk').onclick=async()=>{await talked(id);showCard(id);if(view.n==='list')vList()};root.querySelector('#ced').onclick=()=>{view={n:'person',id};render()};
  root.querySelector('#cai').onclick=()=>{view={n:'mend',id};render()}}
 /* ---------- birthday calendar ---------- */
 let CAL={y:new Date().getFullYear(),m:new Date().getMonth(),sel:null};
@@ -643,9 +655,9 @@ function vCal(){
  app.innerHTML=`<div class="lay"><div class="lcol"><div class="bar"><div class="logo">C</div><div class="t"><em>&gt;_</em> context <span>/ birthdays</span></div>${topr()}</div>
  <div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><button class="ib" id="pv"><i class="fa-solid fa-chevron-left"></i></button><div class="lab">${first.toLocaleDateString(undefined,{month:'long',year:'numeric'})}</div><button class="ib" id="nx"><i class="fa-solid fa-chevron-right"></i></button></div>
  <div class="cal">${'MTWTFSS'.split('').map(c=>`<small>${c}</small>`).join('')}${'<i></i>'.repeat(pad)}${cells}</div></div>
- <h2>${CAL.sel?new Date(y,m,CAL.sel).toLocaleDateString(undefined,{day:'numeric',month:'long'}):'this month'}</h2>
+ <button class="btn sm" id="ics" style="margin-top:14px"><i class="fa-solid fa-calendar-plus"></i> Add birthdays to my calendar</button><h2>${CAL.sel?new Date(y,m,CAL.sel).toLocaleDateString(undefined,{day:'numeric',month:'long'}):'this month'}</h2>
  ${days.length?days.map(p=>{const b=new Date(p.bday+'T00:00'),age=y-b.getFullYear();return`<div class="row" data-id="${p.id}">${avatar(p,64)}<div class="n"><b>${esc(p.name||'Unnamed')}</b><small>${age>0?'turns '+age+' · ':''}${b.toLocaleDateString(undefined,{day:'numeric',month:'short'})}</small></div></div>`}).join(''):'<p class="hint">No birthdays here.</p>'}</div><aside class="pane" id="cpane"></aside></div>`;
- wireTop();
+ wireTop();$('#ics').onclick=exportICS;
  const go=n=>{CAL.m+=n;if(CAL.m<0){CAL.m=11;CAL.y--}if(CAL.m>11){CAL.m=0;CAL.y++}CAL.sel=null;vCal()};$('#pv').onclick=()=>go(-1);$('#nx').onclick=()=>go(1);
  app.querySelectorAll('[data-d]').forEach(c=>c.onclick=()=>{CAL.sel=CAL.sel===+c.dataset.d?null:+c.dataset.d;vCal()});
  app.querySelectorAll('.row').forEach(r=>r.onclick=()=>showCard(r.dataset.id));
@@ -681,6 +693,23 @@ async function runAI(pr,out,lab,onSave){const s=DB.settings;
  try{const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${s.model}:generateContent`,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':s.apiKey},body:JSON.stringify({contents:[{parts:[{text:pr}]}]})});
   const j=await r.json();if(!r.ok)throw new Error(j.error?.message||r.status);const t=j.candidates[0].content.parts.map(x=>x.text).join('');
   out.innerHTML=`<pre>${esc(t)}</pre><button class="btn r" id="sv">${lab}</button>`;out.querySelector('#sv').onclick=()=>onSave(t)}catch(e){out.innerHTML=`<p class="err">${esc(e.message)}</p>`}}
+/* ---------- contact tracking, nudges, calendar file ---------- */
+const DAY=864e5,lcOf=p=>p.lastContact||p.touched||0;
+const isStale=p=>Date.now()-lcOf(p)>(p.every?p.every*7:30)*DAY&&(p.snooze||0)<Date.now();
+const ago=t=>{const d=Math.floor((Date.now()-t)/DAY);return d<1?'today':d===1?'yesterday':d<30?d+'d ago':d<365?Math.floor(d/30)+'mo ago':Math.floor(d/365)+'y ago'};
+async function talked(id){const p=DB.people.find(x=>x.id===id);if(!p)return;const n=p.nick||p.name||'them';ud('Talked to '+n,['people'],null,true);p.lastContact=Date.now();p.snooze=0;await save();toast('Logged: talked to '+n,{label:'Undo',f:udUndo})}
+async function snooze(id){const p=DB.people.find(x=>x.id===id);if(!p)return;ud('Snoozed',['people'],null,true);p.snooze=Date.now()+3*DAY;await save();toast('Reminder snoozed for 3 days',{label:'Undo',f:udUndo})}
+const icsDate=d=>d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'),icsEsc=t=>String(t).replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\n/g,'\\n');
+const fold=l=>{let o='';while(l.length>73){o+=l.slice(0,73)+'\r\n ';l=l.slice(73)}return o+l};
+async function exportICS(){const w=await uiDialog({msg:'This calendar file is NOT encrypted. It will contain names and birthdays.\n\nWhat should it include?',buttons:[{t:'Cancel',v:null},{t:'With check-ins',v:'all'},{t:'Birthdays',r:1,v:'b'}]});if(!w)return;
+ const now=new Date(),t0=new Date(now.getFullYear(),now.getMonth(),now.getDate()),stamp=now.toISOString().replace(/[-:]/g,'').replace(/\.\d+/,''),L=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Context//Relationship tracker//EN','CALSCALE:GREGORIAN','X-WR-CALNAME:Context'];let n=0;
+ const ev=(uid,date,sum,rule,alarms)=>{L.push('BEGIN:VEVENT','UID:'+uid+'@context.app','DTSTAMP:'+stamp,'DTSTART;VALUE=DATE:'+icsDate(date),'RRULE:'+rule,fold('SUMMARY:'+icsEsc(sum)),'TRANSP:TRANSPARENT');alarms.forEach(a=>L.push('BEGIN:VALARM','ACTION:DISPLAY',fold('DESCRIPTION:'+icsEsc(sum)),'TRIGGER:'+a,'END:VALARM'));L.push('END:VEVENT');n++};
+ DB.people.forEach(p=>{if(!p.bday)return;const b=new Date(p.bday+'T00:00'),d=new Date(now.getFullYear(),b.getMonth(),b.getDate());if(d<t0)d.setFullYear(d.getFullYear()+1);ev('bday-'+p.id,d,(p.nick||p.name||'Someone')+"'s birthday",'FREQ=YEARLY',['-P1D','PT9H'])});
+ if(w==='all')DB.people.forEach(p=>{if(!p.every)return;const due=new Date(lcOf(p)+p.every*7*DAY);ev('checkin-'+p.id,due<t0?new Date(t0.getTime()+DAY):due,'Check in with '+(p.nick||p.name||'them'),'FREQ=WEEKLY;INTERVAL='+p.every,['PT9H'])});
+ if(!n){toast('Nothing to export yet. Add birthdays first.');return}L.push('END:VCALENDAR');
+ const file=new File([L.join('\r\n')+'\r\n'],'context-calendar.ics',{type:'text/calendar'});
+ if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:'Context calendar'});return}catch(e){if(e.name==='AbortError')return}}
+ const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=file.name;a.click()}
 /* ---------- undo / redo (in memory, cleared on lock) ---------- */
 const UD={u:[],r:[]};
 const clP=p=>({...p,love:[...(p.love||[])],circles:[...(p.circles||[])],tags:[...(p.tags||[])],history:(p.history||[]).map(h=>({...h})),soc:{...(p.soc||{})}});
